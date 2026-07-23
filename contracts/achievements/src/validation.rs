@@ -4,16 +4,14 @@ use crate::types::LeaderboardType;
 
 /// Validate achievement type (1-13)
 pub fn validate_achievement_type(achievement_type: u32) -> Result<(), ContractError> {
-    if achievement_type < 1 || achievement_type > 13 {
+    if !(1..=13).contains(&achievement_type) {
         return Err(ContractError::InvalidAchievementType);
     }
     Ok(())
 }
 
 /// Validate leaderboard type
-pub fn validate_leaderboard_type(
-    leaderboard_type: u32,
-) -> Result<LeaderboardType, ContractError> {
+pub fn validate_leaderboard_type(leaderboard_type: u32) -> Result<LeaderboardType, ContractError> {
     match leaderboard_type {
         1 => Ok(LeaderboardType::Points),
         2 => Ok(LeaderboardType::Contributions),
