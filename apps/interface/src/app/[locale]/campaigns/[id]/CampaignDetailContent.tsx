@@ -17,6 +17,7 @@ import { SimilarCampaigns } from "@/components/ui/SimilarCampaigns";
 import { VideoPlayer } from "@/components/ui/VideoPlayer";
 import { FAQAccordion } from "@/components/ui/FAQAccordion";
 import { TeamMemberCard } from "@/components/ui/TeamMemberCard";
+import { TeamManagement } from "@/components/campaign/TeamManagement";
 import { TrustSignals } from "@/components/ui/TrustSignals";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
 import { Confetti } from "@/components/ui/Confetti";
@@ -283,6 +284,17 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
           onOptimisticContribute={applyOptimisticContribution}
           onRollbackOptimistic={rollbackOptimistic}
         />
+
+        {/* Team Management (RBAC) — visible once a wallet is connected */}
+        {address && (
+          <div className="space-y-3" data-testid="team-management-section">
+            <h2 className="text-lg font-semibold">Manage Team</h2>
+            <TeamManagement
+              campaignId={contractId}
+              currentUserAddress={address}
+            />
+          </div>
+        )}
 
         {/* Trust Signals */}
         {(() => {
