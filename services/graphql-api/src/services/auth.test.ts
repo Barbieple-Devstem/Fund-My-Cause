@@ -3,7 +3,8 @@ import jwt from "jsonwebtoken";
 import { AuthService } from "./auth.js";
 
 describe("AuthService", () => {
-  const secret = "test-secret-key";
+  // Use a valid 32+ character secret for testing
+  const secret = "test-secret-key-32-chars-minimum!";
   let auth: AuthService;
 
   beforeEach(() => {
@@ -30,7 +31,8 @@ describe("AuthService", () => {
 
     it("rejects a token verified against a different secret", () => {
       const token = auth.generateToken("GADDRESS123");
-      const otherAuth = new AuthService("a-completely-different-secret", "24h");
+      // Use another valid 32+ character secret
+      const otherAuth = new AuthService("a-completely-different-secret-32c", "24h");
 
       expect(otherAuth.verifyToken(token)).toBeNull();
     });
@@ -53,27 +55,29 @@ describe("AuthService", () => {
     });
   });
 
-  describe("constructor defaults", () => {
-    const originalSecret = process.env.JWT_SECRET;
-
-    afterEach(() => {
-      if (originalSecret === undefined) {
-        delete process.env.JWT_SECRET;
-      } else {
-        process.env.JWT_SECRET = originalSecret;
-      }
+  describe("constructor validation", () => {
+    it("throws error when JWT_SECRET is too short (less than 32 characters)", () => {
+      expect(() => {
+        new AuthService("short-secret");
+      }).toThrow(/32 characters/);
     });
 
-    it("currently falls back to a hardcoded default secret when JWT_SECRET is unset (tracked by issue #10 — should throw instead)", () => {
-      delete process.env.JWT_SECRET;
-      const insecureAuth = new AuthService();
-      const token = insecureAuth.generateToken("GADDRESS123");
+    it("throws error when JWT_SECRET is undefined", () => {
+      expect(() => {
+        new AuthService(undefined as any);
+      }).toThrow(/JWT_SECRET/);
+    });
 
-      // Documents the present (insecure) behavior: a token signed under the
-      // fallback secret verifies against another instance that has no secret
-      // configured either, since both silently agree on "your-secret-key".
-      const anotherInsecureAuth = new AuthService();
-      expect(anotherInsecureAuth.verifyToken(token)).not.toBeNull();
+    it("throws error when JWT_SECRET is empty", () => {
+      expect(() => {
+        new AuthService("");
+      }).toThrow(/JWT_SECRET/);
+    });
+
+    it("accepts valid JWT_SECRET (32+ characters)", () => {
+      expect(() => {
+        new AuthService("valid-secret-32-characters-long!");
+      }).not.toThrow();
     });
   });
 
@@ -99,7 +103,8 @@ describe("AuthService", () => {
   describe("decodeToken", () => {
     it("decodes token payload without verifying the signature", () => {
       const token = auth.generateToken("GADDRESS123");
-      const otherAuth = new AuthService("different-secret", "24h");
+      // Use another valid 32+ character secret
+      const otherAuth = new AuthService("different-secret-32-chars-minimum", "24h");
       const decoded = otherAuth.decodeToken(token);
 
       expect(decoded.address).toBe("GADDRESS123");
