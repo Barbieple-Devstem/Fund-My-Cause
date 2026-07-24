@@ -22,7 +22,30 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 const RPC_URL = process.env.RPC_URL || "https://soroban-testnet.stellar.org";
 const CONTRACT_NETWORK = process.env.CONTRACT_NETWORK || "testnet";
 const REGISTRY_CONTRACT_ID = process.env.REGISTRY_CONTRACT_ID || "";
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+const JWT_SECRET = process.env.JWT_SECRET;
+
+// Validate JWT_SECRET at startup
+if (!JWT_SECRET || JWT_SECRET.trim() === "") {
+  console.error("FATAL: JWT_SECRET environment variable is required and must not be empty");
+  process.exit(1);
+}
+
+const knownDefaults = [
+  "your-secret-key",
+  "your-secret-key-change-in-production",
+  "dev-secret-key-change-in-production",
+];
+
+// Check for known defaults before length check
+if (knownDefaults.includes(JWT_SECRET)) {
+  console.error("FATAL: JWT_SECRET appears to be a default/example value and must be changed");
+  process.exit(1);
+}
+
+if (JWT_SECRET.length < 32) {
+  console.error("FATAL: JWT_SECRET must be at least 32 characters for secure operation");
+  process.exit(1);
+}
 
 /**
  * Initialize and start the GraphQL server
