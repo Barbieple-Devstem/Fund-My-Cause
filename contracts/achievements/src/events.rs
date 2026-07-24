@@ -1,4 +1,5 @@
 /// Event types and handlers for the achievements contract
+use soroban_sdk::String;
 
 /// Achievement unlocked event
 pub struct AchievementUnlockedEvent {

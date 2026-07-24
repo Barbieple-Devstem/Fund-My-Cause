@@ -30,13 +30,19 @@ jobs:
       
       - name: Build registry contract
         run: cargo build --release --target wasm32-unknown-unknown --manifest-path contracts/registry/Cargo.toml
-      
+
+      - name: Build achievements contract
+        run: cargo build --release --target wasm32-unknown-unknown --manifest-path contracts/achievements/Cargo.toml
+
       - name: Run contract tests
         run: cargo test --workspace --manifest-path contracts/crowdfund/Cargo.toml
-      
+
       - name: Run registry tests
         run: cargo test --workspace --manifest-path contracts/registry/Cargo.toml
-      
+
+      - name: Run achievements tests
+        run: cargo test --workspace --manifest-path contracts/achievements/Cargo.toml
+
       - name: Run fuzz tests (property-based)
         run: cargo test --test fuzz_tests --manifest-path contracts/crowdfund/Cargo.toml -- --nocapture
       
@@ -48,6 +54,12 @@ jobs:
       
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --manifest-path contracts/crowdfund/Cargo.toml -- -D warnings
-      
+
       - name: Check formatting
         run: cargo fmt --all --check --manifest-path contracts/crowdfund/Cargo.toml
+
+      - name: Run achievements clippy
+        run: cargo clippy --workspace --all-targets --manifest-path contracts/achievements/Cargo.toml -- -D warnings
+
+      - name: Check achievements formatting
+        run: cargo fmt --all --check --manifest-path contracts/achievements/Cargo.toml
