@@ -266,9 +266,10 @@ pub(crate) fn clone_campaign(
     env.events().publish(
         ("campaign", "cloned"),
         EventCampaignCloned {
-            creator,
-            goal,
-            deadline,
+            original_creator: creator.clone(),
+            new_creator: creator,
+            new_goal: goal,
+            new_deadline: deadline,
         },
     );
 
@@ -295,12 +296,17 @@ pub(crate) fn cancel_campaign(env: Env) -> Result<(), ContractError> {
     let creator: Address = inst.get(&KEY_CREATOR).ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
 
+    let total_raised: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
+
     inst.set(&KEY_STATUS, &Status::Cancelled);
     inst.extend_ttl(17280, 518400);
 
     env.events().publish(
         ("campaign", "cancelled"),
-        EventCancelled { creator },
+        EventCancelled {
+            creator,
+            total_raised,
+        },
     );
 
     Ok(())
@@ -319,6 +325,7 @@ pub(crate) fn archive(env: Env) -> Result<(), ContractError> {
     creator.require_auth();
 
     let archived_at = env.ledger().timestamp();
+    let total_raised: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
     inst.set(&KEY_ARCHIVED, &archived_at);
     inst.extend_ttl(17280, 518400);
 
@@ -326,6 +333,7 @@ pub(crate) fn archive(env: Env) -> Result<(), ContractError> {
         ("campaign", "archived"),
         EventArchived {
             creator,
+            total_raised,
             timestamp: archived_at,
         },
     );

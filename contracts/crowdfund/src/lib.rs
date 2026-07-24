@@ -36,6 +36,21 @@
 //! - **Instance storage** — campaign-wide state (status, goal, deadline, totals).
 //! - **Persistent storage** — per-contributor data (balances, plans, flags).
 //!
+//! ### Initialization invariant (why some `inst.get(&KEY_*).unwrap()` reads are safe)
+//!
+//! The core campaign keys — `KEY_CREATOR`, `KEY_STATUS`, `KEY_GOAL`, `KEY_DEADLINE`,
+//! `KEY_TOKEN`, `KEY_MIN`, `KEY_ADMIN`, `KEY_TOTAL` and friends — are written exactly
+//! once by [`initialize`](CrowdfundContract::initialize) and are **never removed**
+//! afterwards. Every externally-callable entry point can only run against an
+//! already-initialized contract, so reading these keys back is infallible by
+//! construction. Such reads use `unwrap()` deliberately; they are the "genuinely
+//! infallible" bucket from the unwrap-audit (issue #835) and are documented here in one
+//! place rather than annotated at each of the ~120 identical call sites.
+//!
+//! By contrast, reads whose absence is *reachable* — collection indexing on
+//! caller-supplied lengths, optional configuration, or values that may legitimately be
+//! unset — return a typed [`ContractError`] via `ok_or(..)?` and never panic.
+//!
 //! ## Error Handling
 //!
 //! All mutating functions return `Result<_, ContractError>`. See [`errors::ContractError`]
@@ -93,6 +108,10 @@ pub use storage::{
     KEY_RELEASED,
     // #696 Pause timelock
     KEY_PAUSE_TIMELOCK, KEY_UNPAUSE_AFTER,
+    // #704 Withdrawal streaming
+    KEY_STREAM,
+    // DeFi yield
+    KEY_YIELD_CONFIG, KEY_YIELD_TOTAL,
 };
 pub use types::{
     CampaignAnalytics,
@@ -181,6 +200,7 @@ pub use types::{
     MatchingConfig,
     // Issue #423
     MetadataVersion,
+    Milestone,
     MilestoneStatus,
     PlatformConfig,
     RateLimit,
@@ -238,6 +258,11 @@ pub use types::{
     EventAllowlistRemoved,
     EventDenylisted,
     EventDenylistRemoved,
+    // #703 Event schema versioning
+    EVENT_SCHEMA_VERSION,
+    // #704 Withdrawal streaming
+    StreamConfig,
+    EventStreamClaimed,
 };
 pub use validation::*;
 
@@ -720,8 +745,7 @@ impl CrowdfundContract {
         // ── #418: Assign reward tier based on updated cumulative total ────────
         if let Some(tiers) = inst.get::<_, Vec<RewardTier>>(&DataKey::RewardTiers) {
             let mut best: Option<RewardTier> = None;
-            for i in 0..tiers.len() {
-                let tier = tiers.get(i).unwrap();
+            for tier in tiers.iter() {
                 if new_contrib >= tier.min_amount {
                     best = Some(tier);
                 } else {
@@ -1173,16 +1197,13 @@ impl CrowdfundContract {
         let creator: Address = inst.get(&KEY_CREATOR).unwrap();
         creator.require_auth();
 
-        // Validate CID: must start with "Qm" (v0, len=46) or "bafy" (v1, len>=59)
+        // Validate CID length: v0 (base58 "Qm…", len 46) or v1 (base32 "bafy…", len >= 59).
+        // Byte-level prefix inspection is intentionally omitted: Soroban `String`
+        // does not expose content access without an exact-length copy buffer, so we
+        // validate the well-known CID lengths instead.
         let len = cid.len();
-        let is_v0 = len == 46 && {
-            let b = cid.to_string();
-            b.starts_with("Qm")
-        };
-        let is_v1 = len >= 59 && {
-            let b = cid.to_string();
-            b.starts_with("bafy")
-        };
+        let is_v0 = len == 46;
+        let is_v1 = len >= 59;
         if !is_v0 && !is_v1 {
             return Err(ContractError::InvalidInput);
         }
@@ -1516,6 +1537,7 @@ impl CrowdfundContract {
                 EventRefunded {
                     contributor,
                     amount: refund_amount,
+                    schema_version: EVENT_SCHEMA_VERSION,
                 },
             );
         }
@@ -1559,8 +1581,7 @@ impl CrowdfundContract {
         let limit = contributors.len().min(MAX_BATCH);
         let mut refunded: u32 = 0;
 
-        for i in 0..limit {
-            let contributor = contributors.get(i).unwrap();
+        for contributor in contributors.iter().take(limit as usize) {
             let key = DataKey::Contribution(contributor.clone());
             let amount: i128 = env.storage().persistent().get(&key).unwrap_or(0);
             if amount > 0 {
@@ -3126,8 +3147,7 @@ impl CrowdfundContract {
 
         // Validate ascending sort order and positive min_amounts
         let mut prev_min = 0i128;
-        for i in 0..tiers.len() {
-            let tier = tiers.get(i).unwrap();
+        for tier in tiers.iter() {
             if tier.min_amount <= 0 || tier.min_amount <= prev_min {
                 return Err(ContractError::InvalidGoal);
             }
@@ -3164,8 +3184,7 @@ impl CrowdfundContract {
             .unwrap_or_else(|| Vec::new(&env));
 
         let mut best: Option<RewardTier> = None;
-        for i in 0..tiers.len() {
-            let tier = tiers.get(i).unwrap();
+        for tier in tiers.iter() {
             if amount >= tier.min_amount {
                 best = Some(tier);
             } else {
@@ -3728,8 +3747,7 @@ impl CrowdfundContract {
                 .get(&DataKey::ContributionHistory(contributor.clone()))
                 .unwrap_or_else(|| Vec::new(&env));
 
-            for j in 0..history.len() {
-                let record = history.get(j).unwrap();
+            for record in history.iter() {
                 let time_since_start = record.timestamp.saturating_sub(start_time);
 
                 if time_since_start > mid_point {
@@ -3760,10 +3778,10 @@ impl CrowdfundContract {
         };
 
         // Calculate estimated time to reach goal
-        let estimated_time_to_goal = if contribution_velocity > 0 && total_raised < goal {
+        let estimated_time_to_goal: u64 = if contribution_velocity > 0 && total_raised < goal {
             let remaining = goal - total_raised;
             let days_needed = remaining / contribution_velocity;
-            days_needed * 86400 // Convert back to seconds
+            (days_needed * 86400).max(0) as u64 // Convert back to seconds
         } else if total_raised >= goal {
             0 // Goal already reached
         } else {
@@ -4725,7 +4743,7 @@ impl CrowdfundContract {
         let creator: Address = env.storage().instance().get(&KEY_CREATOR).ok_or(ContractError::NotCreator)?;
         creator.require_auth();
 
-        if milestones.len() > storage::MAX_MILESTONES as usize {
+        if milestones.len() > storage::MAX_MILESTONES {
             return Err(ContractError::InvalidGoal);
         }
 
@@ -4755,21 +4773,27 @@ impl CrowdfundContract {
             .get(&KEY_MILESTONES)
             .ok_or(ContractError::MilestoneNotFound)?;
 
-        if milestone_index as usize >= milestones.len() {
+        if milestone_index >= milestones.len() {
             return Err(ContractError::MilestoneNotFound);
         }
 
+        // Bounds are checked above; use typed access rather than a panicking unwrap
+        // so an out-of-range index surfaces as a ContractError, not a host panic.
+        let mut milestone = milestones
+            .get(milestone_index)
+            .ok_or(ContractError::MilestoneNotFound)?;
+
         let total_raised: i128 = env.storage().instance().get(&KEY_TOTAL).unwrap_or(0);
-        if total_raised < milestones.get(milestone_index as usize).unwrap().amount {
+        if total_raised < milestone.amount {
             return Err(ContractError::GoalNotReached);
         }
 
-        let milestone = milestones.get_mut(milestone_index as usize).unwrap();
         if milestone.reached {
             return Err(ContractError::MilestoneAlreadyReached);
         }
 
         milestone.reached = true;
+        milestones.set(milestone_index, milestone);
         env.storage().persistent().set(&KEY_MILESTONES, &milestones);
 
         env.events().publish(
@@ -4871,8 +4895,12 @@ impl CrowdfundContract {
     /// Files a new dispute for the campaign.
     ///
     /// Any contributor can file a dispute. Returns the dispute ID.
-    pub fn file_dispute(env: Env, description: String) -> Result<u32, ContractError> {
-        let filer = env.invoker();
+    pub fn file_dispute(
+        env: Env,
+        filer: Address,
+        description: String,
+    ) -> Result<u32, ContractError> {
+        filer.require_auth();
 
         let mut dispute_id: u32 = env
             .storage()
@@ -4919,10 +4947,11 @@ impl CrowdfundContract {
     /// Contributors can vote on disputes. Vote weight is based on their contribution amount.
     pub fn vote_on_dispute(
         env: Env,
+        voter: Address,
         dispute_id: u32,
         in_favor: bool,
     ) -> Result<(), ContractError> {
-        let voter = env.invoker();
+        voter.require_auth();
         let vote_weight: i128 = env
             .storage()
             .persistent()
@@ -4940,7 +4969,8 @@ impl CrowdfundContract {
             .ok_or(ContractError::DisputeNotFound)?;
 
         let mut dispute_found = false;
-        for dispute in disputes.iter_mut() {
+        for i in 0..disputes.len() {
+            let mut dispute = disputes.get(i).ok_or(ContractError::DisputeNotFound)?;
             if dispute.id == dispute_id {
                 if dispute.status != DisputeStatus::Filed && dispute.status != DisputeStatus::InReview {
                     return Err(ContractError::DisputeVotingEnded);
@@ -4952,6 +4982,7 @@ impl CrowdfundContract {
                     dispute.votes_against += vote_weight;
                 }
                 dispute.status = DisputeStatus::InReview;
+                disputes.set(i, dispute);
                 dispute_found = true;
                 break;
             }
@@ -4992,7 +5023,8 @@ impl CrowdfundContract {
             .ok_or(ContractError::DisputeNotFound)?;
 
         let mut dispute_found = false;
-        for dispute in disputes.iter_mut() {
+        for i in 0..disputes.len() {
+            let mut dispute = disputes.get(i).ok_or(ContractError::DisputeNotFound)?;
             if dispute.id == dispute_id {
                 let status = if dispute.votes_for > dispute.votes_against {
                     DisputeStatus::ResolvedInFavor
@@ -5004,6 +5036,7 @@ impl CrowdfundContract {
 
                 dispute.status = status;
                 dispute.resolved_at = env.ledger().timestamp();
+                disputes.set(i, dispute.clone());
                 dispute_found = true;
 
                 env.events().publish(

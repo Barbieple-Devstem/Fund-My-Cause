@@ -24,6 +24,9 @@ pub(crate) fn total_raised(env: Env) -> i128 {
 
 /// Returns the campaign creator's Stellar address.
 pub(crate) fn creator(env: Env) -> Address {
+    // Infallible: KEY_CREATOR is written during `initialize` and never removed, so any
+    // successfully-initialized contract always has it. This getter returns a bare value
+    // (not a Result), so the post-init invariant is documented rather than propagated.
     env.storage().instance().get(&KEY_CREATOR).unwrap()
 }
 
@@ -133,15 +136,35 @@ pub(crate) fn version(env: Env) -> u32 {
 /// Returns comprehensive campaign information.
 pub(crate) fn get_campaign_info(env: Env) -> CampaignInfo {
     let inst = env.storage().instance();
-    
+    // Infallible: KEY_CREATOR / KEY_TOKEN are written during `initialize` and never
+    // removed. This getter returns a bare `CampaignInfo` (not a Result), so the
+    // post-init invariant is documented rather than propagated.
+    let creator: Address = inst.get(&KEY_CREATOR).unwrap();
+
+    let (has_platform_config, platform_fee_bps, platform_address) =
+        if let Some(config) = inst.get::<_, PlatformConfig>(&KEY_PLATFORM) {
+            (true, config.fee_bps, config.address)
+        } else {
+            (false, 0, creator.clone())
+        };
+
     CampaignInfo {
-        creator: inst.get(&KEY_CREATOR).unwrap(),
-        title: inst.get(&KEY_TITLE).unwrap_or_default(),
-        description: inst.get(&KEY_DESC).unwrap_or_default(),
+        creator,
+        token: inst.get(&KEY_TOKEN).unwrap(),
         goal: inst.get(&KEY_GOAL).unwrap_or(0),
-        total_raised: inst.get(&KEY_TOTAL).unwrap_or(0),
         deadline: inst.get(&KEY_DEADLINE).unwrap_or(0),
+        min_contribution: inst.get(&KEY_MIN).unwrap_or(0),
+        max_contribution: inst.get(&KEY_MAX).unwrap_or(0),
+        title: inst
+            .get(&KEY_TITLE)
+            .unwrap_or_else(|| String::from_str(&env, "")),
+        description: inst
+            .get(&KEY_DESC)
+            .unwrap_or_else(|| String::from_str(&env, "")),
         status: inst.get(&KEY_STATUS).unwrap_or(Status::Active),
+        has_platform_config,
+        platform_fee_bps,
+        platform_address,
         category: inst.get(&KEY_CATEGORY).unwrap_or(Category::Technology),
     }
 }
@@ -212,7 +235,7 @@ pub(crate) fn contributor_list(env: Env, offset: u32, limit: u32) -> Vec<Address
     let count: u32 = inst.get(&DataKey::ContributorCount).unwrap_or(0);
     
     let mut result = Vec::new(&env);
-    let end = std::cmp::min(offset + limit, count);
+    let end = (offset + limit).min(count);
     
     for i in offset..end {
         if let Some(addr) = persistent.get::<_, Address>(&DataKey::ContributorIndex(i)) {

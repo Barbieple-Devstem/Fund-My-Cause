@@ -56,7 +56,7 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
     env.storage().persistent().set(&key, &plan);
 
     let inst = env.storage().instance();
-    let token: Address = inst.get(&KEY_TOKEN).unwrap();
+    let token: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(env, &token).transfer(
         &contributor,
         &env.current_contract_address(),
@@ -70,7 +70,7 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
         &prev.checked_add(plan.amount).ok_or(ContractError::Overflow)?,
     );
 
-    let total: i128 = inst.get(&KEY_TOTAL).unwrap();
+    let total: i128 = inst.get(&KEY_TOTAL).ok_or(ContractError::InvalidInput)?;
     inst.set(&KEY_TOTAL, &total.checked_add(plan.amount).ok_or(ContractError::Overflow)?);
 
     env.events().publish(

@@ -4,7 +4,10 @@
 
 mod common;
 
-use soroban_sdk::{Address, Env};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    Address, Env,
+};
 use crate::common::{setup, Campaign};
 use proptest::prelude::*;
 
@@ -99,8 +102,8 @@ fn test_invariant_contribution_zero_after_refund() {
     let amount = 2_500i128;
 
     env.ledger().set_timestamp(500);
-    c.token_admin.mint(contributor.clone(), &amount);
-    c.client.contribute(contributor.clone(), &amount, &c.token_id, &None);
+    c.token_admin.mint(&contributor, &amount);
+    c.client.contribute(&contributor, &amount, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
     assert!(c.client.try_withdraw().is_err());
@@ -123,8 +126,8 @@ fn test_invariant_no_double_refund() {
     let amount = 1_200i128;
 
     env.ledger().set_timestamp(500);
-    c.token_admin.mint(contributor.clone(), &amount);
-    c.client.contribute(contributor.clone(), &amount, &c.token_id, &None);
+    c.token_admin.mint(&contributor, &amount);
+    c.client.contribute(&contributor, &amount, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
     assert!(c.client.try_withdraw().is_err());
@@ -162,9 +165,9 @@ fn test_invariant_contract_balance_zero_after_successful_withdraw() {
     );
 
     let contributor = Address::generate(&env);
-    c.token_admin.mint(contributor.clone(), &goal);
+    c.token_admin.mint(&contributor, &goal);
     env.ledger().set_timestamp(500);
-    c.client.contribute(contributor.clone(), &goal, &c.token_id, &None);
+    c.client.contribute(&contributor, &goal, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
     c.client.withdraw();
@@ -357,6 +360,7 @@ proptest! {
             Some(crowdfund::PlatformConfig {
                 address: platform_addr.clone(),
                 fee_bps,
+                fee_mode: crowdfund::FeeMode::OnSuccess,
             }),
         );
         env.ledger().set_timestamp(500);

@@ -408,3 +408,30 @@ pub fn validate_category(category: &Category) -> Result<(), ContractError> {
         _ => Err(ContractError::InvalidCategory),
     }
 }
+
+/// Validates a multi-sig governance configuration.
+///
+/// A configuration is valid only when there is at least one governor, at least
+/// one required approval, and the required-approval threshold does not exceed the
+/// number of governors (otherwise no proposal could ever be executed).
+///
+/// # Arguments
+/// * `required_approvals` - Minimum approvals needed to execute a proposal
+/// * `num_governors` - Number of governor addresses configured
+/// * `timelock_delay` - Timelock delay in seconds (currently unrestricted, but
+///   validated for presence to keep the signature stable)
+///
+/// # Returns
+/// * `Ok(())` if the configuration is internally consistent
+/// * `Err(ContractError::InvalidInput)` otherwise
+pub fn validate_governance_config(
+    required_approvals: u32,
+    num_governors: u32,
+    timelock_delay: u64,
+) -> Result<(), ContractError> {
+    let _ = timelock_delay; // no upper/lower bound enforced yet
+    if num_governors == 0 || required_approvals == 0 || required_approvals > num_governors {
+        return Err(ContractError::InvalidInput);
+    }
+    Ok(())
+}

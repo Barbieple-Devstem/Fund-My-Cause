@@ -249,13 +249,22 @@ pub(crate) fn set_visibility(env: Env, visibility: Visibility) -> Result<(), Con
         .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
 
+    let old_visibility: Visibility = env
+        .storage()
+        .instance()
+        .get(&KEY_VISIBILITY)
+        .unwrap_or(Visibility::Public);
+
     env.storage()
         .instance()
         .set(&KEY_VISIBILITY, &visibility);
 
     env.events().publish(
         ("campaign", "visibility_changed"),
-        EventVisibilityChanged { visibility },
+        EventVisibilityChanged {
+            old_visibility,
+            new_visibility: visibility,
+        },
     );
 
     Ok(())
@@ -287,7 +296,7 @@ pub(crate) fn transfer_ownership(env: Env, new_owner: Address) -> Result<(), Con
     env.events().publish(
         ("campaign", "ownership_transferred"),
         EventOwnershipTransferred {
-            old_owner: creator,
+            previous_owner: creator,
             new_owner,
         },
     );
@@ -408,7 +417,10 @@ pub(crate) fn set_pause_timelock(env: Env, unpause_after: u64) -> Result<(), Con
 
     env.events().publish(
         ("campaign", "paused_with_timelock"),
-        EventPausedWithTimelock { unpause_after },
+        EventPausedWithTimelock {
+            timestamp: env.ledger().timestamp(),
+            unpause_after,
+        },
     );
 
     Ok(())

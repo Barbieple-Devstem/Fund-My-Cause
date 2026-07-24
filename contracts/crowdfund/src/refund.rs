@@ -11,7 +11,7 @@ use crate::{
     storage::{
         DataKey, KEY_STATUS, KEY_TOTAL, KEY_TOKEN, KEY_DEADLINE,
     },
-    types::{Status, EventRefunded, EventBatchRefundCompleted, EventPartialRefund},
+    types::{Status, EventRefunded, EventBatchRefundCompleted, EventPartialRefund, EVENT_SCHEMA_VERSION},
 };
 
 /// Refunds a single contributor's contribution.
@@ -62,7 +62,7 @@ pub(crate) fn refund_single(
     // Mark as refunded to prevent double-claiming
     persistent.set(&contrib_key, &0i128);
 
-    let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
+    let token_address: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(&env, &token_address).transfer(
         &env.current_contract_address(),
         &contributor,
@@ -74,6 +74,7 @@ pub(crate) fn refund_single(
         EventRefunded {
             contributor: contributor.clone(),
             amount,
+            schema_version: EVENT_SCHEMA_VERSION,
         },
     );
 
@@ -105,13 +106,12 @@ pub(crate) fn refund_batch(
     }
 
     let persistent = env.storage().persistent();
-    let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
+    let token_address: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     let token_client = token::Client::new(&env, &token_address);
 
     let mut refunded_count: u32 = 0;
 
-    for i in 0..contributors.len() {
-        let contributor = contributors.get(i).unwrap();
+    for contributor in contributors.iter() {
         let contrib_key = DataKey::Contribution(contributor.clone());
         let amount: i128 = persistent.get(&contrib_key).unwrap_or(0);
 
@@ -121,11 +121,12 @@ pub(crate) fn refund_batch(
 
         persistent.set(&contrib_key, &0i128);
 
-        if let Err(_) = token_client.transfer(
-            &env.current_contract_address(),
-            &contributor,
-            &amount,
-        ) {
+        if token_client
+            .try_transfer(&env.current_contract_address(), &contributor, &amount)
+            .is_err()
+        {
+            // Roll back the zeroing so the contributor can retry their refund
+            persistent.set(&contrib_key, &amount);
             continue;
         }
 
@@ -135,8 +136,8 @@ pub(crate) fn refund_batch(
     env.events().publish(
         ("campaign", "batch_refund_completed"),
         EventBatchRefundCompleted {
-            refunded_count,
-            total_attempted: contributors.len() as u32,
+            total_refunded: refunded_count,
+            batch_size: contributors.len() as u32,
         },
     );
 
@@ -172,7 +173,7 @@ pub(crate) fn refund_partial(
     let new_balance = current - amount;
     persistent.set(&contrib_key, &new_balance);
 
-    let token_address: Address = env.storage().instance().get(&KEY_TOKEN).unwrap();
+    let token_address: Address = env.storage().instance().get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(&env, &token_address).transfer(
         &env.current_contract_address(),
         &contributor,
@@ -209,7 +210,7 @@ pub(crate) fn refund_matching_sponsor(env: Env) -> Result<(), ContractError> {
     if let Some(config) = inst.get::<_, crate::types::MatchingConfig>(&DataKey::MatchingConfig) {
         config.sponsor.require_auth();
 
-        let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
+        let token_address: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
         token::Client::new(&env, &token_address).transfer(
             &env.current_contract_address(),
             &config.sponsor,

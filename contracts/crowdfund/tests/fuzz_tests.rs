@@ -6,7 +6,7 @@ use soroban_sdk::{
     token, Address, Env, String, Vec,
 };
 
-use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig};
+use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig, RewardTier};
 
 mod common;
 use common::{setup, Campaign};
@@ -16,18 +16,18 @@ prop_compose! {
 }
 
 prop_compose! {
-    fn small_amount()(amount in 1i128..10_000i128) -> i128 { amount }
+    // Lower bound matches the `setup` helper's min-contribution (100); amounts
+    // below the campaign minimum are rejected with `BelowMinimum` by design.
+    fn small_amount()(amount in 100i128..10_000i128) -> i128 { amount }
 }
 
-prop_compose! {
-    fn edge_amount() -> i128 {
-        prop_oneof![
-            Just(0i128),
-            Just(i128::MAX),
-            Just(i128::MAX / 2),
-            Just(1i128),
-        ].boxed()
-    }
+fn edge_amount() -> impl Strategy<Value = i128> {
+    prop_oneof![
+        Just(0i128),
+        Just(i128::MAX),
+        Just(i128::MAX / 2),
+        Just(1i128),
+    ]
 }
 
 prop_compose! {
@@ -268,7 +268,9 @@ proptest! {
     #[test]
     fn fuzz_withdraw_below_goal_fails(
         goal in 1_000i128..100_000i128,
-        amount in 1i128..999i128,
+        // At/above the campaign minimum (100) but strictly below the smallest goal
+        // (1_000), so the campaign is under-funded and withdrawal must fail.
+        amount in 100i128..999i128,
     ) {
         let env = Env::default();
         env.mock_all_auths();
@@ -405,7 +407,9 @@ proptest! {
     #[test]
     fn fuzz_multiple_refunds_parallel_withdrawal(
         (c1_amt, c2_amt, c3_amt) in (small_amount(), small_amount(), small_amount()),
-        goal in 10_000i128..50_000i128,
+        // Above the maximum possible sum of three `small_amount` contributions
+        // (3 × 10_000) so the goal is never reached and all three remain refundable.
+        goal in 30_001i128..50_000i128,
     ) {
         let env = Env::default();
         env.mock_all_auths();
@@ -498,7 +502,9 @@ proptest! {
     ) {
         let env = Env::default();
         env.mock_all_auths();
-        let c = setup(&env, i128::MAX, 1_000_000u64, None);
+        // Largest goal the contract accepts (see `validate_goal_not_overflow`);
+        // i128::MAX itself is rejected with `GoalOverflow`.
+        let c = setup(&env, i128::MAX / 2, 1_000_000u64, None);
 
         let c1 = Address::generate(&env);
         let c2 = Address::generate(&env);
@@ -506,7 +512,9 @@ proptest! {
         c.token_admin.mint(&c1, &a1);
         c.token_admin.mint(&c2, &a2);
 
-        c.client.contribute(&c1, &a1, &c.token_id, &None);
+        // `valid_amount` can fall below the campaign minimum; tolerate that here
+        // since this test only asserts overflow behaviour on the second contribution.
+        let _ = c.client.try_contribute(&c1, &a1, &c.token_id, &None);
         let result = c.client.try_contribute(&c2, &a2, &c.token_id, &None);
 
         // Check saturating behavior or error handling
@@ -548,5 +556,73 @@ proptest! {
         let contributor = Address::generate(&env);
         let result = c.client.try_contribute(&contributor, &0, &c.token_id, &None);
         assert!(result.is_err());
+    }
+}
+// ── Issue #835: fuzz the previously-panicking, caller-length-controlled paths ──
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// `refund_batch` iterates a caller-supplied contributor list. Fuzzing the
+    /// list length (including 0 and sizes beyond the internal 25-item batch cap)
+    /// must never trigger an index-out-of-bounds panic — the call always returns
+    /// a typed `Result`.
+    #[test]
+    fn fuzz_refund_batch_arbitrary_length_never_panics(n in 0usize..60usize) {
+        let env = Env::default();
+        env.mock_all_auths();
+
+        let deadline = 1_000u64;
+        let goal = 1_000_000i128;
+        let c = setup(&env, goal, deadline, None);
+
+        // Cancel so the campaign is refund-eligible regardless of goal progress.
+        c.client.cancel_campaign();
+
+        // Build a contributor list of the fuzzed length; none have balances,
+        // so nothing is refunded, but the loop still walks every entry.
+        let mut contributors: Vec<Address> = Vec::new(&env);
+        for _ in 0..n {
+            contributors.push_back(Address::generate(&env));
+        }
+
+        let result = c.client.try_refund_batch(&contributors);
+        prop_assert!(result.is_ok());
+        prop_assert_eq!(result.unwrap().unwrap(), 0u32);
+    }
+
+    /// `get_tier_for_amount` iterates the stored reward tiers. Fuzzing the query
+    /// amount across the full i128 range must never panic and must respect the
+    /// ascending-threshold contract.
+    #[test]
+    fn fuzz_get_tier_for_amount_never_panics(amount in edge_amount()) {
+        let env = Env::default();
+        env.mock_all_auths();
+        let c = setup(&env, 1_000_000i128, 1_000u64, None);
+
+        let tiers = Vec::from_array(
+            &env,
+            [
+                RewardTier {
+                    min_amount: 100,
+                    name: String::from_str(&env, "bronze"),
+                    description: String::from_str(&env, "b"),
+                },
+                RewardTier {
+                    min_amount: 1_000,
+                    name: String::from_str(&env, "gold"),
+                    description: String::from_str(&env, "g"),
+                },
+            ],
+        );
+        c.client.set_reward_tiers(&tiers);
+
+        // Never panics; result is consistent with the amount.
+        let tier = c.client.get_tier_for_amount(&amount);
+        if amount < 100 {
+            prop_assert!(tier.is_none());
+        } else {
+            prop_assert!(tier.is_some());
+        }
     }
 }

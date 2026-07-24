@@ -152,7 +152,7 @@ impl RateLimiter {
         let current_ledger = env.ledger().sequence();
         let key = storage::make_rate_limit_key(addr);
 
-        let (last_ledger, count): (u64, u32) = env
+        let (last_ledger, count): (u32, u32) = env
             .storage()
             .persistent()
             .get(&key)
@@ -221,8 +221,12 @@ impl InputValidator {
     pub fn validate_no_duplicates(addresses: &Vec<Address>) -> Result<(), ContractError> {
         let len = addresses.len();
         for i in 0..len {
+            // Bounds are guaranteed by the loop range, but use fallible access so an
+            // unexpected out-of-range index returns a typed error rather than panicking.
+            let a = addresses.get(i).ok_or(ContractError::InvalidInput)?;
             for j in (i + 1)..len {
-                if &addresses.get(i).unwrap() == &addresses.get(j).unwrap() {
+                let b = addresses.get(j).ok_or(ContractError::InvalidInput)?;
+                if a == b {
                     return Err(ContractError::InvalidInput);
                 }
             }
@@ -278,12 +282,8 @@ impl AccessControl {
     /// * `true` if address is whitelisted
     /// * `false` otherwise
     pub fn is_whitelisted(addr: &Address, whitelist: &Vec<Address>) -> bool {
-        for i in 0..whitelist.len() {
-            if &whitelist.get(i).unwrap() == addr {
-                return true;
-            }
-        }
-        false
+        // Iterate by value so no panicking index access is required.
+        whitelist.iter().any(|entry| &entry == addr)
     }
 
     /// Checks if an address is in a blacklist.
@@ -297,12 +297,8 @@ impl AccessControl {
     /// * `true` if address is blacklisted
     /// * `false` otherwise
     pub fn is_blacklisted(addr: &Address, blacklist: &Vec<Address>) -> bool {
-        for i in 0..blacklist.len() {
-            if &blacklist.get(i).unwrap() == addr {
-                return true;
-            }
-        }
-        false
+        // Iterate by value so no panicking index access is required.
+        blacklist.iter().any(|entry| &entry == addr)
     }
 }
 
@@ -322,5 +318,67 @@ mod tests {
         assert!(InputValidator::validate_amount(100, 1000).is_ok());
         assert!(InputValidator::validate_amount(-1, 1000).is_err());
         assert!(InputValidator::validate_amount(1001, 1000).is_err());
+    }
+
+    // ── Issue #835: no-panic guarantees on the previously-unwrapping paths ─────
+
+    use soroban_sdk::{testutils::Address as _, Env, Vec};
+
+    /// `validate_no_duplicates` must never panic, regardless of list contents or
+    /// length — empty, single, duplicate-laden, or large adversarial inputs all
+    /// return a typed `Result` instead of an index-out-of-bounds panic.
+    #[test]
+    fn test_validate_no_duplicates_never_panics() {
+        let env = Env::default();
+
+        // Empty and single-element lists: trivially OK.
+        let empty: Vec<Address> = Vec::new(&env);
+        assert!(InputValidator::validate_no_duplicates(&empty).is_ok());
+
+        let a = Address::generate(&env);
+        let single = Vec::from_array(&env, [a.clone()]);
+        assert!(InputValidator::validate_no_duplicates(&single).is_ok());
+
+        // Distinct addresses: OK.
+        let b = Address::generate(&env);
+        let distinct = Vec::from_array(&env, [a.clone(), b.clone()]);
+        assert!(InputValidator::validate_no_duplicates(&distinct).is_ok());
+
+        // Duplicates anywhere in the list: typed error, no panic.
+        let dupes = Vec::from_array(&env, [a.clone(), b, a]);
+        assert_eq!(
+            InputValidator::validate_no_duplicates(&dupes),
+            Err(ContractError::InvalidInput)
+        );
+
+        // Larger adversarial list built dynamically — exercises the nested
+        // index access that previously used `.get(i).unwrap()`.
+        let mut big: Vec<Address> = Vec::new(&env);
+        for _ in 0..64 {
+            big.push_back(Address::generate(&env));
+        }
+        assert!(InputValidator::validate_no_duplicates(&big).is_ok());
+    }
+
+    /// `is_whitelisted` / `is_blacklisted` must never panic on any list, including
+    /// the empty list where the old `0..len` + `.get(i).unwrap()` loop was safe
+    /// only by accident.
+    #[test]
+    fn test_membership_checks_never_panic() {
+        let env = Env::default();
+        let target = Address::generate(&env);
+
+        let empty: Vec<Address> = Vec::new(&env);
+        assert!(!AccessControl::is_whitelisted(&target, &empty));
+        assert!(!AccessControl::is_blacklisted(&target, &empty));
+
+        let other = Address::generate(&env);
+        let list = Vec::from_array(&env, [other.clone(), target.clone()]);
+        assert!(AccessControl::is_whitelisted(&target, &list));
+        assert!(AccessControl::is_blacklisted(&target, &list));
+
+        let missing = Vec::from_array(&env, [other]);
+        assert!(!AccessControl::is_whitelisted(&target, &missing));
+        assert!(!AccessControl::is_blacklisted(&target, &missing));
     }
 }

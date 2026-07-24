@@ -7,8 +7,21 @@ use soroban_sdk::{
     token, Address, Env,
 };
 
+use crowdfund::RewardTier;
+
 mod common;
 use common::setup;
+
+/// Helper: build a `RewardTier` with the given minimum amount.
+/// Uses fully-qualified `soroban_sdk` types so the module-level `Vec` prelude
+/// (std) used by other tests in this file is not shadowed.
+fn tier(env: &Env, min_amount: i128) -> RewardTier {
+    RewardTier {
+        min_amount,
+        name: soroban_sdk::String::from_str(env, "tier"),
+        description: soroban_sdk::String::from_str(env, "desc"),
+    }
+}
 
 #[test]
 fn test_adversarial_multiple_refunds_same_tx() {
@@ -238,8 +251,8 @@ fn test_adversarial_selective_refund_targeting() {
     env.ledger().set_timestamp(deadline + 1);
 
     // Refund in arbitrary order
-    for &addr in &contributors {
-        c.client.refund_single(&addr);
+    for addr in &contributors {
+        c.client.refund_single(addr);
     }
 
     // All refunds succeeded
@@ -463,4 +476,105 @@ fn test_on_contribution_fee_mode_net_vs_gross() {
     let stats = client.get_stats();
     assert_eq!(stats.total_raised, expected_net);
     assert_eq!(stats.gross_raised, contrib_amount);
+}
+
+// ── Issue #835: previously-panicking paths now return typed errors, not panics ──
+
+/// `set_reward_tiers` previously indexed the caller-supplied `tiers` vector with
+/// `.get(i).unwrap()` while validating sort order. Adversarial tier lists
+/// (unsorted, duplicate thresholds, zero/negative thresholds, empty) must now
+/// surface a typed `ContractError` instead of aborting the transaction.
+#[test]
+fn test_adversarial_set_reward_tiers_returns_typed_error() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = setup(&env, 1_000_000i128, 1_000u64, None);
+
+    // Empty list is rejected with a typed error, not a panic.
+    let empty: soroban_sdk::Vec<RewardTier> = soroban_sdk::Vec::new(&env);
+    assert!(c.client.try_set_reward_tiers(&empty).is_err());
+
+    // Descending / unsorted thresholds are rejected.
+    let unsorted = soroban_sdk::Vec::from_array(&env, [tier(&env, 100), tier(&env, 50)]);
+    assert!(c.client.try_set_reward_tiers(&unsorted).is_err());
+
+    // Duplicate thresholds are rejected.
+    let dupes = soroban_sdk::Vec::from_array(&env, [tier(&env, 100), tier(&env, 100)]);
+    assert!(c.client.try_set_reward_tiers(&dupes).is_err());
+
+    // Zero / negative thresholds are rejected.
+    let non_positive = soroban_sdk::Vec::from_array(&env, [tier(&env, 0)]);
+    assert!(c.client.try_set_reward_tiers(&non_positive).is_err());
+
+    // A valid ascending list succeeds.
+    let ok = soroban_sdk::Vec::from_array(&env, [tier(&env, 10), tier(&env, 20), tier(&env, 30)]);
+    assert!(c.client.try_set_reward_tiers(&ok).is_ok());
+}
+
+/// `get_tier_for_amount` iterated the stored tiers with `.get(i).unwrap()`.
+/// Edge amounts (0, i128::MAX) and the no-tiers-configured case must resolve
+/// without panicking.
+#[test]
+fn test_adversarial_get_tier_for_amount_never_panics() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let c = setup(&env, 1_000_000i128, 1_000u64, None);
+
+    // No tiers configured → None, no panic.
+    assert!(c.client.get_tier_for_amount(&0).is_none());
+    assert!(c.client.get_tier_for_amount(&i128::MAX).is_none());
+
+    let tiers = soroban_sdk::Vec::from_array(&env, [tier(&env, 100), tier(&env, 1_000)]);
+    c.client.set_reward_tiers(&tiers);
+
+    // Below all thresholds → None.
+    assert!(c.client.get_tier_for_amount(&0).is_none());
+    assert!(c.client.get_tier_for_amount(&99).is_none());
+    // At/above thresholds → best qualifying tier, no panic on the extreme value.
+    assert_eq!(c.client.get_tier_for_amount(&100).unwrap().min_amount, 100);
+    assert_eq!(c.client.get_tier_for_amount(&i128::MAX).unwrap().min_amount, 1_000);
+}
+
+/// `refund_batch` iterated a caller-supplied contributor list with
+/// `.get(i).unwrap()`. An adversarial list — oversized (beyond the internal
+/// batch cap), duplicate-laden, and containing addresses that never contributed
+/// — must complete without panicking and without over-refunding.
+#[test]
+fn test_adversarial_refund_batch_oversized_and_duplicates() {
+    let env = Env::default();
+    env.mock_all_auths();
+
+    let deadline = 1_000u64;
+    let goal = 1_000_000i128;
+    let c = setup(&env, goal, deadline, None);
+
+    // One genuine contributor with a real balance.
+    let contributor = Address::generate(&env);
+    c.token_admin.mint(&contributor, &10_000);
+    env.ledger().set_timestamp(500);
+    c.client.contribute(&contributor, &10_000, &c.token_id, &None);
+
+    // Cancel so the campaign is refund-eligible.
+    c.client.cancel_campaign();
+
+    // Build an adversarial list: 40 entries (> the 25 batch cap), the real
+    // contributor duplicated several times, plus never-seen addresses.
+    let mut contributors: soroban_sdk::Vec<Address> = soroban_sdk::Vec::new(&env);
+    for _ in 0..3 {
+        contributors.push_back(contributor.clone());
+    }
+    for _ in 0..40 {
+        contributors.push_back(Address::generate(&env));
+    }
+
+    let balance_before = c.token.balance(&contributor);
+    // Must not panic; returns a typed Ok with the refunded count.
+    let refunded = c.client.try_refund_batch(&contributors);
+    assert!(refunded.is_ok());
+
+    // The real contributor is refunded exactly once despite the duplicates.
+    assert_eq!(c.token.balance(&contributor), balance_before + 10_000);
+    // A second batch refunds nothing further (balance already zeroed).
+    let _ = c.client.try_refund_batch(&contributors);
+    assert_eq!(c.token.balance(&contributor), balance_before + 10_000);
 }

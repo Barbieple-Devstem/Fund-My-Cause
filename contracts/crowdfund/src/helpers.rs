@@ -13,7 +13,7 @@ use crate::{
         DataKey, KEY_PLATFORM, KEY_INSURANCE, KEY_STATUS, KEY_CREATOR, 
         KEY_VISIBILITY, KEY_INSURANCE_POOL, KEY_RATE_LIMIT,
     },
-    types::{FeeMode, PlatformConfig, RateLimit, Visibility, InsuranceConfig, Status},
+    types::{FeeMode, MatchingConfig, PlatformConfig, RateLimit, Visibility, InsuranceConfig, Status},
 };
 
 /// Validates that the campaign is in Active status and that the caller is the creator.
@@ -247,12 +247,10 @@ pub(crate) fn apply_insurance_fee(
 pub(crate) fn apply_matching(env: &Env, amount: i128) -> Result<i128, ContractError> {
     let inst = env.storage().instance();
 
-    let matching_config = inst.get(&DataKey::MatchingConfig);
-    if matching_config.is_none() {
-        return Ok(0);
-    }
-
-    let config = matching_config.unwrap();
+    let config: MatchingConfig = match inst.get(&DataKey::MatchingConfig) {
+        Some(config) => config,
+        None => return Ok(0),
+    };
     let match_amount = (amount * config.match_ratio as i128) / 10_000;
     let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
     let available_match = config.max_match - total_matched;

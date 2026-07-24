@@ -3,6 +3,10 @@
 /// This module provides storage keys and helper utilities for managing contract state.
 use soroban_sdk::Symbol;
 
+/// Re-export `DataKey` so it can be imported via `crate::storage::DataKey`
+/// (the enum itself is defined in the `types` module).
+pub use crate::types::DataKey;
+
 /// Contract version for upgrades and compatibility tracking
 pub const CONTRACT_VERSION: u32 = 6;
 
@@ -67,7 +71,7 @@ pub const KEY_ARCHIVED: Symbol = soroban_sdk::symbol_short!("ARCHIVED");
 
 // ── Issue #436: Campaign Milestones ───────────────────────────────────────────
 /// Storage key for milestones list
-pub const KEY_MILESTONES: Symbol = soroban_sdk::symbol_short!("MILESTONES");
+pub const KEY_MILESTONES: Symbol = soroban_sdk::symbol_short!("MILESTONE");
 /// Storage key for milestone verification status
 pub const KEY_MILESTONE_STATUS: Symbol = soroban_sdk::symbol_short!("MLSTATUS");
 /// Storage key for next milestone release amount
@@ -143,21 +147,19 @@ pub const KEY_PAUSE_TIMELOCK: Symbol = soroban_sdk::symbol_short!("PTLOCK");
 /// Storage key for the earliest timestamp at which the contract may be unpaused
 pub const KEY_UNPAUSE_AFTER: Symbol = soroban_sdk::symbol_short!("UNPAFTER");
 
-// ── Issue #694: Soft-cap / stretch-goal ──────────────────────────────────────
-/// Storage key for the campaign soft cap (minimum viable funding target)
-pub const KEY_SOFT_CAP: Symbol = soroban_sdk::symbol_short!("SOFTCAP");
-/// Storage key for the campaign stretch goal (over-funding target)
-pub const KEY_STRETCH_GOAL: Symbol = soroban_sdk::symbol_short!("STRETCH");
+// ── Gross contribution tracking ──────────────────────────────────────────────
+/// Storage key for the gross total contributed (before any fee deductions)
+pub const KEY_GROSS_TOTAL: Symbol = soroban_sdk::symbol_short!("GROSST");
 
-// ── Issue #695: Released-amount tracking ─────────────────────────────────────
-/// Storage key for the total amount already released to the creator via milestones
-pub const KEY_RELEASED: Symbol = soroban_sdk::symbol_short!("RELEASED");
+// ── IPFS metadata ─────────────────────────────────────────────────────────────
+/// Storage key for the campaign's off-chain IPFS content identifier (CID)
+pub const KEY_IPFS_CID: Symbol = soroban_sdk::symbol_short!("IPFSCID");
 
-// ── Issue #696: Pause timelock ───────────────────────────────────────────────
-/// Storage key for the timelock duration (seconds) required before unpausing
-pub const KEY_PAUSE_TIMELOCK: Symbol = soroban_sdk::symbol_short!("PTLOCK");
-/// Storage key for the earliest timestamp at which the contract may be unpaused
-pub const KEY_UNPAUSE_AFTER: Symbol = soroban_sdk::symbol_short!("UNPAFTER");
+// ── Yield / treasury ─────────────────────────────────────────────────────────
+/// Storage key for the yield-generation configuration
+pub const KEY_YIELD_CONFIG: Symbol = soroban_sdk::symbol_short!("YLDCFG");
+/// Storage key for the total yield accrued
+pub const KEY_YIELD_TOTAL: Symbol = soroban_sdk::symbol_short!("YLDTOT");
 
 use soroban_sdk::{Address, Symbol as SorobanSymbol};
 

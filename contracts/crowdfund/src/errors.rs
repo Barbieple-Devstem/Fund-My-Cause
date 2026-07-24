@@ -151,4 +151,10 @@ pub enum ContractError {
     InvalidInitParams = 68,
     /// The withdrawal has already been executed (campaign already paid out)
     AlreadyWithdrawn = 69,
+    /// A required address could not be read from storage (contract not initialized)
+    InvalidAddress = 70,
+    /// There is nothing available to refund for this caller
+    NothingToRefund = 71,
+    /// The campaign is not currently paused
+    NotPaused = 72,
 }

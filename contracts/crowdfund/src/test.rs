@@ -197,6 +197,7 @@ fn invalid_platform_fee_is_rejected() {
         &Some(PlatformConfig {
             address: Address::generate(&env),
             fee_bps: 10_001,
+            fee_mode: FeeMode::OnSuccess,
         }),
         &None,
         &Category::Other,
@@ -469,7 +470,7 @@ fn contribute_exceeding_max_is_rejected() {
     token_admin_client.mint(&contributor, &600);
 
     let result = client.try_contribute(&contributor, &600, &token_id, &None);
-    assert_eq!(result.err(), Some(Ok(ContractError::ExceedsMaximum)));
+    assert_eq!(result.err(), Some(Ok(ContractError::ContributorCapExceeded)));
 }
 
 #[test]
@@ -483,7 +484,7 @@ fn cumulative_contribution_exceeding_max_is_rejected() {
 
     client.contribute(&contributor, &300, &token_id, &None);
     let result = client.try_contribute(&contributor, &300, &token_id, &None);
-    assert_eq!(result.err(), Some(Ok(ContractError::ExceedsMaximum)));
+    assert_eq!(result.err(), Some(Ok(ContractError::ContributorCapExceeded)));
 }
 
 #[test]
@@ -627,6 +628,7 @@ fn initialize_with_self_fee_address_is_rejected() {
         &Some(PlatformConfig {
             address: creator.clone(), // same as creator — invalid
             fee_bps: 100,
+            fee_mode: FeeMode::OnSuccess,
         }),
         &None,
         &Category::Other,
@@ -958,6 +960,11 @@ fn setup_and_execute_recurring_contribution() {
 
     let contributor = Address::generate(&env);
     token_admin_client.mint(&contributor, &10_000);
+
+    // `execute_recurring` pulls a token transfer from the contributor as a
+    // non-root authorization (the caller need not be the contributor), which
+    // requires the allowing-non-root auth mock under Soroban 25.x.
+    env.mock_all_auths_allowing_non_root_auth();
 
     env.ledger().set_timestamp(1_000);
     let interval = 3_600u64;
