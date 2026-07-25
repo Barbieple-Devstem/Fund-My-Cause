@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, ExternalLink } from "lucide-react";
 import { fetchAllCampaigns } from "@/lib/soroban";
+import { formatCampaignDateShort } from "@/lib/campaignDateFormatting";
 import type { CampaignData } from "@/lib/soroban";
 
 interface CampaignsSectionProps {
@@ -16,7 +17,7 @@ function CampaignCardRow({ campaign }: { campaign: CampaignData }) {
   const raisedXlm = campaign.raised;
   const goalXlm = campaign.goal;
   const progress = goalXlm > 0 ? Math.min(100, (raisedXlm / goalXlm) * 100) : 0;
-  const deadline = new Date(campaign.deadline).toLocaleDateString();
+  const deadline = formatCampaignDateShort(campaign.deadline);
 
   return (
     <Link
