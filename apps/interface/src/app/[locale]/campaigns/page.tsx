@@ -1,7 +1,7 @@
 "use client";
 
 import React, { Suspense, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { CampaignCard } from "@/components/ui/CampaignCard";
@@ -17,11 +17,11 @@ import { ALL_CAMPAIGNS } from "@/lib/campaigns";
 import { Search, GitCompare, SlidersHorizontal, X } from "lucide-react";
 import { useComparison } from "@/context/ComparisonContext";
 import { useTranslations } from "next-intl";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type FilterTab = "all" | "active" | "funded" | "ended";
-type SortOption = "recent" | "popular" | "deadline" | "progress";
+import {
+  useCampaignFilters,
+  type FilterTab,
+  type SortOption,
+} from "@/hooks/useCampaignFilters";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -58,27 +58,34 @@ const PAGE_SIZE = 9;
 
 function CampaignsInner() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { selected, clear } = useComparison();
   const t = useTranslations("campaigns");
 
-  const filter = (searchParams.get("filter") as FilterTab) ?? "all";
-  const sort = (searchParams.get("sort") as SortOption) ?? "recent";
-  const query = searchParams.get("q") ?? "";
-  const category = searchParams.get("category") ?? "";
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
+  const {
+    filters,
+    setParam,
+    setInputValue,
+    setGoalMin,
+    setGoalMax,
+    setDateFrom,
+    setDateTo,
+    applyAdvanced,
+    clearAdvanced,
+    inputValue,
+    showAdvanced,
+    setShowAdvanced,
+    hasAdvanced,
+    activeGoalMin,
+    activeGoalMax,
+    activeDateFrom,
+    activeDateTo,
+  } = useCampaignFilters();
 
   const [pledge, setPledge] = useState<string | null>(null);
   const [shareTarget, setShareTarget] = useState<{
     id: string;
     title: string;
   } | null>(null);
-  const [inputValue, setInputValue] = useState(query);
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [goalMin, setGoalMin] = useState(searchParams.get("goalMin") ?? "");
-  const [goalMax, setGoalMax] = useState(searchParams.get("goalMax") ?? "");
-  const [dateFrom, setDateFrom] = useState(searchParams.get("dateFrom") ?? "");
-  const [dateTo, setDateTo] = useState(searchParams.get("dateTo") ?? "");
 
   const FILTER_TABS: { label: string; value: FilterTab }[] = [
     { label: t("filterAll"), value: "all" },
@@ -87,86 +94,21 @@ function CampaignsInner() {
     { label: t("filterEnded"), value: "ended" },
   ];
 
-  const setParam = (key: string, value: string) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value === "") {
-      params.delete(key);
-    } else if (key === "filter" && value === "all") {
-      params.delete(key);
-    } else if (key === "sort" && value === "recent") {
-      params.delete(key);
-    } else {
-      params.set(key, value);
-    }
-    if (key !== "page") params.delete("page");
-    router.replace(`/campaigns?${params.toString()}`, { scroll: false });
-  };
-
-  const applyAdvanced = () => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (goalMin) params.set("goalMin", goalMin);
-    else params.delete("goalMin");
-    if (goalMax) params.set("goalMax", goalMax);
-    else params.delete("goalMax");
-    if (dateFrom) params.set("dateFrom", dateFrom);
-    else params.delete("dateFrom");
-    if (dateTo) params.set("dateTo", dateTo);
-    else params.delete("dateTo");
-    params.delete("page");
-    router.replace(`/campaigns?${params.toString()}`, { scroll: false });
-    setShowAdvanced(false);
-  };
-
-  const clearAdvanced = () => {
-    setGoalMin("");
-    setGoalMax("");
-    setDateFrom("");
-    setDateTo("");
-    const params = new URLSearchParams(searchParams.toString());
-    ["goalMin", "goalMax", "dateFrom", "dateTo"].forEach((k) =>
-      params.delete(k),
-    );
-    params.delete("page");
-    router.replace(`/campaigns?${params.toString()}`, { scroll: false });
-  };
-
-  React.useEffect(() => {
-    setInputValue(query);
-  }, [query]);
-
-  React.useEffect(() => {
-    const timer = setTimeout(() => setParam("q", inputValue), 300);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inputValue]);
-
   const setPage = (p: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (p === 1) params.delete("page");
-    else params.set("page", String(p));
+    const params = new URLSearchParams();
+    if (p !== 1) params.set("page", String(p));
+    if (filters.filter !== "all") params.set("filter", filters.filter);
+    if (filters.sort !== "recent") params.set("sort", filters.sort);
+    if (filters.category) params.set("category", filters.category);
+    if (filters.query) params.set("q", filters.query);
     router.replace(`/campaigns?${params.toString()}`, { scroll: false });
   };
-
-  const activeGoalMin = searchParams.get("goalMin")
-    ? Number(searchParams.get("goalMin"))
-    : null;
-  const activeGoalMax = searchParams.get("goalMax")
-    ? Number(searchParams.get("goalMax"))
-    : null;
-  const activeDateFrom = searchParams.get("dateFrom") ?? null;
-  const activeDateTo = searchParams.get("dateTo") ?? null;
-  const hasAdvanced = !!(
-    activeGoalMin ||
-    activeGoalMax ||
-    activeDateFrom ||
-    activeDateTo
-  );
 
   const filtered = applySort(
     applyFilter(
       ALL_CAMPAIGNS.filter((c) => {
-        if (query) {
-          const q = query.toLowerCase();
+        if (filters.query) {
+          const q = filters.query.toLowerCase();
           if (
             !c.title.toLowerCase().includes(q) &&
             !c.description.toLowerCase().includes(q) &&
@@ -174,7 +116,7 @@ function CampaignsInner() {
           )
             return false;
         }
-        if (category && c.category !== category) return false;
+        if (filters.category && c.category !== filters.category) return false;
         if (activeGoalMin !== null && c.goal < activeGoalMin) return false;
         if (activeGoalMax !== null && c.goal > activeGoalMax) return false;
         if (activeDateFrom && new Date(c.deadline) < new Date(activeDateFrom))
@@ -183,13 +125,13 @@ function CampaignsInner() {
           return false;
         return true;
       }),
-      filter,
+      filters.filter,
     ),
-    sort,
+    filters.sort,
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
+  const currentPage = Math.min(filters.page, totalPages);
   const paginated = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
@@ -222,7 +164,7 @@ function CampaignsInner() {
 
         {/* Category filter */}
         <select
-          value={category}
+          value={filters.category}
           onChange={(e) => setParam("category", e.target.value)}
           aria-label="Filter by category"
           className={selectCls}
@@ -237,7 +179,7 @@ function CampaignsInner() {
 
         {/* Sort */}
         <select
-          value={sort}
+          value={filters.sort}
           onChange={(e) => setParam("sort", e.target.value)}
           aria-label="Sort campaigns"
           className={selectCls}
@@ -346,8 +288,8 @@ function CampaignsInner() {
           <button
             key={tab.value}
             role="tab"
-            aria-selected={filter === tab.value}
-            tabIndex={filter === tab.value ? 0 : -1}
+            aria-selected={filters.filter === tab.value}
+            tabIndex={filters.filter === tab.value ? 0 : -1}
             onClick={() => setParam("filter", tab.value)}
             onKeyDown={(e) => {
               if (e.key === "ArrowRight") {
@@ -372,7 +314,7 @@ function CampaignsInner() {
               }
             }}
             className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
-              filter === tab.value
+              filters.filter === tab.value
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-200 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
