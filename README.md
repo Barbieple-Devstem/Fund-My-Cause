@@ -196,6 +196,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### 6. Run the backend services (optional)
+
+The frontend runs without them, but if you are working on `services/graphql-api`
+or `services/indexer`, see
+**[docs/services-local-development.md](./docs/services-local-development.md)**.
+It covers each service standalone: required environment variables, which service
+needs Redis (and which does not), why neither needs a database, and the
+known-issue workarounds you will otherwise hit on a fresh clone.
+
 ---
 
 ## Docker

@@ -32,4 +32,4 @@ You do **not** need an ADR for routine implementation choices (which library to 
 | [ADR-001](./ADR-001-pull-based-refund-model.md) | Pull-based refund model | Accepted |
 | [ADR-002](./ADR-002-off-chain-indexer-architecture.md) | Off-chain indexer architecture | Accepted |
 | [ADR-003](./ADR-003-graphql-api-for-frontend-queries.md) | GraphQL API for frontend queries | Accepted |
-| [ADR-005](./ADR-005-fraud-detection-vs-recommendations-service-split.md) | `fraud_detection` / `recommendations` service split | Proposed |
+| [ADR-004](./ADR-004-contract-module-boundaries.md) | Soroban contract module boundaries (`contracts/common`) | Proposed |

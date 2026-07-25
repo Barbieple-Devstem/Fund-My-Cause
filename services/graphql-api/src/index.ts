@@ -47,6 +47,11 @@ if (JWT_SECRET.length < 32) {
   process.exit(1);
 }
 
+// Every guard above exits the process on failure, so JWT_SECRET is a validated
+// non-empty string from here on. TypeScript does not carry that narrowing into
+// the startServer() closure below, hence this already-narrowed alias.
+const VALIDATED_JWT_SECRET: string = JWT_SECRET;
+
 /**
  * Initialize and start the GraphQL server
  */
@@ -72,7 +77,7 @@ async function startServer() {
     });
     const dataLoaders = createDataLoaders(contractService);
     const pubsub = getPubSub();
-    const authService = new AuthService(JWT_SECRET);
+    const authService = new AuthService(VALIDATED_JWT_SECRET);
     const rateLimiter = new RateLimiterService(redis);
 
     console.log("✅ Services initialized");
