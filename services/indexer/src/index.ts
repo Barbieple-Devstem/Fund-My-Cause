@@ -1,9 +1,9 @@
 import "dotenv/config";
 import express, { Express } from "express";
 import pino from "pino";
-import { SorobanRPCClient } from "./rpc-client";
-import { HealthChecker } from "./health-checker";
-import { EventStore } from "./event-store";
+import { SorobanRPCClient } from "./rpc-client.js";
+import { HealthChecker } from "./health-checker.js";
+import { EventStore } from "./event-store.js";
 
 // Environment variables
 const PORT = parseInt(process.env.PORT ?? "3001", 10);

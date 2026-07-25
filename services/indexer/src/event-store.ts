@@ -1,5 +1,5 @@
 import pino from "pino";
-import type { IndexerEvent } from "./rpc-client";
+import type { IndexerEvent } from "./rpc-client.js";
 
 /**
  * In-memory event store (for MVP - replace with database)
