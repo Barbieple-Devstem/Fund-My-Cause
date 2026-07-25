@@ -7,15 +7,6 @@
   /* Text alignment */
   text-align: start;
 
-  /* Reverse flex row direction for icon+label pairs */
-  .flex-row-reverse-rtl {
-    flex-direction: row-reverse;
-  }
-
-  /* Flip absolute-positioned badges that use left/right */
-  .rtl-flip-x {
-    transform: scaleX(-1);
-  }
 
   /* Navigation and menus */
   nav .flex {
@@ -39,20 +30,6 @@
     unicode-bidi: plaintext;
   }
 
-  /* Progress bars fill from right in RTL */
-  .rtl-progress {
-    transform-origin: right;
-  }
-
-  /* Breadcrumb separators flip */
-  .breadcrumb-separator {
-    transform: scaleX(-1);
-  }
-
-  /* Icons that indicate direction (arrows, chevrons) should be mirrored */
-  .icon-directional {
-    transform: scaleX(-1);
-  }
 
   /* Logical margin/padding shorthands for common layout patterns */
   .ms-auto {
@@ -65,23 +42,6 @@
     margin-inline-start: 0;
   }
 
-  /* Toast notifications appear on the correct side */
-  .toast-container {
-    inset-inline-end: 1rem;
-    inset-inline-start: auto;
-  }
-
-  /* Modal close buttons should stay visually in the top-end corner */
-  .modal-close {
-    inset-inline-end: 1rem;
-    inset-inline-start: auto;
-  }
-
-  /* Dropdown menus open toward the start */
-  .dropdown-menu {
-    inset-inline-end: 0;
-    inset-inline-start: auto;
-  }
 }
 
 /* Logical property utilities — usable in both LTR and RTL */
