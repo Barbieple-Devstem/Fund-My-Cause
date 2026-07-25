@@ -107,6 +107,25 @@ import { ProgressBar } from "@fund-my-cause/components";
 - `showLabel`: boolean
 - `color`: "indigo" | "green" | "blue" | "red"
 
+## Prop Naming Conventions
+
+To maintain consistency across the component library, follow these naming patterns:
+
+### Boolean Props
+- Use `is*` prefix for state-like booleans: `isOpen`, `isLoading`, `isDisabled`
+- Use `*` or `has*` for feature flags: `disabled`, `required`, `hasError`
+
+### Event Handler Props
+- Use `on*` prefix with camelCase action: `onClick`, `onClose`, `onSubmit`, `onChange`
+
+### Size & Variant Props
+- Use explicit names: `size`, `variant`, `color`, `padding`
+- Values are lowercase or kebab-case
+
+### Other Props
+- Use clear, descriptive names
+- Avoid abbreviations unless standard (e.g., `aria-*` for ARIA attributes)
+
 ## Styling
 
 All components use Tailwind CSS for styling. Ensure Tailwind CSS is configured in your project.
