@@ -328,3 +328,33 @@ export function CampaignCard({
     </motion.div>
   );
 }
+
+// `onPledge`/`onShare` are recreated every parent render but are behaviorally
+// stable (they just forward to a state setter), so they're excluded here —
+// comparing them by reference would defeat the memoization on every list
+// update even though nothing this card renders actually changed.
+function campaignCardPropsAreEqual(
+  prev: CampaignCardProps,
+  next: CampaignCardProps,
+): boolean {
+  return (
+    prev.campaign.id === next.campaign.id &&
+    prev.campaign.title === next.campaign.title &&
+    prev.campaign.description === next.campaign.description &&
+    prev.campaign.image === next.campaign.image &&
+    prev.campaign.raised === next.campaign.raised &&
+    prev.campaign.goal === next.campaign.goal &&
+    prev.campaign.deadline === next.campaign.deadline &&
+    prev.campaign.category === next.campaign.category &&
+    prev.campaign.videoUrl === next.campaign.videoUrl &&
+    prev.campaign.contributorCount === next.campaign.contributorCount &&
+    prev.xlmPrice === next.xlmPrice &&
+    prev.index === next.index &&
+    prev.query === next.query
+  );
+}
+
+export const CampaignCard = React.memo(
+  CampaignCardComponent,
+  campaignCardPropsAreEqual,
+);
