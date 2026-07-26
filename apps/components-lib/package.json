@@ -14,9 +14,21 @@
       "import": "./src/Button.entry.ts",
       "types": "./src/Button.entry.ts"
     },
+    "./form-field": {
+      "import": "./src/FormField.entry.ts",
+      "types": "./src/FormField.entry.ts"
+    },
     "./input": {
       "import": "./src/Input.entry.ts",
       "types": "./src/Input.entry.ts"
+    },
+    "./select": {
+      "import": "./src/Select.entry.ts",
+      "types": "./src/Select.entry.ts"
+    },
+    "./textarea": {
+      "import": "./src/Textarea.entry.ts",
+      "types": "./src/Textarea.entry.ts"
     },
     "./modal": {
       "import": "./src/Modal.entry.ts",
@@ -41,6 +53,10 @@
     "./campaign-actions": {
       "import": "./src/CampaignActions.entry.ts",
       "types": "./src/CampaignActions.entry.ts"
+    },
+    "./examples": {
+      "import": "./src/examples/index.ts",
+      "types": "./src/examples/index.ts"
     }
   },
   "scripts": {

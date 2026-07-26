@@ -4,11 +4,22 @@
  */
 
 export { Button, type ButtonProps } from "./Button";
-export { Input, type InputProps } from "./Input";
 export { Modal, type ModalProps } from "./Modal";
 export { Card, CardHeader, CardBody, CardFooter, type CardProps } from "./Card";
 export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
 export { cn } from "./lib/utils";
+
+// ── Form primitives ────────────────────────────────────────────────────────
+export {
+  FormField,
+  getFieldErrorId,
+  getFieldHelperId,
+  type FormFieldProps,
+  type FormControlProps,
+} from "./FormField";
+export { Input, type InputProps } from "./Input";
+export { Select, type SelectProps, type SelectOption } from "./Select";
+export { Textarea, type TextareaProps } from "./Textarea";
 
 // ── Campaign card building blocks ──────────────────────────────────────────
 export {

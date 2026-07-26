@@ -8,6 +8,13 @@ import { SavedSearchManager } from "@/components/search/SavedSearchManager";
 import type { SearchFilters } from "@/services/search.service";
 import type { SearchSuggestion } from "@/hooks/useSearchSuggestions";
 import type { SavedSearch } from "@/services/savedSearch.service";
+import { Input, Select } from "@fund-my-cause/components";
+import {
+  FORM_FIELD_CLS,
+  FORM_INPUT_CLS_COMPACT,
+  FORM_LABEL_CLS_XS,
+  FORM_SELECT_CLS_INLINE,
+} from "@/lib/formStyles";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,11 +67,13 @@ const FILTER_TABS = [
   { label: "Ended", value: "ended" },
 ];
 
-const selectCls =
-  "bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:border-indigo-500";
-
-const inputCls =
-  "w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500";
+/** Styling handed to the shared form primitives in the advanced filter panel. */
+const filterFieldStyles = {
+  unstyled: true as const,
+  className: FORM_INPUT_CLS_COMPACT,
+  fieldClassName: FORM_FIELD_CLS,
+  labelClassName: FORM_LABEL_CLS_XS,
+};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -207,18 +216,15 @@ export function AdvancedSearch({
         </div>
 
         {/* Sort selector */}
-        <select
+        <Select
+          unstyled
+          className={FORM_SELECT_CLS_INLINE}
+          fieldClassName={FORM_FIELD_CLS}
           value={filters.sort ?? "recent"}
           onChange={(e) => onFilterChange("sort", e.target.value)}
           aria-label="Sort campaigns"
-          className={selectCls}
-        >
-          {SORT_OPTIONS.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          options={SORT_OPTIONS}
+        />
 
         {/* Mobile filters toggle */}
         <button
@@ -283,7 +289,9 @@ export function AdvancedSearch({
       {/* ── Mobile filters panel ──────────────────────────────────────────── */}
       {showMobileFilters && (
         <div className="rounded-2xl border border-gray-700 bg-gray-900 p-5 space-y-4 sm:hidden">
-          <h3 className="text-sm font-semibold text-gray-300">Filter by Status</h3>
+          <h3 className="text-sm font-semibold text-gray-300">
+            Filter by Status
+          </h3>
           <div className="flex flex-col gap-2">
             {FILTER_TABS.map((tab) => (
               <button
@@ -319,54 +327,38 @@ export function AdvancedSearch({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Min Goal (XLM)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={goalMin}
-                onChange={(e) => setGoalMin(e.target.value)}
-                placeholder="e.g. 1000"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Max Goal (XLM)
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={goalMax}
-                onChange={(e) => setGoalMax(e.target.value)}
-                placeholder="e.g. 50000"
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Deadline From
-              </label>
-              <input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className={inputCls}
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-gray-400">
-                Deadline To
-              </label>
-              <input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className={inputCls}
-              />
-            </div>
+            <Input
+              {...filterFieldStyles}
+              label="Min Goal (XLM)"
+              type="number"
+              min={0}
+              value={goalMin}
+              onChange={(e) => setGoalMin(e.target.value)}
+              placeholder="e.g. 1000"
+            />
+            <Input
+              {...filterFieldStyles}
+              label="Max Goal (XLM)"
+              type="number"
+              min={0}
+              value={goalMax}
+              onChange={(e) => setGoalMax(e.target.value)}
+              placeholder="e.g. 50000"
+            />
+            <Input
+              {...filterFieldStyles}
+              label="Deadline From"
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+            <Input
+              {...filterFieldStyles}
+              label="Deadline To"
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
           </div>
 
           <div className="flex gap-2 justify-end">
@@ -389,7 +381,9 @@ export function AdvancedSearch({
       {/* ── Saved searches panel ─────────────────────────────────────────── */}
       {onSaveSearch && (
         <div className="rounded-2xl border border-gray-700 bg-gray-900 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-300">Saved Searches</h3>
+          <h3 className="mb-3 text-sm font-semibold text-gray-300">
+            Saved Searches
+          </h3>
           <SavedSearchManager
             savedSearches={savedSearches}
             onRestore={onRestoreSearch ?? (() => {})}
