@@ -14,6 +14,10 @@ import { useBookmarks } from "@/context/BookmarkContext";
 import { getCategoryBySlug } from "@/lib/categories";
 import { getFallbackImage, isValidImageUri } from "@/lib/imageValidation";
 import { SIZES_CARD_THUMB } from "@/lib/imageOptimization";
+import {
+  calculateCampaignProgress,
+  calculateIsEnded,
+} from "@/lib/campaignProgress";
 import { useTranslations } from "next-intl";
 
 export interface CampaignCardProps {
@@ -53,7 +57,13 @@ function Highlight({ text, query }: { text: string; query?: string }) {
   );
 }
 
-function StatusBadge({ status, label }: { status: "funded" | "ended"; label: string }) {
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: "funded" | "ended";
+  label: string;
+}) {
   const icon = status === "funded" ? "✓" : "⏰";
   return (
     <span
@@ -64,7 +74,9 @@ function StatusBadge({ status, label }: { status: "funded" | "ended"; label: str
           : "bg-[var(--color-surface-elevated)]/90 text-[var(--color-text-secondary)]",
       )}
     >
-      <span aria-hidden="true" className="mr-1">{icon}</span>
+      <span aria-hidden="true" className="mr-1">
+        {icon}
+      </span>
       {label}
     </span>
   );
@@ -89,10 +101,15 @@ export function CampaignCard({
   query,
 }: CampaignCardProps) {
   const t = useTranslations("campaignCard");
-  const progress =
-    campaign.goal > 0 ? (campaign.raised / campaign.goal) * 100 : 0;
+  const progress = React.useMemo(
+    () => calculateCampaignProgress(campaign.raised, campaign.goal),
+    [campaign.raised, campaign.goal],
+  );
   const isFunded = progress >= 100;
-  const isEnded = !isFunded && new Date(campaign.deadline) < new Date();
+  const isEnded = React.useMemo(
+    () => calculateIsEnded(campaign.deadline, isFunded),
+    [campaign.deadline, isFunded],
+  );
   const isDisabled = isFunded || isEnded;
 
   // Resolve image: use campaign.image if valid, otherwise deterministic fallback
@@ -155,7 +172,9 @@ export function CampaignCard({
               e.stopPropagation();
               toggleBookmark(campaign.id);
             }}
-            aria-label={bookmarked ? t("removeBookmark") : t("bookmarkCampaign")}
+            aria-label={
+              bookmarked ? t("removeBookmark") : t("bookmarkCampaign")
+            }
             className="p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
           >
             <Bookmark
@@ -179,8 +198,12 @@ export function CampaignCard({
         </p>
         <ProgressBar progress={progress} />
         <div className="flex justify-between text-sm text-[var(--color-text-secondary)]">
-          <span>{formatXlm(campaign.raised, xlmPrice)} {t("raised")}</span>
-          <span>{formatXlm(campaign.goal, xlmPrice)} {t("goal")}</span>
+          <span>
+            {formatXlm(campaign.raised, xlmPrice)} {t("raised")}
+          </span>
+          <span>
+            {formatXlm(campaign.goal, xlmPrice)} {t("goal")}
+          </span>
         </div>
         <CountdownTimer deadline={campaign.deadline} />
         <label
