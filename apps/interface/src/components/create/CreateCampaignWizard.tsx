@@ -24,7 +24,13 @@ import { CampaignPreview } from "@/components/ui/CampaignPreview";
 import { VideoUploader } from "@/components/ui/VideoUploader";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import type { FAQ, TeamMember } from "@/types/campaign";
-import { getAccessibleInputProps, getErrorId } from "@/lib/accessibleFormUtils";
+import { FormField, Input, Select, Textarea } from "@fund-my-cause/components";
+import {
+  FORM_ERROR_CLS,
+  FORM_FIELD_CLS,
+  FORM_INPUT_CLS,
+  FORM_LABEL_CLS,
+} from "@/lib/formStyles";
 import {
   CheckCircle2,
   XCircle,
@@ -85,10 +91,19 @@ export const INITIAL: FormData = {
   feeBps: "",
 };
 
-const inputCls =
-  "w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500";
-const labelCls = "block text-sm text-gray-600 dark:text-gray-400 mb-1";
+/** Styling the wizard hands to every shared form primitive. */
+const fieldStyles = {
+  unstyled: true as const,
+  className: FORM_INPUT_CLS,
+  fieldClassName: FORM_FIELD_CLS,
+  labelClassName: FORM_LABEL_CLS,
+  errorClassName: FORM_ERROR_CLS,
+};
 
+/**
+ * Label wrapper for controls the shared primitives don't cover (uploaders and
+ * other composite widgets). Real inputs use `Input` / `Select` / `Textarea`.
+ */
 function Field({
   label,
   children,
@@ -97,71 +112,13 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className={labelCls}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-interface FieldWithErrorProps {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-  /** The field name used to generate accessible IDs for aria-describedby / aria-errormessage */
-  fieldName?: string;
-  /** Whether the field is required */
-  required?: boolean;
-  /** Whether there are additional instructions for this field */
-  hasInstructions?: boolean;
-}
-
-function FieldWithError({
-  label,
-  error,
-  children,
-  fieldName,
-  required,
-  hasInstructions,
-}: FieldWithErrorProps) {
-  const accessibleProps = fieldName
-    ? getAccessibleInputProps(fieldName, !!required, error, hasInstructions)
-    : {};
-
-  const childrenWithProps = React.Children.map(children, (child) => {
-    if (React.isValidElement(child) && fieldName) {
-      return React.cloneElement(
-        child,
-        accessibleProps as Record<string, unknown>,
-      );
-    }
-    return child;
-  });
-
-  return (
-    <div>
-      <label className={labelCls}>
-        {label}
-        {required && (
-          <span aria-hidden="true" className="text-red-500 ml-0.5">
-            *
-          </span>
-        )}
-      </label>
-      {childrenWithProps}
-      {error && fieldName && (
-        <p
-          id={getErrorId(fieldName)}
-          role="alert"
-          className="text-red-500 dark:text-red-400 text-xs mt-1"
-        >
-          {error}
-        </p>
-      )}
-      {error && !fieldName && (
-        <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>
-      )}
-    </div>
+    <FormField
+      label={label}
+      fieldClassName={FORM_FIELD_CLS}
+      labelClassName={FORM_LABEL_CLS}
+    >
+      {() => children}
+    </FormField>
   );
 }
 
@@ -184,109 +141,84 @@ function Step1({
 
   return (
     <div className="space-y-4">
-      <Field label="Contract ID">
-        <input
-          className={inputCls}
-          placeholder="C..."
-          value={data.contractId}
-          onChange={(e) => set("contractId", e.target.value)}
-        />
-      </Field>
-      <Field label="Token Address">
-        <input
-          className={inputCls}
-          placeholder="C..."
-          value={data.token}
-          onChange={(e) => set("token", e.target.value)}
-        />
-      </Field>
-      <FieldWithError
+      <Input
+        {...fieldStyles}
+        label="Contract ID"
+        placeholder="C..."
+        value={data.contractId}
+        onChange={(e) => set("contractId", e.target.value)}
+      />
+      <Input
+        {...fieldStyles}
+        label="Token Address"
+        placeholder="C..."
+        value={data.token}
+        onChange={(e) => set("token", e.target.value)}
+      />
+      <Input
+        {...fieldStyles}
         label="Title"
         error={titleError}
-        fieldName="title"
         required
-      >
-        <input
-          className={inputCls}
-          placeholder="My Campaign"
-          value={data.title}
-          onChange={(e) => set("title", e.target.value)}
-        />
-      </FieldWithError>
-      <FieldWithError
+        placeholder="My Campaign"
+        value={data.title}
+        onChange={(e) => set("title", e.target.value)}
+      />
+      <Textarea
+        {...fieldStyles}
         label="Description"
         error={descError}
-        fieldName="description"
         required
-      >
-        <textarea
-          rows={3}
-          className={inputCls}
-          placeholder="What are you raising funds for?"
-          value={data.description}
-          onChange={(e) => set("description", e.target.value)}
-        />
-      </FieldWithError>
-      <Field label="Category">
-        <select
-          className={inputCls}
-          value={data.category}
-          onChange={(e) => set("category", e.target.value)}
-        >
-          <option value="">Select a category…</option>
-          {CATEGORY_TAXONOMY.map((cat) => (
-            <option key={cat.slug} value={cat.slug}>
-              {cat.emoji} {cat.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+        rows={3}
+        placeholder="What are you raising funds for?"
+        value={data.description}
+        onChange={(e) => set("description", e.target.value)}
+      />
+      <Select
+        {...fieldStyles}
+        label="Category"
+        placeholder="Select a category…"
+        value={data.category}
+        onChange={(e) => set("category", e.target.value)}
+        options={CATEGORY_TAXONOMY.map((cat) => ({
+          value: cat.slug,
+          label: `${cat.emoji} ${cat.label}`,
+        }))}
+      />
       <div className="grid grid-cols-2 gap-4">
-        <FieldWithError
+        <Input
+          {...fieldStyles}
           label="Goal (XLM)"
           error={goalError}
-          fieldName="goal"
           required
-        >
-          <input
-            type="number"
-            min="1"
-            className={inputCls}
-            placeholder="10000"
-            value={data.goal}
-            onChange={(e) => set("goal", e.target.value)}
-          />
-        </FieldWithError>
-        <FieldWithError
+          type="number"
+          min="1"
+          placeholder="10000"
+          value={data.goal}
+          onChange={(e) => set("goal", e.target.value)}
+        />
+        <Input
+          {...fieldStyles}
           label="Min Contribution (XLM)"
           error={minContribError}
-          fieldName="minContribution"
           required
-        >
-          <input
-            type="number"
-            min="1"
-            className={inputCls}
-            placeholder="1"
-            value={data.minContribution}
-            onChange={(e) => set("minContribution", e.target.value)}
-          />
-        </FieldWithError>
+          type="number"
+          min="1"
+          placeholder="1"
+          value={data.minContribution}
+          onChange={(e) => set("minContribution", e.target.value)}
+        />
       </div>
-      <FieldWithError
+      <Input
+        {...fieldStyles}
         label="Deadline"
         error={deadlineError}
-        fieldName="deadline"
         required
-      >
-        <input
-          type="date"
-          className={inputCls}
-          value={data.deadline}
-          min={new Date().toISOString().split("T")[0]}
-          onChange={(e) => set("deadline", e.target.value)}
-        />
-      </FieldWithError>
+        type="date"
+        value={data.deadline}
+        min={new Date().toISOString().split("T")[0]}
+        onChange={(e) => set("deadline", e.target.value)}
+      />
     </div>
   );
 }
@@ -320,12 +252,13 @@ function Step2({
               <p className="text-xs text-gray-500 mb-2">
                 Or enter a video URL directly:
               </p>
-              <input
+              <Input
+                {...fieldStyles}
                 type="url"
+                aria-label="Campaign video URL"
                 placeholder="https://youtube.com/watch?v=... or https://example.com/video.mp4"
                 value={data.videoUrl}
                 onChange={(e) => set("videoUrl", e.target.value)}
-                className={inputCls}
               />
             </div>
           )}
@@ -397,8 +330,10 @@ function Step3({
             className="space-y-2 rounded-xl border border-gray-700 p-3"
           >
             <div className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
+              <Input
+                {...fieldStyles}
+                fieldClassName={`${FORM_FIELD_CLS} flex-1`}
+                aria-label="FAQ question"
                 placeholder="Question"
                 value={faq.question}
                 onChange={(e) => updateFaq(faq.id, "question", e.target.value)}
@@ -412,9 +347,10 @@ function Step3({
                 <Trash2 size={14} />
               </button>
             </div>
-            <textarea
+            <Textarea
+              {...fieldStyles}
               rows={2}
-              className={inputCls}
+              aria-label="FAQ answer"
               placeholder="Answer"
               value={faq.answer}
               onChange={(e) => updateFaq(faq.id, "answer", e.target.value)}
@@ -443,8 +379,10 @@ function Step3({
             className="space-y-2 rounded-xl border border-gray-700 p-3"
           >
             <div className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
+              <Input
+                {...fieldStyles}
+                fieldClassName={`${FORM_FIELD_CLS} flex-1`}
+                aria-label="Team member name"
                 placeholder="Name"
                 value={m.name}
                 onChange={(e) => updateMember(m.id, "name", e.target.value)}
@@ -458,20 +396,23 @@ function Step3({
                 <Trash2 size={14} />
               </button>
             </div>
-            <input
-              className={inputCls}
+            <Input
+              {...fieldStyles}
+              aria-label="Team member role"
               placeholder="Role (e.g. Lead Developer)"
               value={m.role}
               onChange={(e) => updateMember(m.id, "role", e.target.value)}
             />
-            <input
-              className={inputCls}
+            <Input
+              {...fieldStyles}
+              aria-label="Team member bio"
               placeholder="Bio (optional)"
               value={m.bio ?? ""}
               onChange={(e) => updateMember(m.id, "bio", e.target.value)}
             />
-            <input
-              className={inputCls}
+            <Input
+              {...fieldStyles}
+              aria-label="Team member avatar URL"
               placeholder="Avatar URL (optional)"
               value={m.avatarUrl ?? ""}
               onChange={(e) => updateMember(m.id, "avatarUrl", e.target.value)}
@@ -500,28 +441,24 @@ function Step4({
       <p className="text-sm text-gray-400">
         Optional. Leave blank to skip the platform fee.
       </p>
-      <Field label="Platform Fee Address">
-        <input
-          className={inputCls}
-          placeholder="G... or C..."
-          value={data.feeAddress}
-          onChange={(e) => set("feeAddress", e.target.value)}
-        />
-      </Field>
-      <FieldWithError
+      <Input
+        {...fieldStyles}
+        label="Platform Fee Address"
+        placeholder="G... or C..."
+        value={data.feeAddress}
+        onChange={(e) => set("feeAddress", e.target.value)}
+      />
+      <Input
+        {...fieldStyles}
         label="Fee (basis points, e.g. 250 = 2.5%)"
         error={feeError}
-      >
-        <input
-          type="number"
-          min="0"
-          max="10000"
-          className={inputCls}
-          placeholder="0"
-          value={data.feeBps}
-          onChange={(e) => set("feeBps", e.target.value)}
-        />
-      </FieldWithError>
+        type="number"
+        min="0"
+        max="10000"
+        placeholder="0"
+        value={data.feeBps}
+        onChange={(e) => set("feeBps", e.target.value)}
+      />
     </div>
   );
 }

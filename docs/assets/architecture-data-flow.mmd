@@ -1,0 +1,112 @@
+%% Fund-My-Cause — verified data flow across apps/interface, services and contracts.
+%%
+%% This diagram documents the architecture as it actually is, not as it was
+%% designed. Four structural seams are labelled explicitly:
+%%
+%%   1. Two independent frontend -> chain paths
+%%   2. Two independently-versioned Soroban RPC clients
+%%   3. A type-sharing gap between the services
+%%   4. Two disconnected alerting stacks
+%%
+%% Source of truth: docs/assets/architecture-data-flow.svg is rendered from this
+%% file. Regenerate with:  npx -p @mermaid-js/mermaid-cli mmdc \
+%%   -i docs/assets/architecture-data-flow.mmd \
+%%   -o docs/assets/architecture-data-flow.svg
+%%
+%% Last verified against the tree: 2026-07-26
+
+flowchart TB
+    subgraph FE["apps/interface (Next.js 16, @stellar/stellar-sdk 14.6.1)"]
+        UI["React routes &amp; components<br/>components/ui/CampaignCard.tsx"]
+        SOROBAN["lib/soroban.ts (616 lines)<br/>SorobanRpc.Server + Horizon.Server"]
+        STATUS["app/status/page.tsx<br/>fetch NEXT_PUBLIC_GRAPHQL_URL/status"]
+    end
+
+    subgraph GQL["services/graphql-api (Apollo Server 4)"]
+        RESOLVERS["resolvers.ts (404 lines)"]
+        CONTRACT["services/contract.ts (479 lines)<br/>ContractService"]
+        RPC1["rpc.Server<br/>@stellar/stellar-sdk 14.6.1"]
+        REDIS[("Redis cache")]
+    end
+
+    subgraph IDX["services/indexer"]
+        RPCCLIENT["rpc-client.ts (147 lines)<br/>SorobanRPCClient"]
+        RPC2["SorobanRpc.Server<br/>@stellar/stellar-sdk ^12.0.0"]
+        STORE[("event-store.ts<br/>local IndexerEvent[]")]
+    end
+
+    subgraph CHAIN["Stellar / Soroban"]
+        RPCNODE["Soroban RPC node"]
+        HORIZON["Horizon"]
+        CONTRACTS["contracts/crowdfund (Rust WASM)"]
+    end
+
+    subgraph TYPES["packages/types"]
+        TSHARED["CampaignStatus + CAMPAIGN_STATUS_VALUES"]
+        TREST["Campaign, Milestone, Comment,<br/>Api*Response, soroban DTOs"]
+    end
+
+    subgraph MONSVC["services/monitoring-service (port 9091)"]
+        INCIDENT["incident-response.ts<br/>in-process rules engine"]
+        PAGERDUTY["pagerduty-integration.ts"]
+        MSALERTS["POST /alerts, POST /incidents<br/>(no external caller)"]
+    end
+
+    subgraph INFRAMON["infrastructure/monitoring"]
+        PROM["prometheus.yml"]
+        PROMALERTS["prometheus-alerts.yml<br/>log-alert-rules.yml"]
+        ALERTMGR["alertmanager.yml<br/>receivers: PagerDuty + Slack only"]
+    end
+
+    %% ── Seam 1: two independent frontend -> chain paths ────────────────────
+    UI -->|"PATH A — direct RPC reads and tx submission"| SOROBAN
+    SOROBAN --> RPCNODE
+    SOROBAN --> HORIZON
+    UI --> STATUS
+    STATUS -->|"PATH B — HTTP to the GraphQL service"| RESOLVERS
+    RESOLVERS --> CONTRACT
+    CONTRACT --> RPC1
+    RPC1 --> RPCNODE
+    RESOLVERS <--> REDIS
+
+    %% ── Seam 2: a second, independently-versioned RPC client ───────────────
+    RPCCLIENT --> RPC2
+    RPC2 --> RPCNODE
+    RPCCLIENT --> STORE
+
+    RPCNODE --> CONTRACTS
+    HORIZON --> CONTRACTS
+
+    %% ── Seam 3: type sharing stops at CampaignStatus ───────────────────────
+    FE -.->|"imports Campaign, Milestone,<br/>Comment, Api*Response"| TREST
+    GQL -.->|"imports CampaignStatus only"| TSHARED
+    IDX -.->|"imports nothing —<br/>IndexerEvent defined locally"| TYPES
+
+    %% ── Seam 4: metrics flow, alerts do not ────────────────────────────────
+    PROM -->|"scrapes :9091/metrics<br/>(job mislabelled 'fund-my-cause-app')"| MSALERTS
+    PROMALERTS --> ALERTMGR
+    ALERTMGR --> EXTERNAL["PagerDuty / Slack"]
+    PAGERDUTY --> EXTERNAL
+    INCIDENT --> PAGERDUTY
+    MSALERTS --> INCIDENT
+
+    %% ── Explicit seam callouts ─────────────────────────────────────────────
+    N1["SEAM 1 — DUAL FRONTEND PATHS<br/>apps/interface reads chain state twice over:<br/>directly via lib/soroban.ts, and again via<br/>services/graphql-api. Neither funnels through<br/>the other; they can disagree."]
+    N2["SEAM 2 — DUAL RPC CLIENTS<br/>ContractService (SDK 14.6.1, rpc.Server) and<br/>SorobanRPCClient (SDK ^12.0.0, SorobanRpc.Server)<br/>each construct their own client. No shared<br/>factory, no shared retry/timeout policy."]
+    N3["SEAM 3 — TYPE-SHARING GAP<br/>packages/types exports the full domain, but only<br/>apps/interface consumes it. graphql-api imports<br/>CampaignStatus alone and redefines the rest in<br/>src/types.ts; indexer imports nothing and defines<br/>its own IndexerEvent. Event shapes are not shared."]
+    N4["SEAM 4 — DISCONNECTED ALERTING<br/>alertmanager.yml declares no webhook_configs, so<br/>no Prometheus alert ever reaches monitoring-service's<br/>POST /alerts. Its incident engine and PagerDuty<br/>client run on a parallel, unlinked track."]
+
+    N1 -.-> SOROBAN
+    N1 -.-> RESOLVERS
+    N2 -.-> RPC1
+    N2 -.-> RPC2
+    N3 -.-> TYPES
+    N4 -.-> ALERTMGR
+    N4 -.-> MSALERTS
+
+    classDef seam fill:#fff4e5,stroke:#d97706,stroke-width:2px,color:#7c2d12,text-align:left;
+    classDef chain fill:#eef2ff,stroke:#4f46e5,color:#312e81;
+    classDef store fill:#f1f5f9,stroke:#64748b,color:#0f172a;
+    class N1,N2,N3,N4 seam;
+    class RPCNODE,HORIZON,CONTRACTS chain;
+    class REDIS,STORE store;

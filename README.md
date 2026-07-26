@@ -19,6 +19,18 @@ Check out our public roadmap to see what's coming next!
 
 ![System Architecture](./docs/assets/architecture.svg)
 
+### Verified data flow
+
+The diagram below documents how `apps/interface`, `services/*` and `contracts/`
+actually talk to each other today — not the idealized design. It explicitly
+labels four structural seams: the dual frontend→chain paths, the two
+independently-versioned Soroban RPC clients, the type-sharing gap between
+services, and the two disconnected alerting stacks.
+
+![Verified data flow across apps/interface, services and contracts](./docs/assets/architecture-data-flow.svg)
+
+> Diagram source (edit this, then re-render): [docs/assets/architecture-data-flow.mmd](./docs/assets/architecture-data-flow.mmd)
+
 > Full component details and data-flow walkthroughs: [docs/architecture.md](./docs/architecture.md)  
 > Backend & indexer architecture: [docs/backend-architecture.md](./docs/backend-architecture.md)
 

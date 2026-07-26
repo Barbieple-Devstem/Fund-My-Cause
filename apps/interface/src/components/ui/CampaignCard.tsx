@@ -3,11 +3,21 @@
 import React from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { Bookmark, GitCompare, Share2 } from "lucide-react";
+import { GitCompare } from "lucide-react";
+import {
+  CampaignActions,
+  CampaignHeader,
+  CampaignProgress,
+} from "@fund-my-cause/components";
+import {
+  calculateProgress,
+  formatXlmWithUsd,
+  isCampaignEnded,
+  isCampaignFunded,
+} from "@fund-my-cause/shared-utils";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
-import { formatXlm } from "@/lib/price";
 import type { Campaign } from "@/types/campaign";
 import { useComparison } from "@/context/ComparisonContext";
 import { useBookmarks } from "@/context/BookmarkContext";
@@ -92,7 +102,18 @@ function CategoryBadge({ slug }: { slug?: string }) {
   );
 }
 
-function CampaignCardComponent({
+const ICON_BUTTON_CLS =
+  "p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center";
+
+/**
+ * Campaign card for listing, search, bookmark and dashboard views.
+ *
+ * The card is a composition shell: identity comes from `CampaignHeader`,
+ * funding from `CampaignProgress` and controls from `CampaignActions`, all
+ * from `@fund-my-cause/components`. Progress maths and amount formatting come
+ * from `@fund-my-cause/shared-utils` — nothing is computed inline here.
+ */
+export function CampaignCard({
   campaign,
   onPledge,
   onShare,
@@ -117,12 +138,19 @@ function CampaignCardComponent({
   const [imgSrc, setImgSrc] = React.useState<string>(
     isValidImageUri(campaign.image) ? campaign.image : fallbackSrc,
   );
+  const isDisabled = isFunded || isEnded;
 
   const { toggle: toggleCompare, isSelected, selected } = useComparison();
   const { toggle: toggleBookmark, isBookmarked } = useBookmarks();
   const compared = isSelected(campaign.id);
   const bookmarked = isBookmarked(campaign.id);
   const compareDisabled = !compared && selected.length >= 4;
+
+  const pledgeAriaLabel = isFunded
+    ? t("fundedAriaLabel", { title: campaign.title })
+    : isEnded
+      ? t("endedAriaLabel", { title: campaign.title })
+      : t("pledgeAriaLabel", { title: campaign.title });
 
   return (
     <motion.div
@@ -135,31 +163,58 @@ function CampaignCardComponent({
       }}
       className="ds-card"
     >
-      <div className="relative">
-        <div className="relative w-full h-48 sm:h-48">
+      <CampaignHeader
+        title={campaign.title}
+        description={<Highlight text={campaign.description} query={query} />}
+        renderTitle={(title) => <Highlight text={title} query={query} />}
+        imageUrl={isValidImageUri(campaign.image) ? campaign.image : undefined}
+        fallbackImageUrl={getFallbackImage(campaign.id)}
+        imageAlt={`${campaign.title} - campaign header image`}
+        renderImage={({ src, alt, onError }) => (
           <Image
-            src={imgSrc}
-            alt={`${campaign.title} - campaign header image`}
+            src={src}
+            alt={alt}
             fill
             className="object-cover"
             sizes={SIZES_CARD_THUMB}
-            onError={() => setImgSrc(fallbackSrc)}
+            onError={onError}
           />
-        </div>
-        {isFunded && <StatusBadge status="funded" label={t("funded")} />}
-        {isEnded && <StatusBadge status="ended" label={t("ended")} />}
-        {campaign.videoUrl && (
-          <span className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
-            ▶ {t("video")}
-          </span>
         )}
-        <CategoryBadge slug={campaign.category} />
-        <div className="absolute top-10 right-3 flex gap-1">
-          {onShare && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onShare(campaign.id, campaign.title);
+        classNames={{
+          media: "relative w-full h-48 sm:h-48",
+          body: "p-4 sm:p-5 space-y-3",
+          title:
+            "text-base sm:text-lg font-semibold text-[var(--color-text-primary)]",
+          description:
+            "text-[var(--color-text-secondary)] text-sm line-clamp-2",
+        }}
+        overlay={
+          <>
+            {isFunded && <StatusBadge status="funded" label={t("funded")} />}
+            {isEnded && <StatusBadge status="ended" label={t("ended")} />}
+            {campaign.videoUrl && (
+              <span className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/70 text-white text-xs px-2 py-0.5 rounded-full">
+                ▶ {t("video")}
+              </span>
+            )}
+            <CategoryBadge slug={campaign.category} />
+            <CampaignActions
+              unstyled
+              layout="inline"
+              className="absolute top-10 right-3 flex gap-1"
+              onShare={
+                onShare ? () => onShare(campaign.id, campaign.title) : undefined
+              }
+              shareAriaLabel={t("shareCampaign")}
+              onSave={() => toggleBookmark(campaign.id)}
+              saved={bookmarked}
+              saveAriaLabel={t("bookmarkCampaign")}
+              unsaveAriaLabel={t("removeBookmark")}
+              classNames={{
+                iconButton: ICON_BUTTON_CLS,
+                icon: "text-[var(--color-text-muted)]",
+                savedIcon:
+                  "fill-[var(--color-brand)] text-[var(--color-brand)]",
               }}
               aria-label={t("shareCampaign")}
               className="p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
@@ -185,9 +240,21 @@ function CampaignCardComponent({
                   : "text-[var(--color-text-muted)]",
               )}
             />
-          </button>
-        </div>
-      </div>
+          </>
+        }
+      >
+        <CampaignProgress
+          percent={progress}
+          renderBar={({ percent }) => <ProgressBar progress={percent} />}
+          raisedText={`${formatXlmWithUsd(campaign.raised, xlmPrice)} ${t("raised")}`}
+          goalText={`${formatXlmWithUsd(campaign.goal, xlmPrice)} ${t("goal")}`}
+          timeRemaining={<CountdownTimer deadline={campaign.deadline} />}
+          classNames={{
+            root: "space-y-3",
+            amounts:
+              "flex justify-between text-sm text-[var(--color-text-secondary)]",
+          }}
+        />
 
       <div className="p-4 sm:p-5 space-y-3">
         <h2 className="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">
@@ -228,19 +295,36 @@ function CampaignCardComponent({
           disabled={isDisabled}
           aria-label={
             isFunded
-              ? t("fundedAriaLabel", { title: campaign.title })
+              ? t("successfullyFunded")
               : isEnded
-                ? t("endedAriaLabel", { title: campaign.title })
-                : t("pledgeAriaLabel", { title: campaign.title })
+                ? t("campaignEnded")
+                : t("pledgeNow")
           }
+          classNames={{
+            donate:
+              "ds-btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation",
+          }}
         >
-          {isFunded
-            ? t("successfullyFunded")
-            : isEnded
-              ? t("campaignEnded")
-              : t("pledgeNow")}
-        </button>
-      </div>
+          <label
+            className={cn(
+              "flex items-center gap-2 text-xs cursor-pointer select-none touch-manipulation",
+              compareDisabled && "opacity-40 cursor-not-allowed",
+            )}
+          >
+            <input
+              type="checkbox"
+              checked={compared}
+              disabled={compareDisabled}
+              onChange={() => toggleCompare(campaign.id)}
+              className="accent-[var(--color-brand)] w-4 h-4"
+            />
+            <GitCompare size={12} className="text-[var(--color-text-muted)]" />
+            <span className="text-[var(--color-text-muted)]">
+              {t("compare")}
+            </span>
+          </label>
+        </CampaignActions>
+      </CampaignHeader>
     </motion.div>
   );
 }

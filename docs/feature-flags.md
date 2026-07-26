@@ -41,14 +41,14 @@ export default function App() {
 ```tsx
 import { useFeatureFlag, FeatureFlag } from '@/lib/use-feature-flags';
 
-export function CampaignCard() {
-  const hasCategories = useFeatureFlag('campaign_categories');
-  const hasImageUpload = useFeatureFlag('campaign_image_upload');
+export function ContributionForm() {
+  const hasRecurring = useFeatureFlag('recurring_contributions');
+  const hasAnonymous = useFeatureFlag('anonymous_contributions');
 
   return (
     <div>
-      {hasCategories && <CategorySelector />}
-      {hasImageUpload && <ImageUploader />}
+      {hasRecurring && <RecurringSchedulepicker />}
+      {hasAnonymous && <AnonymousToggle />}
     </div>
   );
 }
@@ -62,8 +62,8 @@ import { FeatureFlag } from '@/lib/use-feature-flags';
 export function Dashboard() {
   return (
     <>
-      <FeatureFlag name="campaign_analytics">
-        <AnalyticsDashboard />
+      <FeatureFlag name="ai_recommendations">
+        <RecommendedCampaigns />
       </FeatureFlag>
 
       <FeatureFlag name="advanced_filters" fallback={<BasicFilters />}>
@@ -80,18 +80,23 @@ Feature flags are defined in `src/lib/feature-flag-config.ts`:
 
 ```typescript
 export const FEATURE_FLAGS: Record<string, FeatureFlag> = {
-  CAMPAIGN_CATEGORIES: {
-    name: 'campaign_categories',
+  RECURRING_CONTRIBUTIONS: {
+    name: 'recurring_contributions',
     enabled: true,
-    rolloutPercentage: 100,
+    rolloutPercentage: 50,
     metadata: {
-      description: 'Enable campaign categories feature',
-      releaseDate: '2026-04-27',
+      description: 'Enable recurring contribution feature',
+      releaseDate: '2026-05-01',
     },
   },
   // ... more flags
 };
 ```
+
+Only flags whose outcome is still undecided live here. A flag at 100% rollout
+always returns `true` and a permanently disabled flag always returns `false` —
+both are dead configuration, so they get retired (see
+[Cleanup](#4-cleanup)) rather than left in place.
 
 ### Flag Properties
 
@@ -190,7 +195,7 @@ The UI allows you to:
 Check if a feature is enabled:
 
 ```tsx
-const isEnabled = useFeatureFlag('campaign_categories');
+const isEnabled = useFeatureFlag('recurring_contributions');
 ```
 
 #### `useFeatureFlagConfig(flagName: string): FeatureFlag | undefined`
@@ -198,7 +203,7 @@ const isEnabled = useFeatureFlag('campaign_categories');
 Get the full flag configuration:
 
 ```tsx
-const flag = useFeatureFlagConfig('campaign_categories');
+const flag = useFeatureFlagConfig('recurring_contributions');
 console.log(flag?.rolloutPercentage);
 ```
 
@@ -227,7 +232,7 @@ useRegisterFeatureFlag({
 Update a feature flag:
 
 ```tsx
-const updateFlag = useUpdateFeatureFlag('campaign_categories', {
+const updateFlag = useUpdateFeatureFlag('recurring_contributions', {
   rolloutPercentage: 75,
 });
 updateFlag();
@@ -240,7 +245,7 @@ updateFlag();
 Check if a feature is enabled (outside React):
 
 ```typescript
-if (isFeatureEnabled('campaign_categories', userId, userGroups)) {
+if (isFeatureEnabled('recurring_contributions', userId, userGroups)) {
   // Feature is enabled
 }
 ```
@@ -262,7 +267,7 @@ registerFeatureFlag({
 Update a feature flag (outside React):
 
 ```typescript
-updateFeatureFlag('campaign_categories', {
+updateFeatureFlag('recurring_contributions', {
   rolloutPercentage: 75,
 });
 ```
@@ -275,7 +280,7 @@ Use clear, descriptive names:
 
 ```typescript
 // Good
-'campaign_categories'
+'anonymous_contributions'
 'recurring_contributions'
 'ai_recommendations'
 
@@ -320,12 +325,27 @@ export function useFeatureFlagWithTracking(flagName: string) {
 
 ### 4. Cleanup
 
-Remove flags after full rollout:
+A flag is *resolved* once it can only ever evaluate one way: `enabled: true` at
+`rolloutPercentage: 100` with no target group (permanently on), or `enabled:
+false` at `rolloutPercentage: 0` (permanently off). Resolved flags are removed,
+not left pinned — a stale flag makes reviewers hunt for a branch that no longer
+has two sides.
 
-```typescript
-// After 100% rollout for 2 weeks, remove the flag
-// and make the feature permanent
-```
+Retirement checklist, in order:
+
+1. Confirm with the feature owner that the rollout is finished and won't be
+   reverted.
+2. Delete the dead branch at every call site, keeping only the live path, and
+   inline any condition that has become unconditional.
+3. Remove the flag's entry from `src/lib/feature-flag-config.ts`.
+4. Delete any test mocks or stubs that referenced the flag.
+5. Re-run the component test suite — behaviour should be unchanged.
+
+Flags retired in the 2026-07 sweep (issue #864): `campaign_categories`,
+`campaign_updates`, `campaign_image_upload`, `social_sharing`,
+`campaign_analytics`, `lazy_loading` and `image_optimization` (all at 100%),
+plus `maintenance_mode` (permanently off). Each had already been rolled out to
+completion and no component branched on it, so no call sites needed inlining.
 
 ### 5. Documentation
 
@@ -421,12 +441,12 @@ export function CampaignForm() {
 
 ```tsx
 export function Dashboard() {
-  const hasAnalytics = useFeatureFlag('campaign_analytics');
+  const hasRecommendations = useFeatureFlag('ai_recommendations');
   const hasAdvancedFilters = useFeatureFlag('advanced_filters');
 
   return (
     <div>
-      {hasAnalytics && <AnalyticsDashboard />}
+      {hasRecommendations && <RecommendedCampaigns />}
       {hasAdvancedFilters && <AdvancedFilters />}
     </div>
   );

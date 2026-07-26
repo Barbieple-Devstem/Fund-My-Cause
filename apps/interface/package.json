@@ -21,6 +21,8 @@
     "check:routes": "node scripts/check-route-duplication.cjs"
   },
   "dependencies": {
+    "@fund-my-cause/components": "*",
+    "@fund-my-cause/shared-utils": "*",
     "@fund-my-cause/types": "*",
     "@stellar/freighter-api": "6.0.1",
     "@stellar/stellar-sdk": "14.6.1",
