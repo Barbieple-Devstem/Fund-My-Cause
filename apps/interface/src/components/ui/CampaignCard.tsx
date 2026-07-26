@@ -24,6 +24,10 @@ import { useBookmarks } from "@/context/BookmarkContext";
 import { getCategoryBySlug } from "@/lib/categories";
 import { getFallbackImage, isValidImageUri } from "@/lib/imageValidation";
 import { SIZES_CARD_THUMB } from "@/lib/imageOptimization";
+import {
+  calculateCampaignProgress,
+  calculateIsEnded,
+} from "@/lib/campaignProgress";
 import { useTranslations } from "next-intl";
 
 export interface CampaignCardProps {
@@ -118,12 +122,21 @@ export function CampaignCard({
   query,
 }: CampaignCardProps) {
   const t = useTranslations("campaignCard");
-  const progress = calculateProgress(campaign.raised, campaign.goal);
-  const isFunded = isCampaignFunded(campaign.raised, campaign.goal);
-  const isEnded = isCampaignEnded(
-    campaign.deadline,
-    campaign.raised,
-    campaign.goal,
+  const progress = React.useMemo(
+    () => calculateCampaignProgress(campaign.raised, campaign.goal),
+    [campaign.raised, campaign.goal],
+  );
+  const isFunded = progress >= 100;
+  const isEnded = React.useMemo(
+    () => calculateIsEnded(campaign.deadline, isFunded),
+    [campaign.deadline, isFunded],
+  );
+  const isDisabled = isFunded || isEnded;
+
+  // Resolve image: use campaign.image if valid, otherwise deterministic fallback
+  const fallbackSrc = getFallbackImage(campaign.id);
+  const [imgSrc, setImgSrc] = React.useState<string>(
+    isValidImageUri(campaign.image) ? campaign.image : fallbackSrc,
   );
   const isDisabled = isFunded || isEnded;
 
@@ -203,6 +216,29 @@ export function CampaignCard({
                 savedIcon:
                   "fill-[var(--color-brand)] text-[var(--color-brand)]",
               }}
+              aria-label={t("shareCampaign")}
+              className="p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+            >
+              <Share2 size={15} className="text-[var(--color-text-muted)]" />
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleBookmark(campaign.id);
+            }}
+            aria-label={
+              bookmarked ? t("removeBookmark") : t("bookmarkCampaign")
+            }
+            className="p-2 rounded-full bg-[var(--color-surface)]/80 hover:bg-[var(--color-surface-elevated)] transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+          >
+            <Bookmark
+              size={15}
+              className={cn(
+                bookmarked
+                  ? "fill-[var(--color-brand)] text-[var(--color-brand)]"
+                  : "text-[var(--color-text-muted)]",
+              )}
             />
           </>
         }
@@ -220,13 +256,44 @@ export function CampaignCard({
           }}
         />
 
-        <CampaignActions
-          unstyled
-          className="space-y-3"
-          onDonate={onPledge ? () => onPledge(campaign.id) : undefined}
-          donateDisabled={isDisabled}
-          donateAriaLabel={pledgeAriaLabel}
-          donateLabel={
+      <div className="p-4 sm:p-5 space-y-3">
+        <h2 className="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">
+          <Highlight text={campaign.title} query={query} />
+        </h2>
+        <p className="text-[var(--color-text-secondary)] text-sm line-clamp-2">
+          <Highlight text={campaign.description} query={query} />
+        </p>
+        <ProgressBar progress={progress} />
+        <div className="flex justify-between text-sm text-[var(--color-text-secondary)]">
+          <span>
+            {formatXlm(campaign.raised, xlmPrice)} {t("raised")}
+          </span>
+          <span>
+            {formatXlm(campaign.goal, xlmPrice)} {t("goal")}
+          </span>
+        </div>
+        <CountdownTimer deadline={campaign.deadline} />
+        <label
+          className={cn(
+            "flex items-center gap-2 text-xs cursor-pointer select-none touch-manipulation",
+            compareDisabled && "opacity-40 cursor-not-allowed",
+          )}
+        >
+          <input
+            type="checkbox"
+            checked={compared}
+            disabled={compareDisabled}
+            onChange={() => toggleCompare(campaign.id)}
+            className="accent-[var(--color-brand)] w-4 h-4"
+          />
+          <GitCompare size={12} className="text-[var(--color-text-muted)]" />
+          <span className="text-[var(--color-text-muted)]">{t("compare")}</span>
+        </label>
+        <button
+          className="ds-btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+          onClick={() => onPledge?.(campaign.id)}
+          disabled={isDisabled}
+          aria-label={
             isFunded
               ? t("successfullyFunded")
               : isEnded

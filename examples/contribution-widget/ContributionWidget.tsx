@@ -17,6 +17,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { FmcClient, CampaignStats, CampaignInfo, FmcContractError } from "@fund-my-cause/sdk";
+import { ProgressBar } from "@fund-my-cause/components";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,16 +109,7 @@ export function ContributionWidget({
       <h3 className="fmc-widget__title">{info.title}</h3>
 
       {/* Progress bar */}
-      <div className="fmc-widget__progress-track" aria-label="Funding progress">
-        <div
-          className="fmc-widget__progress-fill"
-          style={{ width: `${progressPct}%` }}
-          role="progressbar"
-          aria-valuenow={progressPct}
-          aria-valuemin={0}
-          aria-valuemax={100}
-        />
-      </div>
+      <ProgressBar progress={progressPct} showLabel={false} />
       <div className="fmc-widget__progress-label">
         <span>{stats.raisedXlm.toFixed(2)} XLM raised</span>
         <span>{progressPct.toFixed(1)}% of {stats.goalXlm.toFixed(2)} XLM</span>

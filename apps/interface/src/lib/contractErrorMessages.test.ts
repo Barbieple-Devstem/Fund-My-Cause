@@ -46,6 +46,17 @@ describe("contractErrorMessages", () => {
         expect(message).not.toContain("undefined");
       }
     });
+
+    describe("each explicitly mapped error code", () => {
+      it.each(
+        Object.entries(CONTRACT_ERROR_CODES).map(([code, expected]) => [
+          Number(code),
+          expected,
+        ]),
+      )("should map code %i to %p", (code, expected) => {
+        expect(getErrorMessage(code)).toBe(expected);
+      });
+    });
   });
 
   describe("parseContractError", () => {
