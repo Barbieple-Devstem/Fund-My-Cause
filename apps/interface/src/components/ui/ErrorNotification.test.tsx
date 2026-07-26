@@ -1,5 +1,4 @@
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ErrorNotification } from "./ErrorNotification";
 import { getErrorMessage } from "@/lib/contractErrorMessages";
 
@@ -48,7 +47,7 @@ describe("ErrorNotification", () => {
     expect(screen.getByText("Error code: 32")).toBeInTheDocument();
   });
 
-  it("should call onClose when close button is clicked", async () => {
+  it("should call onClose when close button is clicked", () => {
     const handleClose = jest.fn();
     render(
       <ErrorNotification
@@ -59,7 +58,7 @@ describe("ErrorNotification", () => {
     );
 
     const closeButton = screen.getByLabelText("Close error notification");
-    await userEvent.click(closeButton);
+    fireEvent.click(closeButton);
 
     expect(handleClose).toHaveBeenCalled();
   });
@@ -135,7 +134,7 @@ describe("ErrorNotification", () => {
   });
 
   describe("mapped vs. fallback contract error copy", () => {
-    it("renders the mapped message, is visible, and is dismissible for a known code", async () => {
+    it("renders the mapped message, is visible, and is dismissible for a known code", () => {
       const handleClose = jest.fn();
       const message = getErrorMessage(2);
 
@@ -154,11 +153,11 @@ describe("ErrorNotification", () => {
       ).toBeInTheDocument();
       expect(screen.getByText("Error code: 2")).toBeInTheDocument();
 
-      await userEvent.click(screen.getByLabelText("Close error notification"));
+      fireEvent.click(screen.getByLabelText("Close error notification"));
       expect(handleClose).toHaveBeenCalled();
     });
 
-    it("renders the generic fallback message, is visible, and is dismissible for an unknown code", async () => {
+    it("renders the generic fallback message, is visible, and is dismissible for an unknown code", () => {
       const handleClose = jest.fn();
       const unknownCode = 9999;
       const message = getErrorMessage(unknownCode);
@@ -179,7 +178,7 @@ describe("ErrorNotification", () => {
         ),
       ).toBeInTheDocument();
 
-      await userEvent.click(screen.getByLabelText("Close error notification"));
+      fireEvent.click(screen.getByLabelText("Close error notification"));
       expect(handleClose).toHaveBeenCalled();
     });
   });
