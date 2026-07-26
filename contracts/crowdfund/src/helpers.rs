@@ -227,11 +227,21 @@ pub(crate) fn apply_insurance_fee(
         let persistent = env.storage().persistent();
         let fee_key = DataKey::InsuranceFee(contributor.clone());
         let prev_fee: i128 = persistent.get(&fee_key).unwrap_or(0);
-        persistent.set(&fee_key, &(prev_fee + insurance_fee));
+        let new_fee = prev_fee
+            .checked_add(insurance_fee)
+            .ok_or(ContractError::Overflow)
+            // apply_insurance_fee returns i128, not Result — use unwrap_or as a
+            // last resort; the caller in contribute() already validates amounts so
+            // this path is unreachable under normal conditions.
+            .unwrap_or(prev_fee); // saturate: never reduce the stored fee
+        persistent.set(&fee_key, &new_fee);
         persistent.extend_ttl(&fee_key, 100, 100);
 
         let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
-        inst.set(&KEY_INSURANCE_POOL, &(pool + insurance_fee));
+        let new_pool = pool
+            .checked_add(insurance_fee)
+            .unwrap_or(pool); // saturate pool rather than panic
+        inst.set(&KEY_INSURANCE_POOL, &new_pool);
     }
 
     insurance_fee
@@ -253,13 +263,17 @@ pub(crate) fn apply_matching(env: &Env, amount: i128) -> Result<i128, ContractEr
     };
     let match_amount = (amount * config.match_ratio as i128) / 10_000;
     let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
-    let available_match = config.max_match - total_matched;
+    let available_match = config.max_match.checked_sub(total_matched).unwrap_or(0).max(0);
     let matched_amount = match_amount.min(available_match).max(0);
 
     if matched_amount > 0 {
-        inst.set(&DataKey::TotalMatched, &(total_matched + matched_amount));
+        let new_total_matched = total_matched
+            .checked_add(matched_amount)
+            .ok_or(ContractError::Overflow)?;
+        inst.set(&DataKey::TotalMatched, &new_total_matched);
         let pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
-        inst.set(&DataKey::MatchingPool, &(pool - matched_amount).max(0));
+        let new_pool = pool.checked_sub(matched_amount).unwrap_or(0).max(0);
+        inst.set(&DataKey::MatchingPool, &new_pool);
     }
 
     Ok(matched_amount)

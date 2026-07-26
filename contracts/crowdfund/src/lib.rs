@@ -610,7 +610,10 @@ impl CrowdfundContract {
         // ── #698: Per-contribution fee deduction (OnContribution mode) ────────
         // Track gross total regardless of fee mode so stats can report both.
         // Uses the `gross_total` value hoisted from the upfront batch above.
-        inst.set(&KEY_GROSS_TOTAL, &(gross_total.checked_add(amount).unwrap_or(gross_total)));
+        let new_gross_total = gross_total
+            .checked_add(amount)
+            .ok_or(ContractError::Overflow)?;
+        inst.set(&KEY_GROSS_TOTAL, &new_gross_total);
 
         let contrib_fee: i128 = if let Some(ref config) = platform_config {
             if config.fee_mode == FeeMode::OnContribution {
@@ -645,11 +648,17 @@ impl CrowdfundContract {
         if insurance_fee > 0 {
             let fee_key = DataKey::InsuranceFee(contributor.clone());
             let prev_fee: i128 = env.storage().persistent().get(&fee_key).unwrap_or(0);
-            env.storage().persistent().set(&fee_key, &(prev_fee + insurance_fee));
+            let new_fee = prev_fee
+                .checked_add(insurance_fee)
+                .ok_or(ContractError::Overflow)?;
+            env.storage().persistent().set(&fee_key, &new_fee);
             env.storage().persistent().extend_ttl(&fee_key, 100, 100);
 
             let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
-            inst.set(&KEY_INSURANCE_POOL, &(pool + insurance_fee));
+            let new_pool = pool
+                .checked_add(insurance_fee)
+                .ok_or(ContractError::Overflow)?;
+            inst.set(&KEY_INSURANCE_POOL, &new_pool);
         }
 
         // ── Update contributor balance (single write) ─────────────────────────
@@ -676,13 +685,20 @@ impl CrowdfundContract {
         if let Some(config) = matching_config {
             let match_amount = (effective_amount * config.match_ratio as i128) / 10_000;
             let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
-            let available_match = config.max_match - total_matched;
+            let available_match = config.max_match
+                .checked_sub(total_matched)
+                .unwrap_or(0)
+                .max(0);
             matched_amount = match_amount.min(available_match).max(0);
             if matched_amount > 0 {
-                inst.set(&DataKey::TotalMatched, &(total_matched + matched_amount));
+                let new_total_matched = total_matched
+                    .checked_add(matched_amount)
+                    .ok_or(ContractError::Overflow)?;
+                inst.set(&DataKey::TotalMatched, &new_total_matched);
                 // Deduct from the escrowed pool so the accounting stays correct
                 let pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
-                inst.set(&DataKey::MatchingPool, &(pool - matched_amount).max(0));
+                let new_pool = pool.checked_sub(matched_amount).unwrap_or(0).max(0);
+                inst.set(&DataKey::MatchingPool, &new_pool);
             }
         }
 
@@ -713,7 +729,8 @@ impl CrowdfundContract {
             env.storage().persistent().extend_ttl(&index_key, 100, 100);
 
             // Use cached `count` — single write
-            inst.set(&DataKey::ContributorCount, &(count + 1));
+            let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
+            inst.set(&DataKey::ContributorCount, &new_count);
         }
 
         // Track updated contributor count for events
@@ -891,7 +908,10 @@ impl CrowdfundContract {
                 payout
             } else {
                 let elapsed = now - v.cliff;
-                payout * elapsed as i128 / v.duration as i128
+                payout
+                    .checked_mul(elapsed as i128)
+                    .ok_or(ContractError::Overflow)?
+                    / v.duration as i128
             };
             token_client.transfer(&env.current_contract_address(), &creator, &vested);
             payout = vested;
@@ -1053,8 +1073,14 @@ impl CrowdfundContract {
             &payout,
         );
 
-        stream.claimed += claimable;
-        let remaining = total - stream.claimed;
+        stream.claimed = stream
+            .claimed
+            .checked_add(claimable)
+            .ok_or(ContractError::Overflow)?;
+        let remaining = total
+            .checked_sub(stream.claimed)
+            .ok_or(ContractError::Overflow)?
+            .max(0);
 
         inst.set(&KEY_STREAM, &stream);
         if remaining == 0 {
@@ -1514,8 +1540,11 @@ impl CrowdfundContract {
                 if released > 0 && total > 0 {
                     // unreleased_ratio = (total - released) / total
                     // contributor_refund = amount * unreleased_ratio
-                    let unreleased = (total - released).max(0);
-                    amount * unreleased / total
+                    let unreleased = total.saturating_sub(released).max(0);
+                    amount
+                        .checked_mul(unreleased)
+                        .ok_or(ContractError::Overflow)?
+                        / total
                 } else {
                     amount
                 }
@@ -1901,7 +1930,7 @@ impl CrowdfundContract {
             .set(&DataKey::EmergencyApproval(approver.clone()), &lock_until);
 
         let count: u32 = inst.get(&DataKey::EmergencyApprovalCount).unwrap_or(0);
-        let new_count = count + 1;
+        let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::EmergencyApprovalCount, &new_count);
 
         env.events().publish(
@@ -3004,9 +3033,10 @@ impl CrowdfundContract {
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &delegator);
             env.storage().persistent().extend_ttl(&index_key, 100, 100);
+            let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
             env.storage()
                 .instance()
-                .set(&DataKey::ContributorCount, &(count + 1));
+                .set(&DataKey::ContributorCount, &new_count);
         }
 
         env.events().publish(
@@ -3466,7 +3496,9 @@ impl CrowdfundContract {
         // Progress is measured against the soft_cap when set, otherwise the hard goal.
         let progress_target = if soft_cap > 0 { soft_cap } else { goal };
         let progress_bps = if progress_target > 0 {
-            let raw = (total_raised * 10_000) / progress_target;
+            // Use saturating_mul to avoid overflow on very large total_raised values;
+            // if the result saturates we cap at 10_000 (100%) anyway.
+            let raw = (total_raised.saturating_mul(10_000)) / progress_target;
             if raw > 10_000 { 10_000 } else { raw as u32 }
         } else {
             0
@@ -3695,9 +3727,11 @@ impl CrowdfundContract {
         let start_time: u64 = inst.get(&KEY_START_TIME).unwrap_or(env.ledger().timestamp());
         let now = env.ledger().timestamp();
 
-        // Calculate success rate in basis points
+        // Calculate success rate in basis points.
+        // Use saturating_mul to prevent overflow on very large total_raised; the
+        // result is capped at 10_000 anyway so saturation is the correct behaviour.
         let success_rate_bps = if goal > 0 {
-            let raw = (total_raised * 10_000) / goal;
+            let raw = total_raised.saturating_mul(10_000) / goal;
             if raw > 10_000 {
                 10_000
             } else {
@@ -3750,38 +3784,41 @@ impl CrowdfundContract {
             for record in history.iter() {
                 let time_since_start = record.timestamp.saturating_sub(start_time);
 
+                // Use saturating_add: amounts are validated positive on entry, but
+                // accumulating many contributions could theoretically overflow i128.
                 if time_since_start > mid_point {
-                    recent_sum += record.amount;
-                    recent_count += 1;
+                    recent_sum = recent_sum.saturating_add(record.amount);
+                    recent_count = recent_count.saturating_add(1);
                 } else {
-                    earlier_sum += record.amount;
-                    earlier_count += 1;
+                    earlier_sum = earlier_sum.saturating_add(record.amount);
+                    earlier_count = earlier_count.saturating_add(1);
                 }
             }
         }
 
-        // Calculate trending: positive if recent > earlier, negative if recent < earlier
+        // Calculate trending: positive if recent > earlier, negative if recent < earlier.
+        // All multiplications by 100 use saturating_mul; the final cast to i32
+        // saturates to i32::MAX/MIN if the scaled ratio is out of range, which is
+        // far preferable to a panic or silent wrap.
         let trending = if earlier_count > 0 && recent_count > 0 {
             let earlier_avg = earlier_sum / earlier_count as i128;
             let recent_avg = recent_sum / recent_count as i128;
-            let diff = recent_avg - earlier_avg;
+            let diff = recent_avg.saturating_sub(earlier_avg);
             // Scale to a reasonable range (-100 to 100)
-            if diff > 0 {
-                ((diff * 100) / earlier_avg.max(1)) as i32
-            } else {
-                ((diff * 100) / earlier_avg.max(1)) as i32
-            }
+            let scaled = diff.saturating_mul(100) / earlier_avg.max(1);
+            scaled.min(i32::MAX as i128).max(i32::MIN as i128) as i32
         } else if recent_count > 0 && earlier_count == 0 {
             50 // Positive trend if only recent contributions
         } else {
             0 // Stable or no data
         };
 
-        // Calculate estimated time to reach goal
+        // Calculate estimated time to reach goal.
+        // days_needed * 86400: use saturating_mul so a huge backlog doesn't panic.
         let estimated_time_to_goal: u64 = if contribution_velocity > 0 && total_raised < goal {
-            let remaining = goal - total_raised;
+            let remaining = goal.saturating_sub(total_raised);
             let days_needed = remaining / contribution_velocity;
-            (days_needed * 86400).max(0) as u64 // Convert back to seconds
+            days_needed.saturating_mul(86400).max(0) as u64
         } else if total_raised >= goal {
             0 // Goal already reached
         } else {
@@ -4907,7 +4944,7 @@ impl CrowdfundContract {
             .persistent()
             .get(&KEY_DISPUTE_ID)
             .unwrap_or(0);
-        dispute_id += 1;
+        dispute_id = dispute_id.checked_add(1).ok_or(ContractError::Overflow)?;
 
         let dispute = Dispute {
             id: dispute_id,
@@ -4977,9 +5014,15 @@ impl CrowdfundContract {
                 }
 
                 if in_favor {
-                    dispute.votes_for += vote_weight;
+                    dispute.votes_for = dispute
+                        .votes_for
+                        .checked_add(vote_weight)
+                        .ok_or(ContractError::Overflow)?;
                 } else {
-                    dispute.votes_against += vote_weight;
+                    dispute.votes_against = dispute
+                        .votes_against
+                        .checked_add(vote_weight)
+                        .ok_or(ContractError::Overflow)?;
                 }
                 dispute.status = DisputeStatus::InReview;
                 disputes.set(i, dispute);
@@ -5168,7 +5211,7 @@ impl CrowdfundContract {
         validate_fee_bps(platform_fee_bps)?;
 
         let nonce: u32 = inst.get(&KEY_GOVERNANCE_NONCE).unwrap_or(0);
-        let new_nonce = nonce + 1;
+        let new_nonce = nonce.checked_add(1).ok_or(ContractError::Overflow)?;
         let now = env.ledger().timestamp();
 
         let proposal = GovernanceProposal {
@@ -5395,7 +5438,7 @@ impl CrowdfundContract {
             .set(&approval_key, &true);
 
         let count: u32 = inst.get(&DataKey::EmergencyPauseApprovals).unwrap_or(0);
-        let new_count = count + 1;
+        let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::EmergencyPauseApprovals, &new_count);
 
         // Trigger pause when majority approves
@@ -5449,7 +5492,7 @@ impl CrowdfundContract {
             .set(&approval_key, &true);
 
         let count: u32 = inst.get(&DataKey::EmergencyPauseApprovals).unwrap_or(0);
-        let new_count = count + 1;
+        let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::EmergencyPauseApprovals, &new_count);
 
         // Resume when majority approves
@@ -5653,9 +5696,12 @@ impl CrowdfundContract {
         // Update accounting
         env.storage().persistent().set(
             &yield_key,
-            &YieldInfo { claimed: info.claimed + payout, reward_debt: accrued },
+            &YieldInfo {
+                claimed: info.claimed.checked_add(payout).ok_or(ContractError::Overflow)?,
+                reward_debt: accrued,
+            },
         );
-        inst.set(&KEY_YIELD_TOTAL, &(distributed + payout));
+        inst.set(&KEY_YIELD_TOTAL, &(distributed.checked_add(payout).ok_or(ContractError::Overflow)?));
 
         // Transfer yield tokens to contributor
         token::Client::new(&env, &config.reward_token).transfer(
