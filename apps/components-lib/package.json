@@ -11,24 +11,24 @@
       "types": "./dist/index.d.ts"
     },
     "./button": {
-      "import": "./dist/Button.js",
-      "types": "./dist/Button.d.ts"
+      "import": "./dist/Button.entry.js",
+      "types": "./dist/Button.entry.d.ts"
     },
     "./input": {
-      "import": "./dist/Input.js",
-      "types": "./dist/Input.d.ts"
+      "import": "./dist/Input.entry.js",
+      "types": "./dist/Input.entry.d.ts"
     },
     "./modal": {
-      "import": "./dist/Modal.js",
-      "types": "./dist/Modal.d.ts"
+      "import": "./dist/Modal.entry.js",
+      "types": "./dist/Modal.entry.d.ts"
     },
     "./card": {
-      "import": "./dist/Card.js",
-      "types": "./dist/Card.d.ts"
+      "import": "./dist/Card.entry.js",
+      "types": "./dist/Card.entry.d.ts"
     },
     "./progress-bar": {
-      "import": "./dist/ProgressBar.js",
-      "types": "./dist/ProgressBar.d.ts"
+      "import": "./dist/ProgressBar.entry.js",
+      "types": "./dist/ProgressBar.entry.d.ts"
     }
   },
   "scripts": {
