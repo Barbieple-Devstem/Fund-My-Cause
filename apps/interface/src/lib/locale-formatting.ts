@@ -2,13 +2,26 @@ import { localeToIntlCode } from "./format";
 import { rtlLocales, type Locale } from "@/i18n/config";
 
 /**
+ * Coerces the Date | number union into a real Date, tolerating invalid
+ * runtime input (null/undefined/malformed strings) that bypasses the
+ * static type. Returns an invalid Date rather than throwing so callers
+ * can check `isNaN(result.getTime())`.
+ */
+function coerceDate(date: Date | number): Date {
+  if (date === null || date === undefined) return new Date(NaN);
+  if (typeof date === "number") return new Date(date * 1000);
+  if (date instanceof Date) return date;
+  return new Date(date as unknown as string);
+}
+
+/**
  * Format currency with locale and RTL support
  * Handles currency symbol placement for RTL locales
  */
 export function formatCurrency(
   amount: number,
   currency: string = "USD",
-  locale: Locale = "en"
+  locale: Locale = "en",
 ): string {
   const intlCode = localeToIntlCode(locale);
   const isRTL = rtlLocales.includes(locale);
@@ -33,7 +46,7 @@ export function formatCurrency(
 export function formatNumber(
   value: number,
   locale: Locale = "en",
-  options?: Intl.NumberFormatOptions
+  options?: Intl.NumberFormatOptions,
 ): string {
   const intlCode = localeToIntlCode(locale);
   return new Intl.NumberFormat(intlCode, options).format(value);
@@ -45,7 +58,7 @@ export function formatNumber(
 export function formatPercentage(
   value: number,
   locale: Locale = "en",
-  fractionDigits: number = 1
+  fractionDigits: number = 1,
 ): string {
   return new Intl.NumberFormat(localeToIntlCode(locale), {
     style: "percent",
@@ -60,9 +73,10 @@ export function formatPercentage(
 export function formatLocalDate(
   date: Date | number,
   locale: Locale = "en",
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
 ): string {
-  const dateObj = typeof date === "number" ? new Date(date * 1000) : date;
+  const dateObj = coerceDate(date);
+  if (Number.isNaN(dateObj.getTime())) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   return dateObj.toLocaleDateString(intlCode, options);
 }
@@ -73,9 +87,10 @@ export function formatLocalDate(
 export function formatLocalTime(
   date: Date | number,
   locale: Locale = "en",
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
 ): string {
-  const dateObj = typeof date === "number" ? new Date(date * 1000) : date;
+  const dateObj = coerceDate(date);
+  if (Number.isNaN(dateObj.getTime())) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   return dateObj.toLocaleTimeString(intlCode, options);
 }
@@ -86,9 +101,10 @@ export function formatLocalTime(
 export function formatLocalDateTime(
   date: Date | number,
   locale: Locale = "en",
-  options?: Intl.DateTimeFormatOptions
+  options?: Intl.DateTimeFormatOptions,
 ): string {
-  const dateObj = typeof date === "number" ? new Date(date * 1000) : date;
+  const dateObj = coerceDate(date);
+  if (Number.isNaN(dateObj.getTime())) return "Invalid Date";
   const intlCode = localeToIntlCode(locale);
   return dateObj.toLocaleString(intlCode, options);
 }
@@ -98,7 +114,7 @@ export function formatLocalDateTime(
  */
 export function formatCompactNumber(
   value: number,
-  locale: Locale = "en"
+  locale: Locale = "en",
 ): string {
   const intlCode = localeToIntlCode(locale);
   return new Intl.NumberFormat(intlCode, {
@@ -115,11 +131,12 @@ export function formatCompactNumber(
  */
 export function formatRelativeTime(
   pastDate: Date | number,
-  locale: Locale = "en"
+  locale: Locale = "en",
 ): string {
   const intlCode = localeToIntlCode(locale);
   const now = new Date();
-  const date = typeof pastDate === "number" ? new Date(pastDate * 1000) : pastDate;
+  const date = coerceDate(pastDate);
+  if (Number.isNaN(date.getTime())) return "Invalid Date";
   const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
   const rtf = new Intl.RelativeTimeFormat(intlCode, { numeric: "auto" });
@@ -136,23 +153,35 @@ export function formatRelativeTime(
  */
 export function formatList(items: string[], locale: Locale = "en"): string {
   const intlCode = localeToIntlCode(locale);
-  const formatter = new Intl.ListFormat(intlCode, { style: "long", type: "conjunction" });
+  const formatter = new Intl.ListFormat(intlCode, {
+    style: "long",
+    type: "conjunction",
+  });
   return formatter.format(items);
 }
 
 /**
  * Format as short list (e.g., "a, b, c")
  */
-export function formatListShort(items: string[], locale: Locale = "en"): string {
+export function formatListShort(
+  items: string[],
+  locale: Locale = "en",
+): string {
   const intlCode = localeToIntlCode(locale);
-  const formatter = new Intl.ListFormat(intlCode, { style: "short", type: "conjunction" });
+  const formatter = new Intl.ListFormat(intlCode, {
+    style: "short",
+    type: "conjunction",
+  });
   return formatter.format(items);
 }
 
 /**
  * Format currency symbol correctly positioned for RTL locales
  */
-export function getCurrencySymbol(currency: string = "USD", locale: Locale = "en"): string {
+export function getCurrencySymbol(
+  currency: string = "USD",
+  locale: Locale = "en",
+): string {
   const intlCode = localeToIntlCode(locale);
   const parts = new Intl.NumberFormat(intlCode, {
     style: "currency",
@@ -169,7 +198,7 @@ export function getCurrencySymbol(currency: string = "USD", locale: Locale = "en
 export function formatCurrencyRTL(
   amount: number,
   currency: string = "USD",
-  locale: Locale = "en"
+  locale: Locale = "en",
 ): string {
   const intlCode = localeToIntlCode(locale);
   const isRTL = rtlLocales.includes(locale);
