@@ -5,6 +5,7 @@ import type { Context, Campaign } from "./types.js";
 import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
 import { PubSubService } from "./services/pubsub.js";
+import { notifyContribution } from "./services/fraud-client.js";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -364,7 +365,39 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      const { traceId, log } = context;
+
+      log.info(
+        {
+          campaignId: input.campaignId,
+          contributor: input.contributor,
+          amount: input.amount.toString(),
+          txHash: input.transactionHash,
+        },
+        "recordContribution: started",
+      );
+
       const contribution = await context.contractService.recordContribution(input);
+
+      log.info(
+        { contributionId: contribution.id, campaignId: input.campaignId },
+        "recordContribution: contract call succeeded",
+      );
+
+      // ── Notify fraud-detection (best-effort, never blocks the response) ──
+      // X-Trace-ID is forwarded inside notifyContribution so the same trace ID
+      // appears in fraud-detection logs for this donation.
+      void notifyContribution(
+        {
+          campaignId: input.campaignId,
+          contributor: input.contributor,
+          amount: input.amount.toString(),
+          transactionHash: input.transactionHash,
+          timestamp: Math.floor(Date.now() / 1000),
+        },
+        traceId,
+        log,
+      );
 
       // Invalidate caches
       await context.cache.del(`campaign:${input.campaignId}`);
@@ -374,12 +407,12 @@ export const resolvers: IResolvers<any, Context> = {
       // Publish events
       await context.pubsub.publish(
         `contribution:${input.campaignId}`,
-        contribution
+        contribution,
       );
 
       // Update progress
       const campaign = await context.contractService.getCampaign(
-        input.campaignId
+        input.campaignId,
       );
       if (campaign) {
         await context.pubsub.publish(`progress:${input.campaignId}`, {
@@ -391,12 +424,17 @@ export const resolvers: IResolvers<any, Context> = {
             0,
             Math.ceil(
               (new Date(campaign.deadline).getTime() - Date.now()) /
-                (1000 * 60 * 60 * 24)
-            )
+                (1000 * 60 * 60 * 24),
+            ),
           ),
           timestamp: new Date().toISOString(),
         });
       }
+
+      log.info(
+        { contributionId: contribution.id, campaignId: input.campaignId },
+        "recordContribution: completed",
+      );
 
       return contribution;
     },
