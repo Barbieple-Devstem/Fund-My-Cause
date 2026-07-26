@@ -153,6 +153,20 @@ export function PledgeModal({
   const isProcessing = txStatus !== "idle" || pendingTx || isSigning;
   isProcessingRef.current = isProcessing;
 
+  const unfundedWarningId = "pledge-unfunded-warning";
+  const minimumNoteId = "pledge-minimum-note";
+  const showUnfundedWarning = Boolean(
+    address && !accountLoading && !accountExists,
+  );
+  const showMinimumNote = minContribution > XLM_TO_STROOPS;
+  const amountDescribedBy =
+    [
+      showUnfundedWarning ? unfundedWarningId : null,
+      showMinimumNote ? minimumNoteId : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
   return (
     // Backdrop: closes modal on click. Keyboard dismissal (Escape) is handled by the focus trap inside the dialog.
     <div
@@ -191,8 +205,12 @@ export function PledgeModal({
         ) : (
           <>
             <div className="space-y-1">
-              {address && !accountLoading && !accountExists && (
-                <p className="text-xs text-yellow-400" role="alert">
+              {showUnfundedWarning && (
+                <p
+                  id={unfundedWarningId}
+                  className="text-xs text-yellow-400"
+                  role="alert"
+                >
                   {t("unfundedWarning")}
                 </p>
               )}
@@ -212,10 +230,11 @@ export function PledgeModal({
                 }
                 disabled={isProcessing}
                 aria-label={t("amountLabel", { min: minXlm })}
+                aria-describedby={amountDescribedBy}
                 className="ds-input w-full px-4 py-3 disabled:opacity-50 text-base"
               />
-              {minContribution > XLM_TO_STROOPS && (
-                <p className="text-xs text-gray-500">
+              {showMinimumNote && (
+                <p id={minimumNoteId} className="text-xs text-gray-500">
                   {t("minimumNote", { min: minXlm })}
                 </p>
               )}
