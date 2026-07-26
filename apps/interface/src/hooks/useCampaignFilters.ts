@@ -1,6 +1,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import React from "react";
 
+function toFiniteNumber(value: string | null): number | null {
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export type FilterTab = "all" | "active" | "funded" | "ended";
 export type SortOption = "recent" | "popular" | "deadline" | "progress";
 
@@ -44,7 +50,7 @@ export function useCampaignFilters(): UseCampaignFiltersReturn {
   const sort = (searchParams.get("sort") as SortOption) ?? "recent";
   const query = searchParams.get("q") ?? "";
   const category = searchParams.get("category") ?? "";
-  const page = Math.max(1, Number(searchParams.get("page") ?? "1"));
+  const page = Math.max(1, toFiniteNumber(searchParams.get("page")) ?? 1);
 
   const [inputValue, setInputValue] = React.useState(query);
   const [showAdvanced, setShowAdvanced] = React.useState(false);
@@ -112,12 +118,8 @@ export function useCampaignFilters(): UseCampaignFiltersReturn {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputValue]);
 
-  const activeGoalMin = searchParams.get("goalMin")
-    ? Number(searchParams.get("goalMin"))
-    : null;
-  const activeGoalMax = searchParams.get("goalMax")
-    ? Number(searchParams.get("goalMax"))
-    : null;
+  const activeGoalMin = toFiniteNumber(searchParams.get("goalMin"));
+  const activeGoalMax = toFiniteNumber(searchParams.get("goalMax"));
   const activeDateFrom = searchParams.get("dateFrom") ?? null;
   const activeDateTo = searchParams.get("dateTo") ?? null;
   const hasAdvanced = !!(
