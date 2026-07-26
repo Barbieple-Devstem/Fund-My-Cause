@@ -65,6 +65,20 @@ describe("useContractError", () => {
     expect(result.current.error.message).toContain("minimum");
   });
 
+  it("should not surface error UI on a successful donation (handleError never called)", () => {
+    const { result } = renderHook(() => useContractError());
+
+    // Simulate a successful pledge: no call to handleError, just clearError
+    // as a defensive reset (mirrors what a success branch would do).
+    act(() => {
+      result.current.clearError();
+    });
+
+    expect(result.current.error.isVisible).toBe(false);
+    expect(result.current.error.message).toBe("");
+    expect(result.current.error.code).toBeNull();
+  });
+
   it("should overwrite previous error", () => {
     const { result } = renderHook(() => useContractError());
 

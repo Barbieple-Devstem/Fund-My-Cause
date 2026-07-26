@@ -162,6 +162,14 @@ describe("PledgeModal", () => {
     );
     expect(onSuccess).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId("tx-status")).toHaveTextContent("success");
+
+    // No error UI should ever fire on a successful donation.
+    expect(mockAddToast).not.toHaveBeenCalledWith(
+      expect.anything(),
+      "error",
+      expect.anything(),
+    );
+    expect(screen.getByTestId("tx-status")).not.toHaveTextContent("error");
   });
 
   it("shows error state when contribute throws", async () => {
