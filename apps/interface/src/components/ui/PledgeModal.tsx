@@ -11,6 +11,8 @@ import { useAccountExists } from "@/hooks/useAccountExists";
 import { useTranslations } from "next-intl";
 import { computePledgeSuggestions } from "@/lib/pledgeSuggestions";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { Input } from "@fund-my-cause/components";
+import { FORM_FIELD_CLS } from "@/lib/formStyles";
 
 const XLM_TO_STROOPS = 10_000_000n;
 const PLEDGE_DEBOUNCE_MS = 2000;
@@ -196,11 +198,12 @@ export function PledgeModal({
                   {t("unfundedWarning")}
                 </p>
               )}
-              <label htmlFor="pledge-amount" className="sr-only">
-                {t("amountLabel", { min: minXlm })}
-              </label>
-              <input
+              <Input
+                unstyled
                 id="pledge-amount"
+                label={t("amountLabel", { min: minXlm })}
+                labelClassName="sr-only"
+                fieldClassName={FORM_FIELD_CLS}
                 type="number"
                 inputMode="decimal"
                 placeholder={t("amountPlaceholder", { min: minXlm })}
@@ -211,7 +214,6 @@ export function PledgeModal({
                   setAmount(e.target.value)
                 }
                 disabled={isProcessing}
-                aria-label={t("amountLabel", { min: minXlm })}
                 className="ds-input w-full px-4 py-3 disabled:opacity-50 text-base"
               />
               {minContribution > XLM_TO_STROOPS && (

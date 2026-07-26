@@ -72,6 +72,14 @@ const cspEmbed = [
 const nextConfig: NextConfig = {
   output: "standalone",
 
+  // Workspace packages are published from TypeScript source (no dist), so Next
+  // has to compile them alongside the app.
+  transpilePackages: [
+    "@fund-my-cause/components",
+    "@fund-my-cause/shared-utils",
+    "@fund-my-cause/types",
+  ],
+
   images: {
     // Serve AVIF first (best compression), fall back to WebP, then original.
     formats: ["image/avif", "image/webp"],
@@ -180,7 +188,8 @@ const nextConfig: NextConfig = {
       },
       // ── Static assets (images, fonts, etc.) — long-lived cache ──────────────
       {
-        source: "/:all*(svg|png|jpg|jpeg|gif|ico|webp|avif|woff2?|ttf|eot|css|js)",
+        source:
+          "/:all*(svg|png|jpg|jpeg|gif|ico|webp|avif|woff2?|ttf|eot|css|js)",
         headers: [
           {
             key: "Cache-Control",

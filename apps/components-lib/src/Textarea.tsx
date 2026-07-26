@@ -1,15 +1,15 @@
 "use client";
 
-import React, { InputHTMLAttributes, ReactNode, forwardRef } from "react";
+import React, { TextareaHTMLAttributes, ReactNode, forwardRef } from "react";
 import { cn } from "./lib/utils";
 import { FormField } from "./FormField";
 import { controlClassName } from "./lib/formStyles";
 
-export interface InputProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
+export interface TextareaProps
+  extends Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "id"> {
   /** Visible label text rendered above the control. */
   label?: ReactNode;
-  /** Validation message. Marks the input invalid and hides `helperText`. */
+  /** Validation message. Marks the textarea invalid and hides `helperText`. */
   error?: string | null;
   /** Supporting text shown below the control while there is no error. */
   helperText?: string;
@@ -17,11 +17,7 @@ export interface InputProps
   fullWidth?: boolean;
   /** Explicit control id. Generated when omitted. */
   id?: string;
-  /**
-   * Drops the library's default control styling so `className` fully owns the
-   * look. Use when adopting the primitive inside an app that already has its
-   * own input styles and needs pixel-identical output.
-   */
+  /** Drops the library's default control styling so `className` owns the look. */
   unstyled?: boolean;
   /** Extra classes for the wrapper element (not the control). */
   fieldClassName?: string;
@@ -31,15 +27,12 @@ export interface InputProps
 }
 
 /**
- * Text input composed onto `FormField` — label, error, helper text and
- * required indicator all come from the shared wrapper.
- *
- * Works controlled (`value` + `onChange`) or uncontrolled (`defaultValue`).
+ * Multi-line text control composed onto `FormField`.
  *
  * @example
- * <Input label="Email" type="email" error="Invalid email" required />
+ * <Textarea label="Description" rows={3} helperText="Markdown supported" />
  */
-export const Input = forwardRef<HTMLInputElement, InputProps>(
+export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
   (
     {
       label,
@@ -54,6 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       helperTextClassName,
       className,
       required,
+      rows = 3,
       ...props
     },
     ref,
@@ -71,8 +65,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       helperTextClassName={helperTextClassName}
     >
       {(control) => (
-        <input
+        <textarea
           ref={ref}
+          rows={rows}
           {...control}
           className={cn(
             controlClassName({ unstyled, hasError: Boolean(error), fullWidth }),
@@ -85,4 +80,4 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ),
 );
 
-Input.displayName = "Input";
+Textarea.displayName = "Textarea";

@@ -1,15 +1,21 @@
 "use client";
 
-import React, { InputHTMLAttributes, ReactNode, forwardRef } from "react";
+import React, { SelectHTMLAttributes, ReactNode, forwardRef } from "react";
 import { cn } from "./lib/utils";
 import { FormField } from "./FormField";
 import { controlClassName } from "./lib/formStyles";
 
-export interface InputProps
-  extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
+export interface SelectOption {
+  value: string;
+  label: string;
+  disabled?: boolean;
+}
+
+export interface SelectProps
+  extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "id"> {
   /** Visible label text rendered above the control. */
   label?: ReactNode;
-  /** Validation message. Marks the input invalid and hides `helperText`. */
+  /** Validation message. Marks the select invalid and hides `helperText`. */
   error?: string | null;
   /** Supporting text shown below the control while there is no error. */
   helperText?: string;
@@ -17,12 +23,15 @@ export interface InputProps
   fullWidth?: boolean;
   /** Explicit control id. Generated when omitted. */
   id?: string;
-  /**
-   * Drops the library's default control styling so `className` fully owns the
-   * look. Use when adopting the primitive inside an app that already has its
-   * own input styles and needs pixel-identical output.
-   */
+  /** Drops the library's default control styling so `className` owns the look. */
   unstyled?: boolean;
+  /**
+   * Options rendered inside the select. Pass `children` instead when you need
+   * `<optgroup>` or custom option markup.
+   */
+  options?: readonly SelectOption[];
+  /** Placeholder option rendered first with an empty value. */
+  placeholder?: string;
   /** Extra classes for the wrapper element (not the control). */
   fieldClassName?: string;
   labelClassName?: string;
@@ -31,15 +40,13 @@ export interface InputProps
 }
 
 /**
- * Text input composed onto `FormField` — label, error, helper text and
- * required indicator all come from the shared wrapper.
- *
- * Works controlled (`value` + `onChange`) or uncontrolled (`defaultValue`).
+ * Select composed onto `FormField`, sharing the same label/error/help contract
+ * as `Input` and `Textarea`.
  *
  * @example
- * <Input label="Email" type="email" error="Invalid email" required />
+ * <Select label="Category" options={categories} placeholder="Select one…" />
  */
-export const Input = forwardRef<HTMLInputElement, InputProps>(
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
     {
       label,
@@ -48,12 +55,15 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       fullWidth = false,
       id,
       unstyled = false,
+      options,
+      placeholder,
       fieldClassName,
       labelClassName,
       errorClassName,
       helperTextClassName,
       className,
       required,
+      children,
       ...props
     },
     ref,
@@ -71,7 +81,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       helperTextClassName={helperTextClassName}
     >
       {(control) => (
-        <input
+        <select
           ref={ref}
           {...control}
           className={cn(
@@ -79,10 +89,22 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             className,
           )}
           {...props}
-        />
+        >
+          {placeholder && <option value="">{placeholder}</option>}
+          {options?.map((option) => (
+            <option
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled}
+            >
+              {option.label}
+            </option>
+          ))}
+          {children}
+        </select>
       )}
     </FormField>
   ),
 );
 
-Input.displayName = "Input";
+Select.displayName = "Select";

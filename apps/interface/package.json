@@ -20,6 +20,8 @@
     "check:routes": "node scripts/check-route-duplication.cjs"
   },
   "dependencies": {
+    "@fund-my-cause/components": "*",
+    "@fund-my-cause/shared-utils": "*",
     "@fund-my-cause/types": "*",
     "@radix-ui/react-slot": "1.2.4",
     "@stellar/freighter-api": "6.0.1",

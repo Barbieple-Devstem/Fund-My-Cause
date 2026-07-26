@@ -4,10 +4,22 @@ import React, { useRef, useState } from "react";
 import { Loader2, PlusCircle, Trash2, X } from "lucide-react";
 import type { ProfileData } from "@/types/profile";
 import { writeProfile } from "@/lib/profileStore";
-import { validateBio, validateSocialLinks, MAX_BIO_LENGTH, MAX_SOCIAL_LINKS } from "@/lib/profileValidation";
+import {
+  validateBio,
+  validateSocialLinks,
+  MAX_BIO_LENGTH,
+  MAX_SOCIAL_LINKS,
+} from "@/lib/profileValidation";
 import { uploadToPinata } from "@/lib/pinata";
 import { validateImageFile } from "@/lib/imageValidation";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { Input, Textarea } from "@fund-my-cause/components";
+import {
+  FORM_ERROR_CLS_XS,
+  FORM_FIELD_CLS,
+  FORM_INPUT_CLS_SM,
+  FORM_LABEL_CLS_MUTED,
+} from "@/lib/formStyles";
 
 interface EditProfileModalProps {
   address: string;
@@ -35,7 +47,9 @@ export function EditProfileModal({
   const [bioError, setBioError] = useState<string | null>(null);
   const [linksError, setLinksError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const dialogRef = useFocusTrap(true, { onEscape: onClose }) as React.RefObject<HTMLDivElement>;
+  const dialogRef = useFocusTrap(true, {
+    onEscape: onClose,
+  }) as React.RefObject<HTMLDivElement>;
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -108,8 +122,14 @@ export function EditProfileModal({
     onSave(updated);
   };
 
-  const inputCls =
-    "w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-2 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none text-sm";
+  /** Styling handed to every shared form primitive in this modal. */
+  const fieldStyles = {
+    unstyled: true as const,
+    className: FORM_INPUT_CLS_SM,
+    fieldClassName: FORM_FIELD_CLS,
+    labelClassName: FORM_LABEL_CLS_MUTED,
+    errorClassName: FORM_ERROR_CLS_XS,
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -139,11 +159,12 @@ export function EditProfileModal({
           <p className="text-sm text-gray-400">Avatar</p>
           <div className="flex items-center gap-4">
             {avatarUri ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={avatarUri.startsWith("ipfs://")
-                  ? `https://gateway.pinata.cloud/ipfs/${avatarUri.slice(7)}`
-                  : avatarUri}
+                src={
+                  avatarUri.startsWith("ipfs://")
+                    ? `https://gateway.pinata.cloud/ipfs/${avatarUri.slice(7)}`
+                    : avatarUri
+                }
                 alt="Current avatar"
                 className="w-16 h-16 rounded-full object-cover border border-gray-700"
               />
@@ -177,31 +198,34 @@ export function EditProfileModal({
                 disabled={avatarUploading}
                 aria-hidden="true"
               />
-              <p className="text-xs text-gray-600 mt-1">PNG, JPG, WebP — max 5 MB</p>
+              <p className="text-xs text-gray-600 mt-1">
+                PNG, JPG, WebP — max 5 MB
+              </p>
             </div>
           </div>
           {avatarError && <p className="text-xs text-red-400">{avatarError}</p>}
         </div>
 
         {/* Bio */}
-        <div className="space-y-1">
-          <label htmlFor="edit-bio" className="text-sm text-gray-400">
-            Bio{" "}
-            <span className="text-gray-600">
-              ({bio.length}/{MAX_BIO_LENGTH})
-            </span>
-          </label>
-          <textarea
-            id="edit-bio"
-            rows={3}
-            className={inputCls}
-            placeholder="Tell the community about yourself…"
-            value={bio}
-            maxLength={MAX_BIO_LENGTH}
-            onChange={(e) => setBio(e.target.value)}
-          />
-          {bioError && <p className="text-xs text-red-400">{bioError}</p>}
-        </div>
+        <Textarea
+          {...fieldStyles}
+          id="edit-bio"
+          fieldClassName={`${FORM_FIELD_CLS} space-y-1`}
+          label={
+            <>
+              Bio{" "}
+              <span className="text-gray-600">
+                ({bio.length}/{MAX_BIO_LENGTH})
+              </span>
+            </>
+          }
+          error={bioError}
+          rows={3}
+          placeholder="Tell the community about yourself…"
+          value={bio}
+          maxLength={MAX_BIO_LENGTH}
+          onChange={(e) => setBio(e.target.value)}
+        />
 
         {/* Social links */}
         <div className="space-y-2">
@@ -224,9 +248,11 @@ export function EditProfileModal({
           </div>
           {socialLinks.map((link, i) => (
             <div key={i} className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
+              <Input
+                {...fieldStyles}
+                fieldClassName={`${FORM_FIELD_CLS} flex-1`}
                 type="url"
+                aria-label={`Social link ${i + 1}`}
                 placeholder="https://twitter.com/yourhandle"
                 value={link}
                 onChange={(e) => updateLink(i, e.target.value)}
