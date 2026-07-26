@@ -29,6 +29,10 @@
     "./comment": {
       "import": "./src/comment.ts",
       "types": "./src/comment.ts"
+    },
+    "./graphql": {
+      "import": "./src/graphql.ts",
+      "types": "./src/graphql.ts"
     }
   },
   "scripts": {

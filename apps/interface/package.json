@@ -17,9 +17,11 @@
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation/mutation-report.html",
     "bundle:check": "node scripts/check-bundle-budgets.cjs",
-    "check:routes": "node scripts/check-route-duplication.cjs"
+    "check:routes": "node scripts/check-route-duplication.cjs",
+    "codegen": "graphql-codegen --config codegen.ts"
   },
   "dependencies": {
+    "@fund-my-cause/sdk": "file:../../sdks/js",
     "@fund-my-cause/types": "*",
     "@radix-ui/react-slot": "1.2.4",
     "@stellar/freighter-api": "6.0.1",
@@ -29,6 +31,8 @@
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "framer-motion": "12.38.0",
+    "graphql": "^16.8.0",
+    "graphql-request": "^7.4.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^2.5.1",
     "lucide-react": "0.577.0",
@@ -43,6 +47,10 @@
   "devDependencies": {
     "@axe-core/react": "^4.8.0",
     "@eslint/eslintrc": "^2.1.4",
+    "@graphql-codegen/cli": "^7.2.0",
+    "@graphql-codegen/typescript": "^6.1.0",
+    "@graphql-codegen/typescript-graphql-request": "^7.1.0",
+    "@graphql-codegen/typescript-operations": "^6.1.2",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/jest-runner": "^9.6.1",
     "@stryker-mutator/typescript-checker": "^9.6.1",

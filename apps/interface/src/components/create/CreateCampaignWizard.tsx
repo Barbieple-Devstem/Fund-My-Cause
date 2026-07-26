@@ -6,632 +6,65 @@ import { Navbar } from "@/components/layout/Navbar";
 import { WalletGuard } from "@/components/WalletGuard";
 import { useWallet } from "@/hooks/useWallet";
 import { buildInitializeTx, submitSignedTx } from "@/lib/soroban";
-import {
-  validateTitle,
-  validateDescription,
-  validateGoal,
-  validateDeadline,
-  validateMinContribution,
-  validateFeeBps,
-  validateVideoUrl,
-  validateContractId,
-  sanitizeTitle,
-  sanitizeDescription,
-} from "@/lib/validation";
-import { useCampaignDraft } from "@/hooks/useCampaignDraft";
+import { sanitizeTitle, sanitizeDescription } from "@/lib/validation";
 import { DraftIndicator } from "@/components/ui/DraftIndicator";
 import { CampaignPreview } from "@/components/ui/CampaignPreview";
-import { VideoUploader } from "@/components/ui/VideoUploader";
-import { ImageUploader } from "@/components/ui/ImageUploader";
-import type { FAQ, TeamMember } from "@/types/campaign";
-import { getAccessibleInputProps, getErrorId } from "@/lib/accessibleFormUtils";
-import {
-  CheckCircle2,
-  XCircle,
-  FileText,
-  X,
-  Eye,
-  Trash2,
-  PlusCircle,
-} from "lucide-react";
+import { CheckCircle2, XCircle, FileText, X, Eye } from "lucide-react";
 import { CampaignPreviewModal } from "@/components/ui/CampaignPreviewModal";
 import { BackButton } from "@/components/ui/BackButton";
-import { CATEGORY_TAXONOMY, saveCampaignMeta } from "@/lib/categories";
+import { saveCampaignMeta } from "@/lib/categories";
+import { useWizardState } from "./wizard/useWizardState";
+import {
+  STEPS,
+  STEP,
+  LAST_FORM_STEP,
+  PREVIEW_STEP,
+  type TxStatus,
+} from "./wizard/types";
+import { BasicInfoStep } from "./wizard/steps/BasicInfoStep";
+import { MediaStep } from "./wizard/steps/MediaStep";
+import { FaqTeamStep } from "./wizard/steps/FaqTeamStep";
+import { PlatformConfigStep } from "./wizard/steps/PlatformConfigStep";
+import { ReviewStep } from "./wizard/steps/ReviewStep";
 
-interface FormData {
-  contractId: string;
-  token: string;
-  title: string;
-  description: string;
-  category: string;
-  goal: string;
-  deadline: string;
-  minContribution: string;
-  imageUrl: string;
-  videoUrl: string;
-  faqs: FAQ[];
-  teamMembers: TeamMember[];
-  feeAddress: string;
-  feeBps: string;
-}
+// Re-exported for consumers (and tests) that imported these from the wizard
+// module before the per-step split.
+export { INITIAL, STEPS, PREVIEW_STEP } from "./wizard/types";
+export type { CampaignFormData } from "./wizard/types";
+export { validateStep, validateAllSteps } from "./wizard/validators";
 
-type TxStatus = "idle" | "pending" | "success" | "error";
+const STROOPS_PER_XLM = 10_000_000;
 
-const STEPS = [
-  "Basic Info",
-  "Media",
-  "FAQ & Team",
-  "Platform Config",
-  "Review & Deploy",
-  "Preview",
-];
-
-const PREVIEW_STEP = 5;
-
-export const INITIAL: FormData = {
-  contractId: "",
-  token: "",
-  title: "",
-  description: "",
-  category: "",
-  goal: "",
-  deadline: "",
-  minContribution: "1",
-  imageUrl: "",
-  videoUrl: "",
-  faqs: [],
-  teamMembers: [],
-  feeAddress: "",
-  feeBps: "",
-};
-
-const inputCls =
-  "w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500";
-const labelCls = "block text-sm text-gray-600 dark:text-gray-400 mb-1";
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <label className={labelCls}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-interface FieldWithErrorProps {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-  /** The field name used to generate accessible IDs for aria-describedby / aria-errormessage */
-  fieldName?: string;
-  /** Whether the field is required */
-  required?: boolean;
-  /** Whether there are additional instructions for this field */
-  hasInstructions?: boolean;
-}
-
-function FieldWithError({
-  label,
-  error,
-  children,
-  fieldName,
-  required,
-  hasInstructions,
-}: FieldWithErrorProps) {
-  const accessibleProps = fieldName
-    ? getAccessibleInputProps(fieldName, !!required, error, hasInstructions)
-    : {};
-
-  const childrenWithProps = React.Children.map(children, (child) => {
-    if (React.isValidElement(child) && fieldName) {
-      return React.cloneElement(
-        child,
-        accessibleProps as Record<string, unknown>,
-      );
-    }
-    return child;
-  });
-
-  return (
-    <div>
-      <label className={labelCls}>
-        {label}
-        {required && (
-          <span aria-hidden="true" className="text-red-500 ml-0.5">
-            *
-          </span>
-        )}
-      </label>
-      {childrenWithProps}
-      {error && fieldName && (
-        <p
-          id={getErrorId(fieldName)}
-          role="alert"
-          className="text-red-500 dark:text-red-400 text-xs mt-1"
-        >
-          {error}
-        </p>
-      )}
-      {error && !fieldName && (
-        <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>
-      )}
-    </div>
-  );
-}
-
-function Step1({
-  data,
-  set,
-}: {
-  data: FormData;
-  set: (k: keyof FormData, v: string) => void;
-}) {
-  const titleError = data.title ? validateTitle(data.title) : null;
-  const descError = data.description
-    ? validateDescription(data.description)
-    : null;
-  const goalError = data.goal ? validateGoal(data.goal) : null;
-  const deadlineError = data.deadline ? validateDeadline(data.deadline) : null;
-  const minContribError = data.minContribution
-    ? validateMinContribution(data.minContribution, data.goal)
-    : null;
-
-  return (
-    <div className="space-y-4">
-      <Field label="Contract ID">
-        <input
-          className={inputCls}
-          placeholder="C..."
-          value={data.contractId}
-          onChange={(e) => set("contractId", e.target.value)}
-        />
-      </Field>
-      <Field label="Token Address">
-        <input
-          className={inputCls}
-          placeholder="C..."
-          value={data.token}
-          onChange={(e) => set("token", e.target.value)}
-        />
-      </Field>
-      <FieldWithError
-        label="Title"
-        error={titleError}
-        fieldName="title"
-        required
-      >
-        <input
-          className={inputCls}
-          placeholder="My Campaign"
-          value={data.title}
-          onChange={(e) => set("title", e.target.value)}
-        />
-      </FieldWithError>
-      <FieldWithError
-        label="Description"
-        error={descError}
-        fieldName="description"
-        required
-      >
-        <textarea
-          rows={3}
-          className={inputCls}
-          placeholder="What are you raising funds for?"
-          value={data.description}
-          onChange={(e) => set("description", e.target.value)}
-        />
-      </FieldWithError>
-      <Field label="Category">
-        <select
-          className={inputCls}
-          value={data.category}
-          onChange={(e) => set("category", e.target.value)}
-        >
-          <option value="">Select a category…</option>
-          {CATEGORY_TAXONOMY.map((cat) => (
-            <option key={cat.slug} value={cat.slug}>
-              {cat.emoji} {cat.label}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <div className="grid grid-cols-2 gap-4">
-        <FieldWithError
-          label="Goal (XLM)"
-          error={goalError}
-          fieldName="goal"
-          required
-        >
-          <input
-            type="number"
-            min="1"
-            className={inputCls}
-            placeholder="10000"
-            value={data.goal}
-            onChange={(e) => set("goal", e.target.value)}
-          />
-        </FieldWithError>
-        <FieldWithError
-          label="Min Contribution (XLM)"
-          error={minContribError}
-          fieldName="minContribution"
-          required
-        >
-          <input
-            type="number"
-            min="1"
-            className={inputCls}
-            placeholder="1"
-            value={data.minContribution}
-            onChange={(e) => set("minContribution", e.target.value)}
-          />
-        </FieldWithError>
-      </div>
-      <FieldWithError
-        label="Deadline"
-        error={deadlineError}
-        fieldName="deadline"
-        required
-      >
-        <input
-          type="date"
-          className={inputCls}
-          value={data.deadline}
-          min={new Date().toISOString().split("T")[0]}
-          onChange={(e) => set("deadline", e.target.value)}
-        />
-      </FieldWithError>
-    </div>
-  );
-}
-
-function Step2({
-  data,
-  set,
-}: {
-  data: FormData;
-  set: (k: keyof FormData, v: string) => void;
-}) {
-  return (
-    <div className="space-y-4">
-      <Field label="Campaign Image (PNG / JPG / WebP, max 5 MB)">
-        <ImageUploader
-          onUpload={(uri) => set("imageUrl", uri)}
-          onClear={() => set("imageUrl", "")}
-          currentUri={data.imageUrl}
-        />
-      </Field>
-
-      <Field label="Campaign Video (optional — Upload MP4/WebM or provide YouTube/Vimeo URL)">
-        <div className="space-y-3">
-          <VideoUploader
-            onUpload={(videoUrl) => set("videoUrl", videoUrl)}
-            onError={(error) => console.error("Video upload error:", error)}
-            disabled={uploading}
-          />
-          {!data.videoUrl && (
-            <div className="border-t border-gray-700 pt-3">
-              <p className="text-xs text-gray-500 mb-2">
-                Or enter a video URL directly:
-              </p>
-              <input
-                type="url"
-                placeholder="https://youtube.com/watch?v=... or https://example.com/video.mp4"
-                value={data.videoUrl}
-                onChange={(e) => set("videoUrl", e.target.value)}
-                className={inputCls}
-              />
-            </div>
-          )}
-          {data.videoUrl && validateVideoUrl(data.videoUrl) && (
-            <p className="text-red-400 text-xs mt-1">
-              {validateVideoUrl(data.videoUrl)}
-            </p>
-          )}
-          {data.videoUrl && !validateVideoUrl(data.videoUrl) && (
-            <p className="text-green-400 text-xs mt-1">✓ Video URL is valid</p>
-          )}
-        </div>
-      </Field>
-    </div>
-  );
-}
-
-function Step3({
-  data,
-  setFaqs,
-  setTeamMembers,
-}: {
-  data: FormData;
-  setFaqs: (faqs: FAQ[]) => void;
-  setTeamMembers: (members: TeamMember[]) => void;
-}) {
-  const addFaq = () =>
-    setFaqs([
-      ...data.faqs,
-      { id: crypto.randomUUID(), question: "", answer: "" },
-    ]);
-
-  const updateFaq = (id: string, field: "question" | "answer", val: string) =>
-    setFaqs(data.faqs.map((f) => (f.id === id ? { ...f, [field]: val } : f)));
-
-  const removeFaq = (id: string) =>
-    setFaqs(data.faqs.filter((f) => f.id !== id));
-
-  const addMember = () =>
-    setTeamMembers([
-      ...data.teamMembers,
-      { id: crypto.randomUUID(), name: "", role: "" },
-    ]);
-
-  const updateMember = (id: string, field: keyof TeamMember, val: string) =>
-    setTeamMembers(
-      data.teamMembers.map((m) => (m.id === id ? { ...m, [field]: val } : m)),
-    );
-
-  const removeMember = (id: string) =>
-    setTeamMembers(data.teamMembers.filter((m) => m.id !== id));
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">FAQs</p>
-          <button
-            type="button"
-            onClick={addFaq}
-            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition"
-          >
-            <PlusCircle size={13} /> Add FAQ
-          </button>
-        </div>
-        {data.faqs.map((faq) => (
-          <div
-            key={faq.id}
-            className="space-y-2 rounded-xl border border-gray-700 p-3"
-          >
-            <div className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
-                placeholder="Question"
-                value={faq.question}
-                onChange={(e) => updateFaq(faq.id, "question", e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => removeFaq(faq.id)}
-                aria-label="Remove FAQ"
-                className="text-gray-500 hover:text-red-400 transition"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-            <textarea
-              rows={2}
-              className={inputCls}
-              placeholder="Answer"
-              value={faq.answer}
-              onChange={(e) => updateFaq(faq.id, "answer", e.target.value)}
-            />
-          </div>
-        ))}
-        {data.faqs.length === 0 && (
-          <p className="text-xs text-gray-500">No FAQs added yet.</p>
-        )}
-      </div>
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium">Team Members</p>
-          <button
-            type="button"
-            onClick={addMember}
-            className="flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-400 transition"
-          >
-            <PlusCircle size={13} /> Add Member
-          </button>
-        </div>
-        {data.teamMembers.map((m) => (
-          <div
-            key={m.id}
-            className="space-y-2 rounded-xl border border-gray-700 p-3"
-          >
-            <div className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
-                placeholder="Name"
-                value={m.name}
-                onChange={(e) => updateMember(m.id, "name", e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => removeMember(m.id)}
-                aria-label="Remove member"
-                className="text-gray-500 hover:text-red-400 transition"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-            <input
-              className={inputCls}
-              placeholder="Role (e.g. Lead Developer)"
-              value={m.role}
-              onChange={(e) => updateMember(m.id, "role", e.target.value)}
-            />
-            <input
-              className={inputCls}
-              placeholder="Bio (optional)"
-              value={m.bio ?? ""}
-              onChange={(e) => updateMember(m.id, "bio", e.target.value)}
-            />
-            <input
-              className={inputCls}
-              placeholder="Avatar URL (optional)"
-              value={m.avatarUrl ?? ""}
-              onChange={(e) => updateMember(m.id, "avatarUrl", e.target.value)}
-            />
-          </div>
-        ))}
-        {data.teamMembers.length === 0 && (
-          <p className="text-xs text-gray-500">No team members added yet.</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Step4({
-  data,
-  set,
-}: {
-  data: FormData;
-  set: (k: keyof FormData, v: string) => void;
-}) {
-  const feeError = data.feeBps ? validateFeeBps(data.feeBps) : null;
-
-  return (
-    <div className="space-y-4">
-      <p className="text-sm text-gray-400">
-        Optional. Leave blank to skip the platform fee.
-      </p>
-      <Field label="Platform Fee Address">
-        <input
-          className={inputCls}
-          placeholder="G... or C..."
-          value={data.feeAddress}
-          onChange={(e) => set("feeAddress", e.target.value)}
-        />
-      </Field>
-      <FieldWithError
-        label="Fee (basis points, e.g. 250 = 2.5%)"
-        error={feeError}
-      >
-        <input
-          type="number"
-          min="0"
-          max="10000"
-          className={inputCls}
-          placeholder="0"
-          value={data.feeBps}
-          onChange={(e) => set("feeBps", e.target.value)}
-        />
-      </FieldWithError>
-    </div>
-  );
-}
-
-function ReviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex justify-between text-sm py-1 border-b border-gray-800">
-      <span className="text-gray-400">{label}</span>
-      <span className="text-white max-w-xs truncate text-right">
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
-
-function Step5({ data }: { data: FormData }) {
-  const deadlineTs = data.deadline
-    ? new Date(data.deadline).toLocaleDateString()
-    : "—";
-  return (
-    <div className="space-y-1">
-      <ReviewRow label="Contract ID" value={data.contractId} />
-      <ReviewRow label="Token" value={data.token} />
-      <ReviewRow label="Title" value={data.title} />
-      <ReviewRow label="Description" value={data.description} />
-      <ReviewRow label="Category" value={data.category} />
-      <ReviewRow label="Goal" value={data.goal ? `${data.goal} XLM` : ""} />
-      <ReviewRow
-        label="Min Contribution"
-        value={data.minContribution ? `${data.minContribution} XLM` : ""}
-      />
-      <ReviewRow label="Deadline" value={deadlineTs} />
-      <ReviewRow label="Image" value={data.imageUrl} />
-      <ReviewRow
-        label="FAQs"
-        value={data.faqs.length ? `${data.faqs.length} added` : "—"}
-      />
-      <ReviewRow
-        label="Team Members"
-        value={
-          data.teamMembers.length ? `${data.teamMembers.length} added` : "—"
-        }
-      />
-      <ReviewRow label="Fee Address" value={data.feeAddress} />
-      <ReviewRow label="Fee (bps)" value={data.feeBps} />
-    </div>
-  );
-}
-
-export function validateStep(step: number, data: FormData): string | null {
-  if (step === 0) {
-    const contractErr = validateContractId(data.contractId);
-    if (contractErr) return contractErr;
-    if (!data.token.trim()) return "Token address is required.";
-
-    const titleErr = validateTitle(data.title);
-    if (titleErr) return titleErr;
-
-    const descErr = validateDescription(data.description);
-    if (descErr) return descErr;
-
-    if (!data.category) return "Please select a category.";
-
-    const goalErr = validateGoal(data.goal);
-    if (goalErr) return goalErr;
-
-    const deadlineErr = validateDeadline(data.deadline);
-    if (deadlineErr) return deadlineErr;
-
-    const minContribErr = validateMinContribution(
-      data.minContribution,
-      data.goal,
-    );
-    if (minContribErr) return minContribErr;
-  }
-
-  if (step === 1) {
-    const videoErr = validateVideoUrl(data.videoUrl);
-    if (videoErr) return videoErr;
-  }
-
-  if (step === 3) {
-    if (data.feeAddress && !data.feeBps)
-      return "Provide fee bps when a fee address is set.";
-
-    const feeErr = validateFeeBps(data.feeBps);
-    if (feeErr) return feeErr;
-  }
-
-  return null;
-}
-
-export function validateAllSteps(data: FormData): string | null {
-  return (
-    validateStep(0, data) ?? validateStep(1, data) ?? validateStep(3, data)
-  );
-}
-
+/**
+ * Campaign-creation wizard.
+ *
+ * This component owns only the shell: chrome, step routing, draft banner, and
+ * the deploy transaction. Per-step fields live in `./wizard/steps`, validation
+ * in `./wizard/validators`, and navigation/form state in `./wizard/useWizardState`.
+ */
 export function CreateCampaignWizard() {
   const { address, signTx, networkMismatch } = useWallet();
   const router = useRouter();
 
-  const [step, setStep] = useState(0);
-  const [data, setData] = useState<FormData>(INITIAL);
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const {
+    step,
+    data,
+    validationError,
+    showPreview,
+    set,
+    setFaqs,
+    setTeamMembers,
+    next,
+    back,
+    restore,
+    validateForSubmission,
+    draft,
+  } = useWizardState();
+
   const [txStatus, setTxStatus] = useState<TxStatus>("idle");
   const [txHash, setTxHash] = useState<string | null>(null);
   const [txError, setTxError] = useState<string | null>(null);
   const [showResumeBanner, setShowResumeBanner] = useState(true);
-  const [showPreview, setShowPreview] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
 
   const {
@@ -642,23 +75,13 @@ export function CreateCampaignWizard() {
     saveStatus,
     lastSaved,
     resolveConflict,
-  } = useCampaignDraft({ ...data, step });
-
-  const set = (k: keyof FormData, v: string) => {
-    setData((prev) => ({ ...prev, [k]: v }));
-    setValidationError(null);
-  };
-
-  const setFaqs = (faqs: FAQ[]) => setData((prev) => ({ ...prev, faqs }));
-  const setTeamMembers = (teamMembers: TeamMember[]) =>
-    setData((prev) => ({ ...prev, teamMembers }));
+  } = draft;
 
   const handleResumeDraft = () => {
-    const draft = loadDraft();
-    if (!draft) return;
-    const { step: savedStep, ...formFields } = draft;
-    setData(formFields as FormData);
-    setStep(savedStep);
+    const saved = loadDraft();
+    if (!saved) return;
+    const { step: savedStep, ...formFields } = saved;
+    restore(formFields, savedStep);
     setShowResumeBanner(false);
   };
 
@@ -671,45 +94,8 @@ export function CreateCampaignWizard() {
     saveDraft({ ...data, step });
   };
 
-  const next = () => {
-    const err = validateStep(step, data);
-    if (err) {
-      setValidationError(err);
-      return;
-    }
-
-    setValidationError(null);
-
-    if (step === STEPS.length - 2) {
-      const allErr = validateAllSteps(data);
-      if (allErr) {
-        setValidationError(allErr);
-        return;
-      }
-      setShowPreview(true);
-      setStep(PREVIEW_STEP);
-      return;
-    }
-
-    setStep((s) => s + 1);
-  };
-
-  const back = () => {
-    setValidationError(null);
-    if (showPreview) {
-      setShowPreview(false);
-      setStep(STEPS.length - 2);
-      return;
-    }
-    setStep((s) => Math.max(0, s - 1));
-  };
-
   const deploy = async () => {
-    const err = validateAllSteps(data);
-    if (err) {
-      setValidationError(err);
-      return;
-    }
+    if (validateForSubmission()) return;
 
     setTxStatus("pending");
     setTxError(null);
@@ -718,7 +104,7 @@ export function CreateCampaignWizard() {
         Math.floor(new Date(data.deadline).getTime() / 1000),
       );
       const xlmToStroops = (xlm: string) =>
-        BigInt(Math.round(Number(xlm) * 10_000_000));
+        BigInt(Math.round(Number(xlm) * STROOPS_PER_XLM));
 
       const xdr = await buildInitializeTx({
         contractId: data.contractId,
@@ -880,24 +266,27 @@ export function CreateCampaignWizard() {
                       const remoteDraft = resolveConflict(resolution);
                       if (remoteDraft) {
                         const { step: savedStep, ...formFields } = remoteDraft;
-                        setData(formFields as FormData);
-                        setStep(savedStep);
+                        restore(formFields, savedStep);
                       }
                     }}
                   />
                 </div>
 
-                {step === 0 && <Step1 data={data} set={set} />}
-                {step === 1 && <Step2 data={data} set={set} />}
-                {step === 2 && (
-                  <Step3
+                {step === STEP.BASIC_INFO && (
+                  <BasicInfoStep data={data} set={set} />
+                )}
+                {step === STEP.MEDIA && <MediaStep data={data} set={set} />}
+                {step === STEP.FAQ_TEAM && (
+                  <FaqTeamStep
                     data={data}
                     setFaqs={setFaqs}
                     setTeamMembers={setTeamMembers}
                   />
                 )}
-                {step === 3 && <Step4 data={data} set={set} />}
-                {step === 4 && <Step5 data={data} />}
+                {step === STEP.PLATFORM_CONFIG && (
+                  <PlatformConfigStep data={data} set={set} />
+                )}
+                {step === STEP.REVIEW && <ReviewStep data={data} />}
 
                 {validationError && (
                   <p className="text-red-500 dark:text-red-400 text-sm">
@@ -922,7 +311,7 @@ export function CreateCampaignWizard() {
                   </button>
 
                   <div className="flex items-center gap-2">
-                    {step === STEPS.length - 2 && (
+                    {step === LAST_FORM_STEP && (
                       <button
                         type="button"
                         onClick={() => setPreviewModalOpen(true)}
@@ -933,7 +322,7 @@ export function CreateCampaignWizard() {
                       </button>
                     )}
 
-                    {step < STEPS.length - 2 ? (
+                    {step < LAST_FORM_STEP ? (
                       <button
                         onClick={next}
                         className="bg-indigo-600 hover:bg-indigo-500 px-6 py-2 rounded-xl text-sm font-medium transition text-white"

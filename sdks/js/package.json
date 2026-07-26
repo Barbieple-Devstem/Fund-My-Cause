@@ -9,6 +9,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./wallet": {
+      "import": "./dist/wallet/index.js",
+      "require": "./dist/wallet/index.js",
+      "types": "./dist/wallet/index.d.ts"
     }
   },
   "scripts": {
@@ -22,11 +27,19 @@
     "@fund-my-cause/types": "file:../../packages/types"
   },
   "peerDependencies": {
-    "@stellar/stellar-sdk": "^14.0.0"
+    "@stellar/stellar-sdk": "^14.0.0",
+    "@stellar/freighter-api": "^6.0.0",
+    "@walletconnect/sign-client": "^2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@stellar/freighter-api": { "optional": true },
+    "@walletconnect/sign-client": { "optional": true }
   },
   "devDependencies": {
+    "@stellar/freighter-api": "^6.0.0",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.0.0",
+    "@walletconnect/sign-client": "^2.0.0",
     "jest": "^30.0.0",
     "ts-jest": "^29.0.0",
     "typedoc": "^0.28.20",
