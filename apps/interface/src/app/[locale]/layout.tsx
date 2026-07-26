@@ -12,6 +12,7 @@ import { BookmarkProvider } from "@/context/BookmarkContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorHandlerInitializer } from "@/components/ErrorHandlerInitializer";
 import { SkipNav } from "@/components/ui/SkipNav";
+import { ThemeProvider } from "@fund-my-cause/components";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { rtlLocales, type Locale } from "@/i18n/config";
@@ -64,32 +65,34 @@ export default async function LocaleLayout({
         <LimitedConnectivityBanner />
         <ErrorBoundary level="page">
           <ErrorHandlerInitializer />
-          <NextIntlClientProvider messages={messages}>
+          <ThemeProvider>
             <ThemeInitializer>
-              <ToastProvider>
-                <NotificationPreferencesProvider>
-                  <CurrencyProvider>
-                    <ComparisonProvider>
-                      <BookmarkProvider>
-                        <CommandPaletteProvider>
-                          <div
-                            id="main-content"
-                            role="main"
-                            tabIndex={-1}
-                            className="outline-none"
-                          >
-                            {children}
-                          </div>
-                        </CommandPaletteProvider>
-                        <WalletSelectModalHost />
-                        <ModalRenderer />
-                      </BookmarkProvider>
-                    </ComparisonProvider>
-                  </CurrencyProvider>
-                </NotificationPreferencesProvider>
-              </ToastProvider>
+              <NextIntlClientProvider messages={messages}>
+                <ToastProvider>
+                  <NotificationPreferencesProvider>
+                    <CurrencyProvider>
+                      <ComparisonProvider>
+                        <BookmarkProvider>
+                          <CommandPaletteProvider>
+                            <div
+                              id="main-content"
+                              role="main"
+                              tabIndex={-1}
+                              className="outline-none"
+                            >
+                              {children}
+                            </div>
+                          </CommandPaletteProvider>
+                          <WalletSelectModalHost />
+                          <ModalRenderer />
+                        </BookmarkProvider>
+                      </ComparisonProvider>
+                    </CurrencyProvider>
+                  </NotificationPreferencesProvider>
+                </ToastProvider>
+              </NextIntlClientProvider>
             </ThemeInitializer>
-          </NextIntlClientProvider>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

@@ -9,3 +9,10 @@ export { Modal, type ModalProps } from "./Modal";
 export { Card, CardHeader, CardBody, CardFooter, type CardProps } from "./Card";
 export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
 export { cn } from "./lib/utils";
+
+export {
+  ThemeProvider,
+  useTheme,
+  type Theme,
+  type ThemeProviderProps,
+} from "./context/ThemeContext";
