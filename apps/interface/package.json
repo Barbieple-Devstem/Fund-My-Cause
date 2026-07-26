@@ -14,6 +14,7 @@
     "test:vitest": "vitest --run",
     "test:vitest:watch": "vitest",
     "test:vitest:coverage": "vitest run --coverage",
+    "bench": "vitest bench",
     "test:mutation": "stryker run",
     "test:mutation:report": "open reports/mutation/mutation-report.html",
     "bundle:check": "node scripts/check-bundle-budgets.cjs",
