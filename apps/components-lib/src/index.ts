@@ -10,6 +10,23 @@ export { Card, CardHeader, CardBody, CardFooter, type CardProps } from "./Card";
 export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
 export { cn } from "./lib/utils";
 
+// ── Campaign card building blocks ──────────────────────────────────────────
+export {
+  CampaignHeader,
+  type CampaignHeaderProps,
+  type CampaignHeaderClassNames,
+} from "./CampaignHeader";
+export {
+  CampaignProgress,
+  type CampaignProgressProps,
+  type CampaignProgressClassNames,
+} from "./CampaignProgress";
+export {
+  CampaignActions,
+  type CampaignActionsProps,
+  type CampaignActionsClassNames,
+} from "./CampaignActions";
+
 export {
   ThemeProvider,
   useTheme,

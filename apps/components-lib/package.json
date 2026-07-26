@@ -3,32 +3,44 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
     },
     "./button": {
-      "import": "./dist/Button.entry.js",
-      "types": "./dist/Button.entry.d.ts"
+      "import": "./src/Button.entry.ts",
+      "types": "./src/Button.entry.ts"
     },
     "./input": {
-      "import": "./dist/Input.entry.js",
-      "types": "./dist/Input.entry.d.ts"
+      "import": "./src/Input.entry.ts",
+      "types": "./src/Input.entry.ts"
     },
     "./modal": {
-      "import": "./dist/Modal.entry.js",
-      "types": "./dist/Modal.entry.d.ts"
+      "import": "./src/Modal.entry.ts",
+      "types": "./src/Modal.entry.ts"
     },
     "./card": {
-      "import": "./dist/Card.entry.js",
-      "types": "./dist/Card.entry.d.ts"
+      "import": "./src/Card.entry.ts",
+      "types": "./src/Card.entry.ts"
     },
     "./progress-bar": {
-      "import": "./dist/ProgressBar.entry.js",
-      "types": "./dist/ProgressBar.entry.d.ts"
+      "import": "./src/ProgressBar.entry.ts",
+      "types": "./src/ProgressBar.entry.ts"
+    },
+    "./campaign-header": {
+      "import": "./src/CampaignHeader.entry.ts",
+      "types": "./src/CampaignHeader.entry.ts"
+    },
+    "./campaign-progress": {
+      "import": "./src/CampaignProgress.entry.ts",
+      "types": "./src/CampaignProgress.entry.ts"
+    },
+    "./campaign-actions": {
+      "import": "./src/CampaignActions.entry.ts",
+      "types": "./src/CampaignActions.entry.ts"
     }
   },
   "scripts": {
