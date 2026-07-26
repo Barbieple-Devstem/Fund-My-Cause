@@ -21,6 +21,7 @@ import { routing } from "@/i18n/routing";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { CommandPaletteProvider } from "@/components/ui/CommandPaletteProvider";
 import { LimitedConnectivityBanner } from "@/components/ui/LimitedConnectivityBanner";
+import { ErrorSimulator } from "@/components/ErrorSimulator";
 
 export const metadata: Metadata = {
   title: "Fund My Cause",
@@ -63,6 +64,7 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <SkipNav />
         <LimitedConnectivityBanner />
+        <ErrorSimulator />
         <ErrorBoundary level="page">
           <ErrorHandlerInitializer />
           <ThemeProvider>

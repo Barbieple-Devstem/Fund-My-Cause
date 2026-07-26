@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ReactQueryProvider } from "@/context/ReactQueryProvider";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
@@ -20,7 +21,9 @@ export default function EmbedLayout({
   return (
     <html lang="en">
       <body className="bg-transparent m-0 p-0 overflow-hidden">
-        <ReactQueryProvider>{children}</ReactQueryProvider>
+        <ErrorBoundary level="page">
+          <ReactQueryProvider>{children}</ReactQueryProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

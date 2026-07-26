@@ -6,6 +6,7 @@ import { ProgressBar } from "@/components/ui/ProgressBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { RecommendedSection } from "@/components/ui/RecommendedSection";
 import { FundingTicker } from "@/components/ui/FundingTicker";
+import { RootPageContent } from "@/components/RootPageContent";
 import { Rocket, Users, Coins, ArrowRight, PlusCircle } from "lucide-react";
 import { formatTimeLeft } from "@/lib/format";
 import {
@@ -90,7 +91,8 @@ const HOW_IT_WORKS = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <RootPageContent>
+      <main className="min-h-screen bg-gray-950 text-white flex flex-col">
       <Navbar />
 
       {/* ── Hero ── */}
@@ -263,5 +265,6 @@ export default function Home() {
         </div>
       </footer>
     </main>
+    </RootPageContent>
   );
 }
