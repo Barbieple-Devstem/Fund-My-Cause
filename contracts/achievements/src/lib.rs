@@ -269,18 +269,14 @@ fn do_unlock(
     achievement_type: u32,
     metadata: String,
 ) -> Result<AchievementNFT, ContractError> {
-    let nft = AchievementNFT {
-        user: user.clone(),
-        achievement_type,
-        unlocked_at: env.ledger().timestamp(),
-        metadata,
-        nft_id: generate_nft_id(env, user, achievement_type),
-    };
+    let unlocked_at = env.ledger().timestamp();
 
-    store_achievement(env, user, &nft)?;
+    // Store compact record (v2) — no `user` or `nft_id` on ledger.
+    store_achievement(env, user, achievement_type, unlocked_at, metadata.clone())?;
 
     let points = get_achievement_points(achievement_type);
     award_points(env, user, points)?;
+    // update_level now only reads points + derives the level — no Level write.
     let new_level = update_level(env, user)?;
 
     add_leaderboard_entry(env, user, points, LeaderboardType::Achievements)?;
@@ -290,6 +286,14 @@ fn do_unlock(
         (user.clone(), achievement_type, new_level),
     );
 
+    // Reconstruct full public NFT (nft_id derived, not read from ledger).
+    let nft = AchievementNFT {
+        user: user.clone(),
+        achievement_type,
+        unlocked_at,
+        metadata,
+        nft_id: generate_nft_id(env, user, achievement_type),
+    };
     Ok(nft)
 }
 
@@ -305,13 +309,11 @@ fn try_auto_unlock(env: &Env, user: &Address, achievement_type: u32) -> Result<(
     Ok(())
 }
 
-/// Recomputes and persists `user`'s level from their current points, mirroring
-/// [`points::calculate_level_from_points`]. Returns the new level.
+/// Recomputes `user`'s level from their current points (derived, not stored).
+/// Returns the computed level.
 fn update_level(env: &Env, user: &Address) -> Result<u32, ContractError> {
     let points = get_user_points(env, user)?;
-    let level = points::calculate_level_from_points(points);
-    points::set_user_level(env, user, level)?;
-    Ok(level)
+    Ok(points::calculate_level_from_points(points))
 }
 
 /// Generate a unique NFT id by hashing the user's address and achievement
@@ -335,11 +337,15 @@ fn generate_nft_id(env: &Env, user: &Address, achievement_type: u32) -> String {
     String::from_str(env, hex_str)
 }
 
-/// Store achievement
-fn store_achievement(env: &Env, user: &Address, nft: &AchievementNFT) -> Result<(), ContractError> {
-    let key = DataKey::Achievement(user.clone(), nft.achievement_type);
-    env.storage().instance().set(&key, nft);
-    Ok(())
+/// Store achievement as a compact [`AchievementRecord`] (v2 layout).
+fn store_achievement(
+    env: &Env,
+    user: &Address,
+    achievement_type: u32,
+    unlocked_at: u64,
+    metadata: String,
+) -> Result<(), ContractError> {
+    achievements::store_achievement_record(env, user, achievement_type, unlocked_at, metadata)
 }
 
 /// Get achievement points based on type

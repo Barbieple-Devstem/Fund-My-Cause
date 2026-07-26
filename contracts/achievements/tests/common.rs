@@ -9,7 +9,7 @@ use achievements::{AchievementsContract, AchievementsContractClient};
 
 /// Deploy a fresh, uninitialized achievements contract.
 pub fn deploy(env: &Env) -> AchievementsContractClient {
-    let id = env.register_contract(None, AchievementsContract);
+    let id = env.register(AchievementsContract, ());
     AchievementsContractClient::new(env, &id)
 }
 
