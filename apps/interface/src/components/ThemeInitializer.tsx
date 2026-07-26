@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useThemeStore, type Theme } from "@/store/useThemeStore";
+import { useTheme, type Theme } from "@fund-my-cause/components";
 
 /**
  * Applies the persisted/system theme on first mount and keeps the document
- * root's class + localStorage in sync with the theme store. Gates rendering
+ * root's class + localStorage in sync with the theme context. Gates rendering
  * of children until the client-only theme resolution has run, so we never
  * flash the wrong theme.
  */
 export function ThemeInitializer({ children }: { children: React.ReactNode }) {
-  const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.setTheme);
+  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
