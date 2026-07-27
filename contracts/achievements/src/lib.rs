@@ -110,7 +110,19 @@ pub struct AchievementsContract;
 #[allow(deprecated)]
 #[contractimpl]
 impl AchievementsContract {
-    /// Initialize the achievements contract
+    /// Initializes the achievements contract with admin and platform addresses.
+    ///
+    /// Must be called exactly once immediately after contract deployment.
+    /// Subsequent calls return an error.
+    ///
+    /// # Parameters
+    ///
+    /// * `admin` — The address authorized to call admin-only functions like `award_user_points`.
+    /// * `platform_address` — The platform address for event tracking and auditing.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::AlreadyInitialized`] (mapped from `CommonError::AlreadyInitialized`) if the contract has already been initialized.
     pub fn initialize(
         env: Env,
         admin: Address,
@@ -139,10 +151,26 @@ impl AchievementsContract {
         Ok(())
     }
 
-    /// Unlock an achievement for a user.
+    /// Unlocks an achievement for a user and awards associated points.
     ///
-    /// Returns `AchievementAlreadyUnlocked` if the user already holds this
-    /// achievement type — repeated calls must not re-award points.
+    /// Stores the achievement NFT, awards points based on achievement type,
+    /// updates the user's level, and adds an entry to the achievements leaderboard.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user unlocking the achievement. Must sign the transaction.
+    /// * `achievement_type` — A u32 identifier for the achievement type (1-13). See error for invalid types.
+    /// * `metadata` — Optional string metadata associated with the achievement unlock (e.g., campaign ID).
+    ///
+    /// # Return Value
+    ///
+    /// Returns the newly created [`AchievementNFT`] with populated fields including
+    /// the derived `nft_id` (hash-based), user address, achievement type, unlock timestamp, and metadata.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidAchievementType`] if `achievement_type` is not in the range 1-13.
+    /// * [`ContractError::AchievementAlreadyUnlocked`] if the user has already unlocked this achievement type.
     pub fn unlock_achievement(
         env: Env,
         user: Address,
@@ -164,12 +192,45 @@ impl AchievementsContract {
         do_unlock(&env, &user, achievement_type, metadata)
     }
 
-    /// Get user achievements
+    /// Retrieves all achievements unlocked by a user.
+    ///
+    /// Reconstructs the full [`AchievementNFT`] entries for each achievement
+    /// the user has unlocked, deriving the `nft_id` from the stored achievement data.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose achievements to retrieve.
+    ///
+    /// # Return Value
+    ///
+    /// Returns a vector of [`AchievementNFT`] structs, one per unlocked achievement.
+    /// Empty vector if the user has not unlocked any achievements.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn get_achievements(env: Env, user: Address) -> Result<Vec<AchievementNFT>, ContractError> {
         get_user_achievements(&env, &user)
     }
 
-    /// Get leaderboard entries
+    /// Retrieves the top leaderboard entries for a given leaderboard type.
+    ///
+    /// Leaderboard type 0 = Points, 1 = Achievements, 2 = Referrals.
+    /// Entries are returned in descending order by score.
+    ///
+    /// # Parameters
+    ///
+    /// * `leaderboard_type` — The u32 type identifier: 0 (Points), 1 (Achievements), or 2 (Referrals).
+    /// * `limit` — Maximum number of top entries to return (as u32).
+    ///
+    /// # Return Value
+    ///
+    /// Returns a vector of [`LeaderboardEntry`] structs, sorted by score descending,
+    /// with at most `limit` entries.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidLeaderboardType`] if `leaderboard_type` is not 0, 1, or 2.
     pub fn get_leaderboard_entries(
         env: Env,
         leaderboard_type: u32,
@@ -182,23 +243,88 @@ impl AchievementsContract {
         )
     }
 
-    /// Get a user's rank on a leaderboard (1-based). Errors with
-    /// `UserNotFound` if the user has no entry on that leaderboard.
+    /// Retrieves a user's rank on a specific leaderboard (1-based ranking).
+    ///
+    /// Leaderboard type 0 = Points, 1 = Achievements, 2 = Referrals.
+    /// Rank 1 is the highest score, rank 2 is second-highest, etc.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose rank to retrieve.
+    /// * `leaderboard_type` — The u32 type identifier: 0 (Points), 1 (Achievements), or 2 (Referrals).
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's 1-based rank (u32) on the specified leaderboard.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidLeaderboardType`] if `leaderboard_type` is not 0, 1, or 2.
+    /// * [`ContractError::UserNotFound`] if the user has no entry on that leaderboard.
     pub fn get_rank(env: Env, user: Address, leaderboard_type: u32) -> Result<u32, ContractError> {
         leaderboard::get_user_rank(&env, &user, validate_leaderboard_type(leaderboard_type)?)
     }
 
-    /// Get user points
+    /// Retrieves the total accumulated points for a user.
+    ///
+    /// Points are earned through achievement unlocks, contributions, referrals, and streaks.
+    /// Used to calculate the user's level (level = points / 100 + 1, capped at 100).
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose points to retrieve.
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's total accumulated points as a u32.
+    /// Returns 0 if the user has no points record.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn get_points(env: Env, user: Address) -> Result<u32, ContractError> {
         get_user_points(&env, &user)
     }
 
-    /// Get user level
+    /// Retrieves the user's current level based on accumulated points.
+    ///
+    /// Level is calculated from points as: `level = min((points / 100) + 1, 100)`.
+    /// The level is derived dynamically from points on every read; no separate
+    /// Level storage entry is maintained after #920.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose level to retrieve.
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's level as a u32 in the range 1-100.
+    /// Returns 1 if the user has no points record.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn get_level(env: Env, user: Address) -> Result<u32, ContractError> {
         get_user_level(&env, &user)
     }
 
-    /// Award points to a user. Admin-only.
+    /// Awards points to a user. Admin-only operation.
+    ///
+    /// Adds the specified points to the user's total, updates their level accordingly,
+    /// and publishes a "points_awarded" event.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user to award points to.
+    /// * `points` — The number of points to award (u32).
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's new total points after the award.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::Unauthorized`] if the caller is not the admin address set during initialization.
     pub fn award_user_points(env: Env, user: Address, points: u32) -> Result<u32, ContractError> {
         let admin: Address = env
             .storage()
@@ -223,7 +349,26 @@ impl AchievementsContract {
         Ok(total_points)
     }
 
-    /// Record a contribution for achievement tracking
+    /// Records a user contribution and evaluates contribution-based achievements.
+    ///
+    /// Stores the contribution, awards points based on amount, updates level,
+    /// and automatically unlocks achievements like "First Contribution",
+    /// "Consistent Contributor", and "Mega Donor" when milestones are reached.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user making the contribution. Must sign the transaction.
+    /// * `campaign_id` — A string identifier for the campaign receiving the contribution.
+    /// * `amount` — The contribution amount in stroops (i128). Must be positive.
+    ///   Points awarded = `(amount / 1,000,000).clamp(1, 1000)`.
+    ///
+    /// # Return Value
+    ///
+    /// Returns `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidAmount`] if `amount` is not positive.
     pub fn record_contribution(
         env: Env,
         user: Address,
@@ -256,7 +401,24 @@ impl AchievementsContract {
         Ok(())
     }
 
-    /// Record a referral success
+    /// Records a successful referral and evaluates referral-based achievements.
+    ///
+    /// Stores the referral relationship, awards fixed points (50) to the referrer,
+    /// updates their level, and automatically unlocks "Referral Champion" achievement
+    /// once the referrer reaches 3 successful referrals.
+    ///
+    /// # Parameters
+    ///
+    /// * `referrer` — The address of the user who made the referral. Must sign the transaction.
+    /// * `referee` — The address of the user being referred.
+    ///
+    /// # Return Value
+    ///
+    /// Returns `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn record_referral(
         env: Env,
         referrer: Address,
@@ -287,7 +449,24 @@ impl AchievementsContract {
         Ok(())
     }
 
-    /// Update user contribution streak
+    /// Updates the user's contribution streak counter.
+    ///
+    /// If this is the first contribution tracked or the last contribution was
+    /// more than 1 day ago, resets the streak to 1. If the last contribution
+    /// was within 1 day, increments the current streak. Every 7-day milestone
+    /// awards a 100-point bonus.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose streak to update. Must sign the transaction.
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's new streak count (u32).
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn update_streak(env: Env, user: Address) -> Result<u32, ContractError> {
         user.require_auth();
 
@@ -439,7 +618,8 @@ fn generate_nft_id(env: &Env, user: &Address, achievement_type: u32) -> String {
         hex_buf[i * 2 + 1] = HEX[(byte & 0x0f) as usize];
     }
 
-    let hex_str = core::str::from_utf8(&hex_buf).unwrap();
+    let hex_str = core::str::from_utf8(&hex_buf)
+        .unwrap_or_else(|_| "0000000000000000000000000000000000000000000000000000000000000000");
     String::from_str(env, hex_str)
 }
 
