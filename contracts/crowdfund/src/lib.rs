@@ -79,6 +79,7 @@ mod views;
 pub use errors::ContractError;
 pub use security::{AccessControl, CircuitBreaker, InputValidator, RateLimiter, ReentrancyGuard};
 pub use storage::{
+    BASIS_POINTS_MAX,
     CONTRACT_VERSION,
     KEY_ADMIN,
     KEY_ANALYTICS,
@@ -116,6 +117,8 @@ pub use storage::{
     KEY_MILESTONE_STATUS,
     KEY_MIN,
     KEY_NEXT_RELEASE,
+    MAX_BATCH_REFUND_SIZE,
+    MAX_MESSAGE_LENGTH,
     // #696 Pause timelock
     KEY_PAUSE_TIMELOCK,
     KEY_PERF_STATS,
@@ -147,6 +150,9 @@ pub use storage::{
     KEY_YIELD_CONFIG,
     KEY_YIELD_TOTAL,
     MIN_SUPPORTED_VERSION,
+    TTL_INSTANCE_EXTEND_MAX,
+    TTL_INSTANCE_EXTEND_MIN,
+    TTL_PERSISTENT_ENTRY,
 };
 pub use types::{
     AnalyticsDataPoint,
@@ -505,7 +511,7 @@ impl CrowdfundContract {
         validate_positive_amount(amount)?;
 
         if let Some(ref msg) = message {
-            if msg.len() > 256 {
+            if msg.len() > MAX_MESSAGE_LENGTH {
                 return Err(ContractError::MessageTooLong);
             }
         }
@@ -636,7 +642,7 @@ impl CrowdfundContract {
 
         let contrib_fee: i128 = if let Some(ref config) = platform_config {
             if config.fee_mode == FeeMode::OnContribution {
-                let f = amount * config.fee_bps as i128 / 10_000;
+                let f = amount * config.fee_bps as i128 / BASIS_POINTS_MAX;
                 if f > 0 {
                     token::Client::new(&env, &token).transfer(
                         &env.current_contract_address(),
@@ -661,7 +667,7 @@ impl CrowdfundContract {
         // Uses the `insurance_config` value hoisted from the upfront batch above.
         let insurance_fee: i128 = insurance_config
             .filter(|c| c.enabled)
-            .map(|c| effective_amount_after_fee * c.fee_bps as i128 / 10_000)
+            .map(|c| effective_amount_after_fee * c.fee_bps as i128 / BASIS_POINTS_MAX)
             .unwrap_or(0);
         let effective_amount = effective_amount_after_fee - insurance_fee;
         if insurance_fee > 0 {
@@ -671,7 +677,7 @@ impl CrowdfundContract {
                 .checked_add(insurance_fee)
                 .ok_or(ContractError::Overflow)?;
             env.storage().persistent().set(&fee_key, &new_fee);
-            env.storage().persistent().extend_ttl(&fee_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
             let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
             let new_pool = pool
@@ -687,12 +693,12 @@ impl CrowdfundContract {
         env.storage().persistent().set(&contrib_key, &new_contrib);
         env.storage()
             .persistent()
-            .extend_ttl(&contrib_key, 100, 100);
+            .extend_ttl(&contrib_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         if let Some(msg) = message {
             let msg_key = DataKey::ContributionMessage(contributor.clone());
             env.storage().persistent().set(&msg_key, &msg);
-            env.storage().persistent().extend_ttl(&msg_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         }
 
         // ── Apply matching (cached instance read) ─────────────────────────────
@@ -702,7 +708,7 @@ impl CrowdfundContract {
         let mut matched_amount = 0i128;
         // Uses `matching_config` hoisted from the upfront batch above.
         if let Some(config) = matching_config {
-            let match_amount = (effective_amount * config.match_ratio as i128) / 10_000;
+            let match_amount = (effective_amount * config.match_ratio as i128) / BASIS_POINTS_MAX;
             let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
             let available_match = config
                 .max_match
@@ -738,7 +744,7 @@ impl CrowdfundContract {
             env.storage().persistent().set(&presence_key, &true);
             env.storage()
                 .persistent()
-                .extend_ttl(&presence_key, 100, 100);
+                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
             // O(1) indexed write: store address at its insertion-order index.
             // Previously used an O(n) Vec append into KEY_CONTRIBS; with many
@@ -746,7 +752,7 @@ impl CrowdfundContract {
             // on every new contribution.
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &contributor);
-            env.storage().persistent().extend_ttl(&index_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
             // Use cached `count` — single write
             let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
@@ -777,7 +783,7 @@ impl CrowdfundContract {
         env.storage().persistent().set(&history_key, &history);
         env.storage()
             .persistent()
-            .extend_ttl(&history_key, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         // ── #418: Assign reward tier based on updated cumulative total ────────
         if let Some(tiers) = inst.get::<_, Vec<RewardTier>>(&DataKey::RewardTiers) {
@@ -809,7 +815,7 @@ impl CrowdfundContract {
             }
         }
 
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         // ── #419: Emit detailed contribution-recorded event ───────────────────
         env.events().publish(
@@ -942,7 +948,7 @@ impl CrowdfundContract {
         // ── Batch all instance writes ─────────────────────────────────────────
         inst.set(&KEY_TOTAL, &0i128);
         inst.set(&KEY_STATUS, &Status::Successful);
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         // ── Refund unused matching funds to sponsor on completion ─────────────
         let matching_pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
@@ -1010,7 +1016,7 @@ impl CrowdfundContract {
                 claimed: 0,
             },
         );
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
         Ok(())
     }
 
@@ -1107,7 +1113,7 @@ impl CrowdfundContract {
             inst.set(&KEY_STATUS, &Status::Successful);
             inst.set(&KEY_TOTAL, &0i128);
         }
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         env.events().publish(
             ("campaign", "stream_claimed"),
@@ -1203,7 +1209,7 @@ impl CrowdfundContract {
         env.storage().persistent().set(&KEY_META_HIST, &meta_hist);
         env.storage()
             .persistent()
-            .extend_ttl(&KEY_META_HIST, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.events().publish(
             ("campaign", "metadata_updated"),
@@ -1368,9 +1374,9 @@ impl CrowdfundContract {
         env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
         env.storage()
             .persistent()
-            .extend_ttl(&KEY_GOAL_HISTORY, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         env.events().publish(
             ("campaign", "goal_adjusted"),
@@ -1625,8 +1631,7 @@ impl CrowdfundContract {
         let token_client = token::Client::new(&env, &token_address);
 
         // Cap batch size to avoid resource exhaustion
-        const MAX_BATCH: u32 = 25;
-        let limit = contributors.len().min(MAX_BATCH);
+        let limit = contributors.len().min(MAX_BATCH_REFUND_SIZE as usize);
         let mut refunded: u32 = 0;
 
         for contributor in contributors.iter().take(limit as usize) {
@@ -2235,7 +2240,7 @@ impl CrowdfundContract {
         );
 
         inst.set(&DataKey::MatchingPool, &0i128);
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         env.events().publish(
             ("campaign", "matching_sponsor_refunded"),
@@ -2682,7 +2687,7 @@ impl CrowdfundContract {
             .set(&DataKey::Whitelist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Whitelist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "whitelisted"), EventWhitelisted { address });
         Ok(())
@@ -2725,7 +2730,7 @@ impl CrowdfundContract {
             .set(&DataKey::Blacklist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Blacklist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "blacklisted"), EventBlacklisted { address });
         Ok(())
@@ -2907,7 +2912,7 @@ impl CrowdfundContract {
             .set(&DataKey::Delegation(delegator.clone()), &delegation);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Delegation(delegator.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events().publish(
             ("campaign", "delegation_created"),
             EventDelegationCreated {
@@ -3016,14 +3021,14 @@ impl CrowdfundContract {
 
         let new_amount = prev.checked_add(amount).ok_or(ContractError::Overflow)?;
         env.storage().persistent().set(&key, &new_amount);
-        env.storage().persistent().extend_ttl(&key, 100, 100);
+        env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.storage()
             .persistent()
             .set(&delegated_key, &(delegated_so_far + amount));
         env.storage()
             .persistent()
-            .extend_ttl(&delegated_key, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         let total: i128 = env.storage().instance().get(&KEY_TOTAL).unwrap();
         let new_total = total.checked_add(amount).ok_or(ContractError::Overflow)?;
@@ -3039,7 +3044,7 @@ impl CrowdfundContract {
             env.storage().persistent().set(&presence_key, &true);
             env.storage()
                 .persistent()
-                .extend_ttl(&presence_key, 100, 100);
+                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
             let count: u32 = env
                 .storage()
                 .instance()
@@ -3048,7 +3053,7 @@ impl CrowdfundContract {
             // O(1) indexed write, same pattern as contribute()
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &delegator);
-            env.storage().persistent().extend_ttl(&index_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
             let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
             env.storage()
                 .instance()
@@ -4494,7 +4499,7 @@ impl CrowdfundContract {
             .set(&KEY_VERSION_HISTORY, &history);
         env.storage()
             .persistent()
-            .extend_ttl(&KEY_VERSION_HISTORY, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.events().publish(
             ("contract", "migrated"),
@@ -4756,7 +4761,7 @@ impl CrowdfundContract {
         }
 
         env.storage().persistent().set(&stats_key, &stats);
-        env.storage().persistent().extend_ttl(&stats_key, 100, 100);
+        env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.events().publish(
             ("perf", "execution_recorded"),
@@ -5922,7 +5927,7 @@ impl CrowdfundContract {
             .set(&DataKey::Whitelist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Whitelist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "allowlisted"), EventAllowlisted { address });
         Ok(())
@@ -5953,7 +5958,7 @@ impl CrowdfundContract {
             .set(&DataKey::Blacklist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Blacklist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "denylisted"), EventDenylisted { address });
         Ok(())

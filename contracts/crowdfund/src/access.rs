@@ -9,6 +9,7 @@ use crate::{
     errors::ContractError,
     storage::{
         DataKey, KEY_CREATOR, KEY_PAUSE_TIMELOCK, KEY_RATE_LIMIT, KEY_STATUS, KEY_VISIBILITY,
+        TTL_INSTANCE_EXTEND_MAX, TTL_INSTANCE_EXTEND_MIN,
     },
     types::{
         EventBlacklisted, EventOwnershipTransferred, EventPaused, EventPausedWithTimelock,
@@ -297,7 +298,7 @@ pub(crate) fn pause(env: Env) -> Result<(), ContractError> {
 
     let inst = env.storage().instance();
     inst.set(&KEY_STATUS, &Status::Paused);
-    inst.extend_ttl(17280, 518400);
+    inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
     env.events().publish(
         ("campaign", "paused"),
@@ -325,7 +326,7 @@ pub(crate) fn resume(env: Env) -> Result<(), ContractError> {
     }
 
     inst.set(&KEY_STATUS, &Status::Active);
-    inst.extend_ttl(17280, 518400);
+    inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
     env.events().publish(
         ("campaign", "resumed"),

@@ -7,7 +7,7 @@ use soroban_sdk::{token, Address, Env};
 
 use crate::{
     errors::ContractError,
-    storage::{KEY_TOKEN, KEY_TOTAL},
+    storage::{KEY_TOKEN, KEY_TOTAL, TTL_PERSISTENT_ENTRY},
     types::{
         DataKey, EventRecurringCancelled, EventRecurringExecuted, EventRecurringSetup,
         RecurringPlan,
@@ -33,7 +33,7 @@ pub(crate) fn setup(
     };
     let key = DataKey::RecurringPlan(contributor.clone());
     env.storage().persistent().set(&key, &plan);
-    env.storage().persistent().extend_ttl(&key, 100, 100);
+    env.storage().persistent().extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
     env.events().publish(
         ("campaign", "recurring_setup"),

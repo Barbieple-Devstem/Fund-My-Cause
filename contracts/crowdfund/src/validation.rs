@@ -2,6 +2,7 @@
 ///
 /// This module contains validation functions for campaign parameters and operations.
 use crate::errors::ContractError;
+use crate::storage::BASIS_POINTS_MAX;
 use crate::types::{Category, Status};
 use soroban_sdk::Address;
 
@@ -45,7 +46,7 @@ pub fn validate_initialization(
         return Err(ContractError::ExceedsMaximum);
     }
     if let Some(fee_bps) = platform_fee_bps {
-        if fee_bps > 10_000 {
+        if fee_bps > BASIS_POINTS_MAX as u32 {
             return Err(ContractError::InvalidFee);
         }
     }
