@@ -453,8 +453,34 @@ logger.on('error', (log) => {
 });
 ```
 
+## Trace-ID Correlation
+
+All Fund-My-Cause services propagate a `trace_id` field in every structured log
+line.  This lets you filter an aggregation backend (Loki, Elasticsearch, Datadog)
+to a single trace ID and see the complete cross-service picture for one request.
+
+```
+# Loki — all logs for one donation request across every service
+{} | json | trace_id="fmc-67946a1b-3f8c2a0d9e4b71c2"
+
+# Elasticsearch / Kibana
+trace_id:"fmc-67946a1b-3f8c2a0d9e4b71c2"
+
+# Datadog
+@trace_id:fmc-67946a1b-3f8c2a0d9e4b71c2
+```
+
+The trace ID is generated once by `graphql-api` (or accepted from the inbound
+`X-Trace-ID` header) and forwarded to `fraud_detection` and `indexer` via the
+same header on outbound HTTP calls.
+
+See [Logging Conventions](./logging-conventions.md) for the full specification,
+including the ID format, generation rules, and how to add propagation to a new
+service.
+
 ## See Also
 
+- [Logging Conventions](./logging-conventions.md) — trace-ID format, generation, structured field reference
 - [Monitoring Guide](./monitoring.md)
 - [Deployment Guide](./deployment.md)
 - [Troubleshooting Guide](./troubleshooting.md)

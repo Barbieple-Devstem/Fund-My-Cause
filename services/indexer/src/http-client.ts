@@ -14,6 +14,14 @@
  * Retried:     network / timeout errors, HTTP 429, HTTP 5xx
  * Not retried: HTTP 4xx (except 429) — these are caller errors and won't self-heal
  *
+ * Trace-ID propagation
+ * ────────────────────
+ * Pass a `traceId` string to `createHttpClient` (or directly to `httpFetch`)
+ * and the client will attach it as the `X-Trace-ID` request header on every
+ * outbound call, including retries.  This ensures the same trace ID that was
+ * generated (or accepted) by the graphql-api is visible in downstream service
+ * logs without any per-call boilerplate.
+ *
  * Per-call overrides
  * ──────────────────
  * Pass a Partial<HttpClientOptions> as the third argument to `httpFetch` to
@@ -22,6 +30,8 @@
  * streaming large payloads).  Every override should be accompanied by a comment
  * explaining why the default is insufficient.
  */
+
+import { TRACE_ID_HEADER } from "./trace.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,14 +86,23 @@ function isRetryable(error: unknown, status?: number): boolean {
     return status === 429 || status >= 500;
   }
   // Network / timeout errors thrown by fetch
-  return error instanceof TypeError || (error instanceof DOMException && error.name === "AbortError");
+  return (
+    error instanceof TypeError ||
+    (error instanceof DOMException && error.name === "AbortError")
+  );
 }
 
 /**
  * Calculates the capped exponential backoff delay for a given attempt index.
  * attempt=0 → initialBackoffMs, attempt=1 → initialBackoffMs*multiplier, …
  */
-export function calcBackoff(attempt: number, opts: Pick<HttpClientOptions, "initialBackoffMs" | "backoffMultiplier" | "maxBackoffMs">): number {
+export function calcBackoff(
+  attempt: number,
+  opts: Pick<
+    HttpClientOptions,
+    "initialBackoffMs" | "backoffMultiplier" | "maxBackoffMs"
+  >,
+): number {
   const raw = opts.initialBackoffMs * Math.pow(opts.backoffMultiplier, attempt);
   return Math.min(raw, opts.maxBackoffMs);
 }
@@ -98,21 +117,35 @@ function defaultSleep(ms: number): Promise<void> {
 // ---------------------------------------------------------------------------
 
 /**
- * Executes a fetch request with automatic retry, exponential backoff, and
- * per-attempt timeouts.
+ * Executes a fetch request with automatic retry, exponential backoff,
+ * per-attempt timeouts, and optional X-Trace-ID propagation.
  *
- * @param url     Destination URL
- * @param init    Standard RequestInit (method, headers, body, …)
+ * @param url      Destination URL
+ * @param init     Standard RequestInit (method, headers, body, …)
  * @param overrides  Per-call option overrides. Document why in a comment at the call site.
- * @param _sleep  Injectable sleep function — used by unit tests to avoid real delays.
+ * @param traceId  When provided, sets the X-Trace-ID header on every attempt.
+ *                 Callers that already set the header in `init` take precedence.
+ * @param _sleep   Injectable sleep function — used by unit tests to avoid real delays.
  */
 export async function httpFetch<T = unknown>(
   url: string,
   init: RequestInit = {},
   overrides: Partial<HttpClientOptions> = {},
+  traceId?: string,
   _sleep: (ms: number) => Promise<void> = defaultSleep,
 ): Promise<HttpClientResult<T>> {
   const opts: HttpClientOptions = { ...HTTP_CLIENT_DEFAULTS, ...overrides };
+
+  // Merge the trace ID header into the caller-supplied headers once so it
+  // is present on every attempt, including retries.  Caller-supplied values
+  // always win — we only inject when the header is absent.
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (traceId && !headers[TRACE_ID_HEADER]) {
+    headers[TRACE_ID_HEADER] = traceId;
+  }
+  const initWithTrace: RequestInit = { ...init, headers };
 
   let lastError: unknown;
   let lastStatus: number | undefined;
@@ -123,13 +156,18 @@ export async function httpFetch<T = unknown>(
     const signal = AbortSignal.timeout(opts.requestTimeoutMs);
 
     try {
-      const response = await fetch(url, { ...init, signal });
+      const response = await fetch(url, { ...initWithTrace, signal });
       lastStatus = response.status;
 
       if (!isRetryable(undefined, response.status)) {
         // Success or a non-retryable client error — return immediately.
         const data = (await response.json().catch(() => null)) as T;
-        return { ok: response.ok, status: response.status, data, attempts: attempt + 1 };
+        return {
+          ok: response.ok,
+          status: response.status,
+          data,
+          attempts: attempt + 1,
+        };
       }
 
       // Retryable HTTP status — consume body to free the connection, then retry.
@@ -153,7 +191,12 @@ export async function httpFetch<T = unknown>(
   }
 
   // All attempts exhausted.
-  throw lastError ?? new Error(`HTTP request failed after ${opts.maxRetries + 1} attempts (last status: ${lastStatus})`);
+  throw (
+    lastError ??
+    new Error(
+      `HTTP request failed after ${opts.maxRetries + 1} attempts (last status: ${lastStatus})`,
+    )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -162,18 +205,31 @@ export async function httpFetch<T = unknown>(
 
 /**
  * Creates a pre-configured fetch wrapper with service-level defaults baked in.
- * Individual calls can still override specific options via the `overrides` parameter.
+ * Individual calls can still override specific options via the `overrides`
+ * parameter.
+ *
+ * Pass `traceId` once at construction time so every outbound request from
+ * this client carries the same X-Trace-ID header automatically.  This is the
+ * recommended pattern for request-scoped clients: create one client per
+ * inbound request, pass the resolved trace ID, then discard the client when
+ * the request completes.
  *
  * Usage:
- *   const client = createHttpClient({ requestTimeoutMs: 60_000 }); // longer default for this service
+ *   const client = createHttpClient({ requestTimeoutMs: 60_000 }, traceId);
  *   const result = await client.fetch<MyType>(url, { method: "POST", body: "…" });
  */
-export function createHttpClient(serviceDefaults: Partial<HttpClientOptions> = {}) {
+export function createHttpClient(
+  serviceDefaults: Partial<HttpClientOptions> = {},
+  traceId?: string,
+) {
   const merged: HttpClientOptions = { ...HTTP_CLIENT_DEFAULTS, ...serviceDefaults };
 
   return {
     /** The resolved options this client was created with. */
     options: merged as Readonly<HttpClientOptions>,
+
+    /** The trace ID bound to this client instance (may be undefined). */
+    traceId,
 
     fetch<T = unknown>(
       url: string,
@@ -182,7 +238,13 @@ export function createHttpClient(serviceDefaults: Partial<HttpClientOptions> = {
       _sleep?: (ms: number) => Promise<void>,
     ): Promise<HttpClientResult<T>> {
       // Call-level overrides are layered on top of the service-level defaults.
-      return httpFetch<T>(url, init, { ...serviceDefaults, ...callOverrides }, _sleep);
+      return httpFetch<T>(
+        url,
+        init,
+        { ...serviceDefaults, ...callOverrides },
+        traceId,
+        _sleep,
+      );
     },
   };
 }

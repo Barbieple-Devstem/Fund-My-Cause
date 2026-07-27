@@ -13,6 +13,7 @@
     "health": "curl http://localhost:3001/health"
   },
   "dependencies": {
+    "@fund-my-cause/shared-utils": "file:../../packages/shared-utils",
     "express": "^4.18.2",
     "@stellar/stellar-sdk": "^12.0.0",
     "pino": "^8.17.2",
