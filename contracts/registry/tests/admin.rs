@@ -1,9 +1,11 @@
-//! # Registry Access Control Integration Tests
+//! # Registry Admin/Mutation Integration Tests
 //!
-//! These tests explicitly verify:
-//! - Unauthorized callers are **rejected** on every state-mutating entry-point.
-//! - Authorized callers succeed on every state-mutating entry-point.
-//! - Read-only queries remain accessible without auth.
+//! Covers every state-mutating entry-point split out into
+//! `contracts/registry/src/admin.rs`: `initialize`, `register`,
+//! `register_with_category`, `register_with_status`, and `update_status`.
+//! Verifies:
+//! - Unauthorized callers are **rejected**.
+//! - Authorized callers succeed.
 //! - Error codes match `ContractError` variants.
 //! - The admin-only entry-point (`update_status`) specifically rejects
 //!   non-admin and unauthenticated callers with an auth abort — see the
@@ -19,27 +21,12 @@
 
 #![cfg(test)]
 
+mod common;
+
 use soroban_sdk::{testutils::Address as _, Address, Env};
 
-use registry::{CampaignStatus, ContractError, RegistryContract, RegistryContractClient};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-/// Deploy a fresh registry contract and return its client.
-/// The contract is **not** initialised — callers must call `initialize` themselves.
-fn deploy(env: &Env) -> RegistryContractClient {
-    let id = env.register_contract(None, RegistryContract);
-    RegistryContractClient::new(env, &id)
-}
-
-/// Deploy and initialise a registry; returns the client and the admin address.
-fn deploy_and_init(env: &Env) -> (RegistryContractClient, Address) {
-    let client = deploy(env);
-    let admin = Address::generate(env);
-    env.mock_all_auths();
-    client.initialize(&admin);
-    (client, admin)
-}
+use common::{deploy, deploy_and_init};
+use registry::{CampaignStatus, ContractError, RegistryContractClient};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // initialize()
@@ -622,71 +609,7 @@ fn test_update_status_admin_only_signer_succeeds() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Read-only queries — no auth required
-// ═══════════════════════════════════════════════════════════════════════════════
-
-#[test]
-fn test_list_pagination() {
-    let env = Env::default();
-    let (client, _admin) = deploy_and_init(&env);
-
-    env.mock_all_auths();
-    for _ in 0..5 {
-        client.register(&Address::generate(&env));
-    }
-
-    assert_eq!(client.list(&0, &3).len(), 3);
-    assert_eq!(client.list(&3, &3).len(), 2);
-    assert_eq!(client.list(&5, &3).len(), 0);
-    assert_eq!(client.list(&0, &0).len(), 0);
-}
-
-#[test]
-fn test_list_by_status_pagination() {
-    let env = Env::default();
-    let (client, _admin) = deploy_and_init(&env);
-
-    env.mock_all_auths();
-    for _ in 0..5 {
-        client.register_with_status(&Address::generate(&env), &CampaignStatus::Active);
-    }
-
-    assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &0, &3).len(),
-        3
-    );
-    assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &3, &3).len(),
-        2
-    );
-    assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &5, &3).len(),
-        0
-    );
-    assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &0, &0).len(),
-        0
-    );
-}
-
-#[test]
-fn test_get_campaigns_by_category_pagination() {
-    let env = Env::default();
-    let (client, _admin) = deploy_and_init(&env);
-
-    env.mock_all_auths();
-    for _ in 0..4 {
-        client.register_with_category(&Address::generate(&env), &2);
-    }
-
-    assert_eq!(client.get_campaigns_by_category(&2, &0, &2).len(), 2);
-    assert_eq!(client.get_campaigns_by_category(&2, &2, &2).len(), 2);
-    assert_eq!(client.get_campaigns_by_category(&2, &4, &2).len(), 0);
-    assert_eq!(client.get_campaigns_by_category(&2, &0, &0).len(), 0);
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Full lifecycle integration
+// Full lifecycle integration (spans admin mutations + read-only assertions)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]

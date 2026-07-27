@@ -49,6 +49,19 @@ fn meta(env: &Env) -> String {
 ///         Points(user), Level(user)   → 3 writes
 /// After:  Achievement(user,type)[AchievementRecord{type,ts,meta}],
 ///         Points(user)               → 2 writes  (-1 per unlock)
+///
+/// # Storage reads eliminated (#925)
+/// Before: `award_points` reads+writes `Points(user)`, then `update_level`
+/// re-reads `Points(user)` to derive the level — 2 reads of the same key
+/// per unlock. `add_leaderboard_entry` also writes `LeaderboardScore`, then
+/// its `reindex_user` helper re-read that same key for the acted-on user.
+/// After: `award_points` returns the new total directly and `update_level`
+/// takes it as a parameter (no re-read); `reindex_user` takes the
+/// just-computed score as a parameter instead of re-reading
+/// `LeaderboardScore` for `user`. Net: -2 reads per unlock.
+/// Re-run `cargo bench --bench achievements_benchmarks` from
+/// `contracts/benchmarks` and record the measured Criterion timing delta
+/// here once available.
 fn bench_unlock(c: &mut Criterion) {
     let mut g = c.benchmark_group("achievements/unlock");
 
@@ -86,6 +99,19 @@ fn bench_unlock(c: &mut Criterion) {
 /// Before: Contribution, ContributionCount, ContributionTotal,
 ///         Points, Level, (maybe Achievement+Level again)   → 5–7 writes
 /// After:  same minus Level entry                           → 4–6 writes
+///
+/// # Storage reads eliminated (#925)
+/// Before: `increment_contribution_stats` reads+writes `ContributionCount`
+/// and `ContributionTotal`, then `check_contribution_achievements`
+/// re-reads both right after (2 extra reads); `award_points`/`update_level`
+/// double-read `Points` as in `bench_unlock` above (1 extra read).
+/// After: the new count/total are threaded through as return values into
+/// `check_contribution_achievements`, and the new points total into
+/// `update_level` — 3 reads eliminated per call (plus any triggered
+/// auto-unlock also benefits from the `bench_unlock` savings above).
+/// Re-run `cargo bench --bench achievements_benchmarks` from
+/// `contracts/benchmarks` and record the measured Criterion timing delta
+/// here once available.
 fn bench_record_contribution(c: &mut Criterion) {
     let mut g = c.benchmark_group("achievements/record_contribution");
 
@@ -179,6 +205,18 @@ fn bench_get_level(c: &mut Criterion) {
 }
 
 /// `record_referral` — 3 referrals triggers the "Referral Champion" unlock.
+///
+/// # Storage reads eliminated (#925)
+/// Before: `increment_referral_count` reads+writes `ReferralCount`, then
+/// `check_referral_achievements` re-reads it right after (1 extra read);
+/// `award_points`/`update_level` double-read `Points` as in `bench_unlock`
+/// above (1 extra read). After: both new values are threaded through as
+/// return values/parameters — 2 reads eliminated per call (the 3rd call,
+/// which triggers the achievement unlock, also benefits from the
+/// `bench_unlock` savings above).
+/// Re-run `cargo bench --bench achievements_benchmarks` from
+/// `contracts/benchmarks` and record the measured Criterion timing delta
+/// here once available.
 fn bench_record_referral(c: &mut Criterion) {
     let mut g = c.benchmark_group("achievements/record_referral");
 

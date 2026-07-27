@@ -9,12 +9,7 @@
 mod access_control;
 mod error;
 mod events;
-mod rbac;
 
 pub use access_control::AccessControl;
 pub use error::CommonError;
 pub use events::EVENT_SCHEMA_VERSION;
-pub use rbac::{
-    check_permission, find_team_member, validate_permission, PermissionResult, RolePermissions,
-    TeamMember,
-};

@@ -23,15 +23,15 @@ fn set_index(env: &Env, leaderboard_type: LeaderboardType, index: &Vec<Address>)
 }
 
 /// Re-insert `user` into the sorted (descending-score) index for `leaderboard_type`,
-/// based on whatever score is currently stored for them.
-fn reindex_user(env: &Env, user: &Address, leaderboard_type: LeaderboardType) {
+/// using the caller-supplied `score` (already just read/written by the caller,
+/// so this doesn't re-fetch `DataKey::LeaderboardScore` for `user`).
+fn reindex_user(env: &Env, user: &Address, leaderboard_type: LeaderboardType, score: u32) {
     let mut index = get_index(env, leaderboard_type);
 
     if let Some(pos) = index.first_index_of(user) {
         let _ = index.remove(pos);
     }
 
-    let score = get_score(env, user, leaderboard_type);
     let mut insert_at = index.len();
     for i in 0..index.len() {
         let existing = index.get(i).unwrap();
@@ -59,7 +59,7 @@ pub fn add_leaderboard_entry(
     let current: u32 = env.storage().instance().get(&key).unwrap_or(0);
     let new_score = current.saturating_add(score_delta);
     env.storage().instance().set(&key, &new_score);
-    reindex_user(env, user, leaderboard_type);
+    reindex_user(env, user, leaderboard_type, new_score);
     Ok(())
 }
 

@@ -15,13 +15,15 @@ use crate::storage::DataKey;
 use soroban_sdk::Address;
 use soroban_sdk::Env;
 
-/// Award points to a user.
-pub fn award_points(env: &Env, user: &Address, points: u32) -> Result<(), ContractError> {
+/// Award points to a user. Returns the user's new points total so callers
+/// that also need it (e.g. to derive a level) don't have to re-read
+/// `DataKey::Points` right after this just wrote it.
+pub fn award_points(env: &Env, user: &Address, points: u32) -> Result<u32, ContractError> {
     let key = DataKey::Points(user.clone());
     let current_points: u32 = env.storage().instance().get(&key).unwrap_or(0);
     let new_points = current_points.saturating_add(points);
     env.storage().instance().set(&key, &new_points);
-    Ok(())
+    Ok(new_points)
 }
 
 /// Get user points.
