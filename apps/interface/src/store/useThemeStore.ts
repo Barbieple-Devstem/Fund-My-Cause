@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export type Theme = "dark" | "light";
 
-interface ThemeStoreState {
+export interface ThemeStoreState {
   theme: Theme;
   setTheme: (theme: Theme) => void;
   toggleTheme: () => void;

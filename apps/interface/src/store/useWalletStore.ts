@@ -21,7 +21,7 @@ const ADAPTERS: Record<WalletType, WalletAdapter> = {
 
 type Toaster = (message: string, type: ToastType) => void;
 
-interface WalletStoreState {
+export interface WalletStoreState {
   address: string | null;
   activeAdapter: WalletAdapter | null;
   isConnecting: boolean;

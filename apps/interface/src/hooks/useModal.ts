@@ -1,8 +1,6 @@
-import { useModalStore } from "@/store/useModalStore";
+import { useModalSlice } from "@/hooks/useUiSlice";
 
 export function useModal() {
-  const openModal = useModalStore((s) => s.openModal);
-  const closeModal = useModalStore((s) => s.closeModal);
-  const closeAll = useModalStore((s) => s.closeAll);
+  const { openModal, closeModal, closeAll } = useModalSlice();
   return { openModal, closeModal, closeAll };
 }
