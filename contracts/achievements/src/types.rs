@@ -1,7 +1,40 @@
 /// Type definitions for the achievements contract
 use soroban_sdk::{contracttype, Address, String};
 
-/// Achievement NFT structure
+// ── Stored type (v2 compact) ─────────────────────────────────────────────────
+
+/// **v2 compact storage record** for a single unlocked achievement.
+///
+/// Stored under `DataKey::Achievement(user, achievement_type)`.
+///
+/// Fields present in the old `AchievementNFT` that are **not** stored here:
+///
+/// * `user` — already encoded in the storage key; re-attached at read time.
+/// * `nft_id` — a 64-byte hex string deterministically derivable from
+///   `(user, achievement_type)` via `generate_nft_id`; re-computed at read time.
+///
+/// This saves roughly **44 + 64 = ~108 bytes per achievement entry** on the
+/// ledger while preserving the full public `AchievementNFT` API surface.
+#[derive(Clone, Debug, PartialEq)]
+#[contracttype]
+pub struct AchievementRecord {
+    /// Achievement type (1-13, mirrors the key but kept for self-description).
+    pub achievement_type: u32,
+    /// Timestamp when achievement was unlocked (Unix timestamp).
+    pub unlocked_at: u64,
+    /// Additional metadata about the achievement.
+    pub metadata: String,
+}
+
+// ── Public / returned types ───────────────────────────────────────────────────
+
+/// Achievement NFT structure — the **public return type** for achievement
+/// queries.  Constructed on-the-fly from an [`AchievementRecord`] plus the
+/// key components (`user`, `achievement_type`) that are available at call sites.
+///
+/// This type is **not stored on the ledger in v2**.  Any v1 entries that used
+/// to store the full struct are transparently handled by the legacy-read path
+/// in `achievements::read_achievement_entry`.
 #[derive(Clone, Debug, PartialEq)]
 #[contracttype]
 pub struct AchievementNFT {
@@ -13,7 +46,7 @@ pub struct AchievementNFT {
     pub unlocked_at: u64,
     /// Additional metadata about the achievement
     pub metadata: String,
-    /// Unique NFT identifier
+    /// Unique NFT identifier (derived from (user, achievement_type) at read time)
     pub nft_id: String,
 }
 
