@@ -161,6 +161,35 @@ pub const KEY_YIELD_CONFIG: Symbol = soroban_sdk::symbol_short!("YLDCFG");
 /// Storage key for the total yield accrued
 pub const KEY_YIELD_TOTAL: Symbol = soroban_sdk::symbol_short!("YLDTOT");
 
+// ── Issue #929: Magic Number Constants ───────────────────────────────────────
+/// Basis points denominator (10,000 basis points = 100%).
+/// Used in fee calculations: fee = amount * fee_bps / BASIS_POINTS_MAX
+pub const BASIS_POINTS_MAX: i128 = 10_000;
+
+/// Maximum message length (characters) for contribution messages.
+/// Validated when storing contribution messages to prevent unbounded storage.
+pub const MAX_MESSAGE_LENGTH: usize = 256;
+
+/// TTL extension value for persistent storage entries (in ledger entries).
+/// Used to extend time-to-live for frequently accessed per-contributor data.
+/// Value represents 100 ledger entries worth of extension.
+pub const TTL_PERSISTENT_ENTRY: u32 = 100;
+
+/// TTL extension value for instance storage (short-term, in ledger entries).
+/// Used for frequent writes to campaign-wide state (e.g., totals, counts).
+/// Value represents 2 days of Soroban ledger entries (~17,280 entries).
+pub const TTL_INSTANCE_EXTEND_MIN: u32 = 17280;
+
+/// TTL extension value for instance storage (long-term, in ledger entries).
+/// Used to ensure campaign data survives well beyond typical campaign lifetime.
+/// Value represents ~6 days of Soroban ledger entries (~518,400 entries).
+pub const TTL_INSTANCE_EXTEND_MAX: u32 = 518400;
+
+/// Maximum batch size for refund operations.
+/// Limits the number of contributors processed in a single `refund_batch` call
+/// to prevent exceeding transaction resource limits and ensure predictable gas costs.
+pub const MAX_BATCH_REFUND_SIZE: u32 = 25;
+
 use soroban_sdk::{Address, Symbol as SorobanSymbol};
 
 /// Helper function to get the admin address from storage
