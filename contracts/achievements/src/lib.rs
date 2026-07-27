@@ -147,10 +147,8 @@ impl AchievementsContract {
             .ok_or(ContractError::Unauthorized)?;
         AccessControl::require_role_auth(&admin);
 
-        award_points(&env, &user, points)?;
-        update_level(&env, &user)?;
-
-        let total_points = get_user_points(&env, &user)?;
+        let total_points = award_points(&env, &user, points)?;
+        update_level(total_points);
 
         env.events()
             .publish(("achievements", "points_awarded"), (user, points));
@@ -170,13 +168,13 @@ impl AchievementsContract {
         validate_amount(amount)?;
 
         store_contribution(&env, &user, &campaign_id, amount)?;
-        increment_contribution_stats(&env, &user, amount)?;
+        let (new_count, new_total) = increment_contribution_stats(&env, &user, amount)?;
 
         let points = calculate_contribution_points(amount);
-        award_points(&env, &user, points)?;
-        update_level(&env, &user)?;
+        let total_points = award_points(&env, &user, points)?;
+        update_level(total_points);
 
-        check_contribution_achievements(&env, &user)?;
+        check_contribution_achievements(&env, &user, new_count, new_total)?;
 
         env.events().publish(
             ("achievements", "contribution_recorded"),
@@ -195,12 +193,12 @@ impl AchievementsContract {
         referrer.require_auth();
 
         store_referral(&env, &referrer, &referee)?;
-        increment_referral_count(&env, &referrer)?;
+        let new_count = increment_referral_count(&env, &referrer)?;
 
-        award_points(&env, &referrer, 50)?;
-        update_level(&env, &referrer)?;
+        let total_points = award_points(&env, &referrer, 50)?;
+        update_level(total_points);
 
-        check_referral_achievements(&env, &referrer)?;
+        check_referral_achievements(&env, &referrer, new_count)?;
 
         env.events()
             .publish(("achievements", "referral_recorded"), (referrer, referee));
@@ -236,8 +234,8 @@ impl AchievementsContract {
         env.storage().instance().set(&streak_key, &new_streak);
 
         if new_streak > 0 && new_streak % 7 == 0 {
-            award_points(&env, &user, 100)?; // Bonus for 7-day streak
-            update_level(&env, &user)?;
+            let total_points = award_points(&env, &user, 100)?; // Bonus for 7-day streak
+            update_level(total_points);
         }
 
         env.events()
@@ -275,9 +273,10 @@ fn do_unlock(
     store_achievement(env, user, achievement_type, unlocked_at, metadata.clone())?;
 
     let points = get_achievement_points(achievement_type);
-    award_points(env, user, points)?;
-    // update_level now only reads points + derives the level — no Level write.
-    let new_level = update_level(env, user)?;
+    let total_points = award_points(env, user, points)?;
+    // update_level is a pure derivation from the points total we already have
+    // in hand — no separate Points re-read, no Level write.
+    let new_level = update_level(total_points);
 
     add_leaderboard_entry(env, user, points, LeaderboardType::Achievements)?;
 
@@ -309,11 +308,11 @@ fn try_auto_unlock(env: &Env, user: &Address, achievement_type: u32) -> Result<(
     Ok(())
 }
 
-/// Recomputes `user`'s level from their current points (derived, not stored).
-/// Returns the computed level.
-fn update_level(env: &Env, user: &Address) -> Result<u32, ContractError> {
-    let points = get_user_points(env, user)?;
-    Ok(points::calculate_level_from_points(points))
+/// Derives a level from an already-known points total (e.g. just returned by
+/// [`award_points`]) — no storage read, since the caller already has the
+/// current total in hand.
+fn update_level(points: u32) -> u32 {
+    points::calculate_level_from_points(points)
 }
 
 /// Generate a unique NFT id by hashing the user's address and achievement
@@ -386,26 +385,26 @@ fn store_contribution(
     Ok(())
 }
 
-/// Increment the aggregate contribution count/total used by
-/// [`check_contribution_achievements`].
+/// Increment the aggregate contribution count/total, returning the new
+/// `(count, total)` so [`check_contribution_achievements`] can use them
+/// directly instead of re-reading `DataKey::ContributionCount`/`ContributionTotal`
+/// right after this just wrote them.
 fn increment_contribution_stats(
     env: &Env,
     user: &Address,
     amount: i128,
-) -> Result<(), ContractError> {
+) -> Result<(u32, i128), ContractError> {
     let count_key = DataKey::ContributionCount(user.clone());
     let count: u32 = env.storage().instance().get(&count_key).unwrap_or(0);
-    env.storage()
-        .instance()
-        .set(&count_key, &(count.saturating_add(1)));
+    let new_count = count.saturating_add(1);
+    env.storage().instance().set(&count_key, &new_count);
 
     let total_key = DataKey::ContributionTotal(user.clone());
     let total: i128 = env.storage().instance().get(&total_key).unwrap_or(0);
-    env.storage()
-        .instance()
-        .set(&total_key, &(total.saturating_add(amount)));
+    let new_total = total.saturating_add(amount);
+    env.storage().instance().set(&total_key, &new_total);
 
-    Ok(())
+    Ok((new_count, new_total))
 }
 
 /// Store referral record
@@ -416,32 +415,27 @@ fn store_referral(env: &Env, referrer: &Address, referee: &Address) -> Result<()
     Ok(())
 }
 
-/// Increment the referral count used by [`check_referral_achievements`].
-fn increment_referral_count(env: &Env, referrer: &Address) -> Result<(), ContractError> {
+/// Increment the referral count, returning the new count so
+/// [`check_referral_achievements`] can use it directly instead of re-reading
+/// `DataKey::ReferralCount` right after this just wrote it.
+fn increment_referral_count(env: &Env, referrer: &Address) -> Result<u32, ContractError> {
     let key = DataKey::ReferralCount(referrer.clone());
     let count: u32 = env.storage().instance().get(&key).unwrap_or(0);
-    env.storage()
-        .instance()
-        .set(&key, &(count.saturating_add(1)));
-    Ok(())
+    let new_count = count.saturating_add(1);
+    env.storage().instance().set(&key, &new_count);
+    Ok(new_count)
 }
 
 /// Check for contribution-based achievements: unlocks "First Contribution" on
 /// the first recorded contribution, "Consistent Contributor" once the user
 /// has contributed `CONSISTENT_CONTRIBUTOR_COUNT` times, and "Mega Donor"
 /// once their cumulative contribution total reaches `MEGA_DONOR_TOTAL`.
-fn check_contribution_achievements(env: &Env, user: &Address) -> Result<(), ContractError> {
-    let count: u32 = env
-        .storage()
-        .instance()
-        .get(&DataKey::ContributionCount(user.clone()))
-        .unwrap_or(0);
-    let total: i128 = env
-        .storage()
-        .instance()
-        .get(&DataKey::ContributionTotal(user.clone()))
-        .unwrap_or(0);
-
+fn check_contribution_achievements(
+    env: &Env,
+    user: &Address,
+    count: u32,
+    total: i128,
+) -> Result<(), ContractError> {
     if count >= 1 {
         try_auto_unlock(env, user, FIRST_CONTRIBUTION_TYPE)?;
     }
@@ -457,13 +451,11 @@ fn check_contribution_achievements(env: &Env, user: &Address) -> Result<(), Cont
 
 /// Check for referral-based achievements: unlocks "Referral Champion" once
 /// the referrer has `REFERRAL_CHAMPION_COUNT` successful referrals.
-fn check_referral_achievements(env: &Env, referrer: &Address) -> Result<(), ContractError> {
-    let count: u32 = env
-        .storage()
-        .instance()
-        .get(&DataKey::ReferralCount(referrer.clone()))
-        .unwrap_or(0);
-
+fn check_referral_achievements(
+    env: &Env,
+    referrer: &Address,
+    count: u32,
+) -> Result<(), ContractError> {
     if count >= REFERRAL_CHAMPION_COUNT {
         try_auto_unlock(env, referrer, REFERRAL_CHAMPION_TYPE)?;
     }

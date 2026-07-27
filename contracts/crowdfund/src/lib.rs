@@ -1519,6 +1519,15 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let status: Status = inst.get(&KEY_STATUS).unwrap();
 
+        // `withdraw()` resets KEY_TOTAL to 0 and moves status to `Successful`,
+        // which would otherwise make `validate_refund_eligibility` see
+        // `total(0) < goal` and treat an already-paid-out campaign as an
+        // eligible-for-refund "failed" one — attempting to pay contributors
+        // a second time out of a contract balance withdraw() already drained.
+        if status == Status::Successful {
+            return Err(ContractError::AlreadyWithdrawn);
+        }
+
         if status != Status::Cancelled {
             validate_refund_eligibility(
                 env.ledger().timestamp(),
@@ -1591,6 +1600,13 @@ impl CrowdfundContract {
         // ── Batch instance reads up-front ─────────────────────────────────────
         let inst = env.storage().instance();
         let status: Status = inst.get(&KEY_STATUS).unwrap();
+
+        // See the matching guard in `refund_single` for why this is needed:
+        // without it, a post-withdraw batch refund would see `total(0) < goal`
+        // and try to pay contributors out of an already-drained balance.
+        if status == Status::Successful {
+            return Err(ContractError::AlreadyWithdrawn);
+        }
 
         if status != Status::Cancelled {
             validate_refund_eligibility(
@@ -2940,7 +2956,10 @@ impl CrowdfundContract {
 
         let delegated_key = DataKey::DelegatedContribution(delegator.clone());
         let delegated_so_far: i128 = env.storage().persistent().get(&delegated_key).unwrap_or(0);
-        if delegated_so_far + amount > delegation.amount {
+        let new_delegated = delegated_so_far
+            .checked_add(amount)
+            .ok_or(ContractError::Overflow)?;
+        if new_delegated > delegation.amount {
             return Err(ContractError::ExceedsMaximum);
         }
 
@@ -3002,9 +3021,7 @@ impl CrowdfundContract {
         env.storage().persistent().set(&key, &new_amount);
         env.storage().persistent().extend_ttl(&key, 100, 100);
 
-        env.storage()
-            .persistent()
-            .set(&delegated_key, &(delegated_so_far + amount));
+        env.storage().persistent().set(&delegated_key, &new_delegated);
         env.storage()
             .persistent()
             .extend_ttl(&delegated_key, 100, 100);

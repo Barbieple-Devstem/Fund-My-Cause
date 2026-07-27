@@ -7,7 +7,7 @@ use soroban_sdk::{
     token, Address, Env,
 };
 
-use crowdfund::RewardTier;
+use crowdfund::{ContractError, RewardTier};
 
 mod common;
 use common::setup;
@@ -73,9 +73,19 @@ fn test_adversarial_race_withdraw_vs_refund() {
     // Successful campaign - creator withdraws
     c.client.withdraw();
 
-    // Contributor attempts refund after successful withdrawal
+    // Contributor attempts refund after successful withdrawal. Must be
+    // rejected with a clean, typed error — not attempt to pay out of the
+    // now-empty contract balance a second time (which would otherwise
+    // panic, since `withdraw()` resets `total` to 0 but does not clear
+    // individual `Contribution` entries, and `validate_refund_eligibility`
+    // would see `total(0) < goal` and wrongly treat this as a refund-eligible
+    // failed campaign). See issue #922.
     let result = c.client.try_refund_single(&contributor);
-    assert!(result.is_err()); // Should fail
+    assert_eq!(
+        result,
+        Err(Ok(ContractError::AlreadyWithdrawn)),
+        "refund after successful withdrawal must return AlreadyWithdrawn, not panic"
+    );
 }
 
 #[test]

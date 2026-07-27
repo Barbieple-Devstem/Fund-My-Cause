@@ -19,10 +19,24 @@
 //! All campaign addresses are stored in a single instance-storage entry under
 //! the `CMPLIST` key as a `Vec<Address>`. Deduplication is enforced on write.
 //! The admin address is stored under `ADMIN` and set once during `initialize`.
+//!
+//! ## Module layout
+//!
+//! The contract's public entry points (below) are thin delegating wrappers —
+//! this file owns the single `#[contractimpl]` block (Soroban generates one
+//! `RegistryContractClient` per contract, so the callable surface must stay
+//! in one place), plus the storage keys and small helpers shared by both:
+//! - [`admin`] — every function that mutates registry state: the two
+//!   admin-gated ones (`initialize`, `update_status`) and the three
+//!   campaign-self-authorized registration entry points.
+//! - [`lookup`] — the three public, read-only, unauthenticated queries.
 
 #![no_std]
 
+mod admin;
 mod errors;
+mod lookup;
+
 pub use errors::ContractError;
 
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec};
@@ -30,10 +44,10 @@ use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, E
 // ── Storage keys ──────────────────────────────────────────────────────────────
 
 /// Instance storage key for the list of registered campaign contract addresses.
-const KEY_CAMPAIGNS: Symbol = symbol_short!("CMPLIST");
+pub(crate) const KEY_CAMPAIGNS: Symbol = symbol_short!("CMPLIST");
 
 /// Instance storage key for the admin address set during `initialize`.
-const KEY_ADMIN: Symbol = symbol_short!("ADMIN");
+pub(crate) const KEY_ADMIN: Symbol = symbol_short!("ADMIN");
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -60,11 +74,39 @@ pub enum CampaignStatus {
 
 /// Storage key variants for indexed campaign lists.
 #[contracttype]
-enum RegDataKey {
+pub(crate) enum RegDataKey {
     /// Paginated list of campaign addresses for a given numeric category id.
     CategoryList(u32),
     /// List of campaign addresses for a given status (maps to CampaignStatus discriminant).
     StatusList(u32),
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+/// Returns `Err(NotInitialized)` if `initialize` has not been called yet.
+pub(crate) fn require_initialized(env: &Env) -> Result<(), ContractError> {
+    if !env.storage().instance().has(&KEY_ADMIN) {
+        return Err(ContractError::NotInitialized);
+    }
+    Ok(())
+}
+
+/// Returns a sub-slice of `src` starting at `offset` with at most `limit` items.
+pub(crate) fn paginate(env: &Env, src: &Vec<Address>, offset: u32, limit: u32) -> Vec<Address> {
+    let total = src.len();
+    if offset >= total {
+        return Vec::new(env);
+    }
+    let end = offset.saturating_add(limit).min(total);
+    let mut out = Vec::new(env);
+    let mut i = offset;
+    while i < end {
+        if let Some(addr) = src.get(i) {
+            out.push_back(addr);
+        }
+        i += 1;
+    }
+    out
 }
 
 // ── Contract ──────────────────────────────────────────────────────────────────
@@ -96,17 +138,7 @@ impl RegistryContract {
     /// - [`ContractError::AlreadyInitialized`] if the contract has already been
     ///   initialised.
     pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
-        admin.require_auth();
-
-        if env.storage().instance().has(&KEY_ADMIN) {
-            return Err(ContractError::AlreadyInitialized);
-        }
-
-        env.storage().instance().set(&KEY_ADMIN, &admin);
-        env.events()
-            .publish(("registry", "initialized"), admin);
-
-        Ok(())
+        admin::initialize(env, admin)
     }
 
     // ── Registration entry-points ─────────────────────────────────────────────
@@ -130,23 +162,7 @@ impl RegistryContract {
     ///   (Soroban surfaces this as a host-level auth failure before the error is
     ///   returned, but the guard is explicit for documentation purposes.)
     pub fn register(env: Env, campaign_id: Address) -> Result<(), ContractError> {
-        Self::require_initialized(&env)?;
-        campaign_id.require_auth();
-
-        let mut campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !campaigns.contains(&campaign_id) {
-            campaigns.push_back(campaign_id.clone());
-            env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id);
-        }
-
-        Ok(())
+        admin::register(env, campaign_id)
     }
 
     /// Registers a campaign together with its numeric category id.
@@ -168,37 +184,7 @@ impl RegistryContract {
         campaign_id: Address,
         category_id: u32,
     ) -> Result<(), ContractError> {
-        Self::require_initialized(&env)?;
-        campaign_id.require_auth();
-
-        // ── Global list ───────────────────────────────────────────────────────
-        let mut campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !campaigns.contains(&campaign_id) {
-            campaigns.push_back(campaign_id.clone());
-            env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id.clone());
-        }
-
-        // ── Category-specific list ────────────────────────────────────────────
-        let cat_key = RegDataKey::CategoryList(category_id);
-        let mut cat_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&cat_key)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !cat_list.contains(&campaign_id) {
-            cat_list.push_back(campaign_id);
-            env.storage().instance().set(&cat_key, &cat_list);
-        }
-
-        Ok(())
+        admin::register_with_category(env, campaign_id, category_id)
     }
 
     /// Registers a campaign with a status tag for status-based filtering.
@@ -220,35 +206,7 @@ impl RegistryContract {
         campaign_id: Address,
         status: CampaignStatus,
     ) -> Result<(), ContractError> {
-        Self::require_initialized(&env)?;
-        campaign_id.require_auth();
-
-        let mut campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !campaigns.contains(&campaign_id) {
-            campaigns.push_back(campaign_id.clone());
-            env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id.clone());
-        }
-
-        let status_key = RegDataKey::StatusList(status as u32);
-        let mut status_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&status_key)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !status_list.contains(&campaign_id) {
-            status_list.push_back(campaign_id);
-            env.storage().instance().set(&status_key, &status_list);
-        }
-
-        Ok(())
+        admin::register_with_status(env, campaign_id, status)
     }
 
     /// Updates the status tag for a registered campaign.
@@ -271,54 +229,7 @@ impl RegistryContract {
         old_status: CampaignStatus,
         new_status: CampaignStatus,
     ) -> Result<(), ContractError> {
-        Self::require_initialized(&env)?;
-
-        let admin: Address = env
-            .storage()
-            .instance()
-            .get(&KEY_ADMIN)
-            .ok_or(ContractError::NotInitialized)?;
-        admin.require_auth();
-
-        // Guard: campaign must already be registered globally
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-        if !campaigns.contains(&campaign_id) {
-            return Err(ContractError::NotFound);
-        }
-
-        // Remove from old status list
-        let old_key = RegDataKey::StatusList(old_status as u32);
-        let old_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&old_key)
-            .unwrap_or_else(|| Vec::new(&env));
-        let mut filtered_old = Vec::new(&env);
-        for i in 0..old_list.len() {
-            let addr = old_list.get(i).unwrap();
-            if addr != campaign_id {
-                filtered_old.push_back(addr);
-            }
-        }
-        env.storage().instance().set(&old_key, &filtered_old);
-
-        // Add to new status list
-        let new_key = RegDataKey::StatusList(new_status as u32);
-        let mut new_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&new_key)
-            .unwrap_or_else(|| Vec::new(&env));
-        if !new_list.contains(&campaign_id) {
-            new_list.push_back(campaign_id);
-            env.storage().instance().set(&new_key, &new_list);
-        }
-
-        Ok(())
+        admin::update_status(env, campaign_id, old_status, new_status)
     }
 
     // ── Read-only queries (no auth required) ──────────────────────────────────
@@ -328,17 +239,7 @@ impl RegistryContract {
     /// Pagination is zero-indexed: pass `offset = 0, limit = 20` for the first
     /// page, `offset = 20, limit = 20` for the second, and so on.
     pub fn list(env: Env, offset: u32, limit: u32) -> Vec<Address> {
-        if limit == 0 {
-            return Vec::new(&env);
-        }
-
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        Self::paginate(&env, &campaigns, offset, limit)
+        lookup::list(env, offset, limit)
     }
 
     /// Returns a paginated slice of campaigns filtered by status.
@@ -350,17 +251,7 @@ impl RegistryContract {
         offset: u32,
         limit: u32,
     ) -> Vec<Address> {
-        if limit == 0 {
-            return Vec::new(&env);
-        }
-
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&RegDataKey::StatusList(status as u32))
-            .unwrap_or_else(|| Vec::new(&env));
-
-        Self::paginate(&env, &campaigns, offset, limit)
+        lookup::list_by_status(env, status, offset, limit)
     }
 
     /// Returns a paginated slice of campaign addresses filtered by category.
@@ -372,44 +263,6 @@ impl RegistryContract {
         offset: u32,
         limit: u32,
     ) -> Vec<Address> {
-        if limit == 0 {
-            return Vec::new(&env);
-        }
-
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&RegDataKey::CategoryList(category_id))
-            .unwrap_or_else(|| Vec::new(&env));
-
-        Self::paginate(&env, &campaigns, offset, limit)
-    }
-
-    // ── Private helpers ───────────────────────────────────────────────────────
-
-    /// Returns `Err(NotInitialized)` if `initialize` has not been called yet.
-    fn require_initialized(env: &Env) -> Result<(), ContractError> {
-        if !env.storage().instance().has(&KEY_ADMIN) {
-            return Err(ContractError::NotInitialized);
-        }
-        Ok(())
-    }
-
-    /// Returns a sub-slice of `src` starting at `offset` with at most `limit` items.
-    fn paginate(env: &Env, src: &Vec<Address>, offset: u32, limit: u32) -> Vec<Address> {
-        let total = src.len();
-        if offset >= total {
-            return Vec::new(env);
-        }
-        let end = offset.saturating_add(limit).min(total);
-        let mut out = Vec::new(env);
-        let mut i = offset;
-        while i < end {
-            if let Some(addr) = src.get(i) {
-                out.push_back(addr);
-            }
-            i += 1;
-        }
-        out
+        lookup::get_campaigns_by_category(env, category_id, offset, limit)
     }
 }

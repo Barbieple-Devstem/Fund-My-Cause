@@ -8,8 +8,6 @@
 
 mod access_control;
 mod error;
-mod rbac;
 
 pub use access_control::AccessControl;
 pub use error::CommonError;
-pub use rbac::{check_permission, find_team_member, validate_permission, PermissionResult, RolePermissions, TeamMember};
