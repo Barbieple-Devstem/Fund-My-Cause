@@ -25,7 +25,28 @@ export { useFocusTrap } from "./useFocusTrap";
 export { useSearchSuggestions } from "./useSearchSuggestions";
 export type { SearchSuggestion } from "./useSearchSuggestions";
 export { useBackButton } from "./useBackButton";
-export type { UseBackButtonOptions, UseBackButtonReturn } from "./useBackButton";
+export type {
+  UseBackButtonOptions,
+  UseBackButtonReturn,
+} from "./useBackButton";
 
 // PWA hooks
 export { useInstallPrompt } from "./useInstallPrompt";
+
+// Store slice hooks (scoped selectors — prefer these over direct store imports)
+export {
+  useCampaignSlice,
+  usePledgeModal,
+  useOptimisticDelta,
+} from "./useCampaignSlice";
+export {
+  useWalletSlice,
+  useWalletStatus,
+  useWalletSigning,
+} from "./useWalletSlice";
+export {
+  useUiSlice,
+  useNotifSlice,
+  useModalSlice,
+  useThemeSlice,
+} from "./useUiSlice";

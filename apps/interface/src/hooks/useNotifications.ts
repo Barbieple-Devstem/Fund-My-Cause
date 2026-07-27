@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useNotifSlice } from "@/hooks/useUiSlice";
 import { useNotificationStore } from "@/store/useNotificationStore";
 
 let hydrated = false;
@@ -8,7 +9,7 @@ let hydrated = false;
  * load, regardless of how many components call this hook.
  */
 export function useNotifications() {
-  const state = useNotificationStore();
+  const state = useNotifSlice();
 
   useEffect(() => {
     if (!hydrated) {

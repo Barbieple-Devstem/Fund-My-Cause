@@ -17,7 +17,7 @@ export interface Notification {
   read: boolean;
 }
 
-interface NotificationStoreState {
+export interface NotificationStoreState {
   notifications: Notification[];
   unreadCount: number;
   hydrate: () => void;
