@@ -8,12 +8,13 @@ use soroban_sdk::{Address, Env};
 use crate::{
     errors::ContractError,
     storage::{
-        DataKey, KEY_CREATOR, KEY_VISIBILITY, KEY_RATE_LIMIT, KEY_PAUSE_TIMELOCK,
-        KEY_STATUS,
+        DataKey, KEY_CREATOR, KEY_PAUSE_TIMELOCK, KEY_RATE_LIMIT, KEY_STATUS, KEY_VISIBILITY,
     },
-    types::{Visibility, Status, RateLimit, EventWhitelisted, EventBlacklisted,
-            EventVisibilityChanged, EventOwnershipTransferred, EventPaused, EventResumed,
-            EventRateLimitUpdated, EventPausedWithTimelock},
+    types::{
+        EventBlacklisted, EventOwnershipTransferred, EventPaused, EventPausedWithTimelock,
+        EventRateLimitUpdated, EventResumed, EventVisibilityChanged, EventWhitelisted, RateLimit,
+        Status, Visibility,
+    },
 };
 
 // ── Whitelist Functions ───────────────────────────────────────────────────────
@@ -31,10 +32,8 @@ pub(crate) fn add_to_whitelist(env: Env, address: Address) -> Result<(), Contrac
         .persistent()
         .set(&DataKey::Whitelist(address.clone()), &true);
 
-    env.events().publish(
-        ("campaign", "whitelisted"),
-        EventWhitelisted { address },
-    );
+    env.events()
+        .publish(("campaign", "whitelisted"), EventWhitelisted { address });
 
     Ok(())
 }
@@ -52,10 +51,8 @@ pub(crate) fn remove_from_whitelist(env: Env, address: Address) -> Result<(), Co
         .persistent()
         .remove(&DataKey::Whitelist(address.clone()));
 
-    env.events().publish(
-        ("campaign", "whitelist_removed"),
-        (address,),
-    );
+    env.events()
+        .publish(("campaign", "whitelist_removed"), (address,));
 
     Ok(())
 }
@@ -99,10 +96,8 @@ pub(crate) fn add_to_blacklist(env: Env, address: Address) -> Result<(), Contrac
         .persistent()
         .set(&DataKey::Blacklist(address.clone()), &true);
 
-    env.events().publish(
-        ("campaign", "blacklisted"),
-        EventBlacklisted { address },
-    );
+    env.events()
+        .publish(("campaign", "blacklisted"), EventBlacklisted { address });
 
     Ok(())
 }
@@ -120,10 +115,8 @@ pub(crate) fn remove_from_blacklist(env: Env, address: Address) -> Result<(), Co
         .persistent()
         .remove(&DataKey::Blacklist(address.clone()));
 
-    env.events().publish(
-        ("campaign", "blacklist_removed"),
-        (address,),
-    );
+    env.events()
+        .publish(("campaign", "blacklist_removed"), (address,));
 
     Ok(())
 }
@@ -151,10 +144,8 @@ pub(crate) fn add_to_allowlist(env: Env, address: Address) -> Result<(), Contrac
         .persistent()
         .set(&DataKey::AllowList(address.clone()), &true);
 
-    env.events().publish(
-        ("campaign", "allowlisted"),
-        (address,),
-    );
+    env.events()
+        .publish(("campaign", "allowlisted"), (address,));
 
     Ok(())
 }
@@ -172,10 +163,8 @@ pub(crate) fn remove_from_allowlist(env: Env, address: Address) -> Result<(), Co
         .persistent()
         .remove(&DataKey::AllowList(address.clone()));
 
-    env.events().publish(
-        ("campaign", "allowlist_removed"),
-        (address,),
-    );
+    env.events()
+        .publish(("campaign", "allowlist_removed"), (address,));
 
     Ok(())
 }
@@ -201,10 +190,7 @@ pub(crate) fn add_to_denylist(env: Env, address: Address) -> Result<(), Contract
         .persistent()
         .set(&DataKey::DenyList(address.clone()), &true);
 
-    env.events().publish(
-        ("campaign", "denylisted"),
-        (address,),
-    );
+    env.events().publish(("campaign", "denylisted"), (address,));
 
     Ok(())
 }
@@ -222,10 +208,8 @@ pub(crate) fn remove_from_denylist(env: Env, address: Address) -> Result<(), Con
         .persistent()
         .remove(&DataKey::DenyList(address.clone()));
 
-    env.events().publish(
-        ("campaign", "denylist_removed"),
-        (address,),
-    );
+    env.events()
+        .publish(("campaign", "denylist_removed"), (address,));
 
     Ok(())
 }
@@ -255,9 +239,7 @@ pub(crate) fn set_visibility(env: Env, visibility: Visibility) -> Result<(), Con
         .get(&KEY_VISIBILITY)
         .unwrap_or(Visibility::Public);
 
-    env.storage()
-        .instance()
-        .set(&KEY_VISIBILITY, &visibility);
+    env.storage().instance().set(&KEY_VISIBILITY, &visibility);
 
     env.events().publish(
         ("campaign", "visibility_changed"),
@@ -289,9 +271,7 @@ pub(crate) fn transfer_ownership(env: Env, new_owner: Address) -> Result<(), Con
         .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
 
-    env.storage()
-        .instance()
-        .set(&KEY_CREATOR, &new_owner);
+    env.storage().instance().set(&KEY_CREATOR, &new_owner);
 
     env.events().publish(
         ("campaign", "ownership_transferred"),
@@ -321,7 +301,9 @@ pub(crate) fn pause(env: Env) -> Result<(), ContractError> {
 
     env.events().publish(
         ("campaign", "paused"),
-        EventPaused { timestamp: env.ledger().timestamp() },
+        EventPaused {
+            timestamp: env.ledger().timestamp(),
+        },
     );
 
     Ok(())
@@ -347,7 +329,9 @@ pub(crate) fn resume(env: Env) -> Result<(), ContractError> {
 
     env.events().publish(
         ("campaign", "resumed"),
-        EventResumed { timestamp: env.ledger().timestamp() },
+        EventResumed {
+            timestamp: env.ledger().timestamp(),
+        },
     );
 
     Ok(())
@@ -378,9 +362,7 @@ pub(crate) fn set_rate_limit(
         window_seconds,
     };
 
-    env.storage()
-        .instance()
-        .set(&KEY_RATE_LIMIT, &rate_limit);
+    env.storage().instance().set(&KEY_RATE_LIMIT, &rate_limit);
 
     env.events().publish(
         ("campaign", "rate_limit_updated"),
@@ -395,9 +377,7 @@ pub(crate) fn set_rate_limit(
 
 /// Gets the current rate limit configuration.
 pub(crate) fn get_rate_limit(env: Env) -> Option<RateLimit> {
-    env.storage()
-        .instance()
-        .get(&KEY_RATE_LIMIT)
+    env.storage().instance().get(&KEY_RATE_LIMIT)
 }
 
 // ── Pause Timelock Functions ──────────────────────────────────────────────────

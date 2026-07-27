@@ -35,7 +35,7 @@ use common::{setup, Campaign};
 fn boundary_amount() -> impl Strategy<Value = i128> {
     prop_oneof![
         Just(1i128),
-        Just(100i128),         // campaign minimum in `setup`
+        Just(100i128), // campaign minimum in `setup`
         Just(i128::MAX / 4),
         Just(i128::MAX / 2 - 1),
         Just(i128::MAX / 2),
@@ -392,8 +392,11 @@ fn prop_stats_progress_bps_bounded_at_max_goal() {
     c.client.contribute(&contributor, &goal, &c.token_id, &None);
 
     let stats = c.client.get_stats();
-    assert!(stats.progress_bps <= 10_000u32,
-        "progress_bps {} out of range at max goal", stats.progress_bps);
+    assert!(
+        stats.progress_bps <= 10_000u32,
+        "progress_bps {} out of range at max goal",
+        stats.progress_bps
+    );
     assert_eq!(stats.total_raised, goal);
 }
 
@@ -477,7 +480,8 @@ fn prop_performance_metrics_zero_velocity_safe() {
     c.token_admin.mint(&contributor, &500_000i128);
     // Contribute at t=1 — still within the first day (days_elapsed == 0)
     env.ledger().set_timestamp(1);
-    c.client.contribute(&contributor, &500_000i128, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &500_000i128, &c.token_id, &None);
 
     let metrics = c.client.get_performance_metrics();
     // Zero elapsed days means zero velocity and no ETA — must not divide by zero

@@ -8,7 +8,10 @@ use soroban_sdk::{token, Address, Env};
 use crate::{
     errors::ContractError,
     storage::{KEY_TOKEN, KEY_TOTAL},
-    types::{DataKey, EventRecurringCancelled, EventRecurringExecuted, EventRecurringSetup, RecurringPlan},
+    types::{
+        DataKey, EventRecurringCancelled, EventRecurringExecuted, EventRecurringSetup,
+        RecurringPlan,
+    },
     validation::validate_recurring_plan,
 };
 
@@ -34,7 +37,12 @@ pub(crate) fn setup(
 
     env.events().publish(
         ("campaign", "recurring_setup"),
-        EventRecurringSetup { contributor, amount, interval, end_date },
+        EventRecurringSetup {
+            contributor,
+            amount,
+            interval,
+            end_date,
+        },
     );
     Ok(())
 }
@@ -67,15 +75,25 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
     let prev: i128 = env.storage().persistent().get(&contrib_key).unwrap_or(0);
     env.storage().persistent().set(
         &contrib_key,
-        &prev.checked_add(plan.amount).ok_or(ContractError::Overflow)?,
+        &prev
+            .checked_add(plan.amount)
+            .ok_or(ContractError::Overflow)?,
     );
 
     let total: i128 = inst.get(&KEY_TOTAL).ok_or(ContractError::InvalidInput)?;
-    inst.set(&KEY_TOTAL, &total.checked_add(plan.amount).ok_or(ContractError::Overflow)?);
+    inst.set(
+        &KEY_TOTAL,
+        &total
+            .checked_add(plan.amount)
+            .ok_or(ContractError::Overflow)?,
+    );
 
     env.events().publish(
         ("campaign", "recurring_executed"),
-        EventRecurringExecuted { contributor, amount: plan.amount },
+        EventRecurringExecuted {
+            contributor,
+            amount: plan.amount,
+        },
     );
     Ok(())
 }

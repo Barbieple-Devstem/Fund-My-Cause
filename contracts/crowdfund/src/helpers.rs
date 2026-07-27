@@ -10,10 +10,12 @@ use soroban_sdk::{Address, Env};
 use crate::{
     errors::ContractError,
     storage::{
-        DataKey, KEY_PLATFORM, KEY_INSURANCE, KEY_STATUS, KEY_CREATOR, 
-        KEY_VISIBILITY, KEY_INSURANCE_POOL, KEY_RATE_LIMIT,
+        DataKey, KEY_CREATOR, KEY_INSURANCE, KEY_INSURANCE_POOL, KEY_PLATFORM, KEY_RATE_LIMIT,
+        KEY_STATUS, KEY_VISIBILITY,
     },
-    types::{FeeMode, MatchingConfig, PlatformConfig, RateLimit, Visibility, InsuranceConfig, Status},
+    types::{
+        FeeMode, InsuranceConfig, MatchingConfig, PlatformConfig, RateLimit, Status, Visibility,
+    },
 };
 
 /// Validates that the campaign is in Active status and that the caller is the creator.
@@ -31,7 +33,9 @@ pub(crate) fn require_active_and_auth_creator(env: &Env) -> Result<Address, Cont
         return Err(ContractError::NotActive);
     }
 
-    let creator: Address = inst.get(&KEY_CREATOR).ok_or(ContractError::InvalidAddress)?;
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
     Ok(creator)
 }
@@ -65,12 +69,8 @@ pub(crate) fn check_contributor_access(
     }
 
     // Check whitelist requirement
-    let whitelist_only: bool = inst
-        .get(&DataKey::WhitelistOnly)
-        .unwrap_or(false);
-    let visibility: Visibility = inst
-        .get(&KEY_VISIBILITY)
-        .unwrap_or(Visibility::Public);
+    let whitelist_only: bool = inst.get(&DataKey::WhitelistOnly).unwrap_or(false);
+    let visibility: Visibility = inst.get(&KEY_VISIBILITY).unwrap_or(Visibility::Public);
 
     let needs_whitelist = whitelist_only || visibility == Visibility::Private;
     if needs_whitelist
@@ -238,9 +238,7 @@ pub(crate) fn apply_insurance_fee(
         persistent.extend_ttl(&fee_key, 100, 100);
 
         let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
-        let new_pool = pool
-            .checked_add(insurance_fee)
-            .unwrap_or(pool); // saturate pool rather than panic
+        let new_pool = pool.checked_add(insurance_fee).unwrap_or(pool); // saturate pool rather than panic
         inst.set(&KEY_INSURANCE_POOL, &new_pool);
     }
 
@@ -263,7 +261,11 @@ pub(crate) fn apply_matching(env: &Env, amount: i128) -> Result<i128, ContractEr
     };
     let match_amount = (amount * config.match_ratio as i128) / 10_000;
     let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
-    let available_match = config.max_match.checked_sub(total_matched).unwrap_or(0).max(0);
+    let available_match = config
+        .max_match
+        .checked_sub(total_matched)
+        .unwrap_or(0)
+        .max(0);
     let matched_amount = match_amount.min(available_match).max(0);
 
     if matched_amount > 0 {

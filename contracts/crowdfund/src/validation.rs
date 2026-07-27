@@ -7,6 +7,11 @@ use soroban_sdk::Address;
 
 /// Validates campaign initialization parameters.
 ///
+/// Single source of truth for the goal/deadline/min/max/fee checks shared by
+/// every entry point that creates a campaign (`initialize`,
+/// `initialize_from_template`) — see the crowdfund README / issue #927 for
+/// the audit that found these had drifted into independent, inline copies.
+///
 /// # Arguments
 /// * `goal` - Campaign funding goal
 /// * `deadline` - Campaign deadline timestamp
@@ -29,6 +34,7 @@ pub fn validate_initialization(
     if goal <= 0 {
         return Err(ContractError::InvalidGoal);
     }
+    validate_goal_not_overflow(goal)?;
     if deadline <= current_time {
         return Err(ContractError::InvalidDeadline);
     }
@@ -46,12 +52,61 @@ pub fn validate_initialization(
     Ok(())
 }
 
-/// Validates a contribution amount.
+/// Validates a contribution amount meets the campaign's minimum.
+///
+/// Split out from [`validate_contribution_amount`] so callers that need to
+/// short-circuit before a costlier storage read (e.g. `contribute()` checks
+/// this before reading the contributor's persistent running total) can do
+/// so without duplicating the comparison.
+///
+/// # Returns
+/// * `Ok(())` if `amount >= min_contribution`
+/// * `Err(ContractError::BelowMinimum)` otherwise
+pub fn validate_min_contribution(
+    amount: i128,
+    min_contribution: i128,
+) -> Result<(), ContractError> {
+    if amount < min_contribution {
+        return Err(ContractError::BelowMinimum);
+    }
+    Ok(())
+}
+
+/// Validates that adding `amount` to `current_contribution` does not push a
+/// single contributor's running total past the campaign's per-contributor
+/// cap. A `max_contribution` of `0` means "no cap".
+///
+/// # Returns
+/// * `Ok(())` if within the cap (or no cap is set)
+/// * `Err(ContractError::ContributorCapExceeded)` if the cap would be exceeded
+/// * `Err(ContractError::Overflow)` if the running total would overflow
+pub fn validate_contributor_cap(
+    amount: i128,
+    max_contribution: i128,
+    current_contribution: i128,
+) -> Result<(), ContractError> {
+    if max_contribution > 0 {
+        let new_total = current_contribution
+            .checked_add(amount)
+            .ok_or(ContractError::Overflow)?;
+        if new_total > max_contribution {
+            return Err(ContractError::ContributorCapExceeded);
+        }
+    }
+    Ok(())
+}
+
+/// Validates a contribution amount against both the campaign minimum and the
+/// per-contributor cap in one call — equivalent to calling
+/// [`validate_min_contribution`] followed by [`validate_contributor_cap`].
+/// Entry points that need to interleave a storage read between the two
+/// checks (to preserve a short-circuit optimisation) should call the split
+/// functions directly instead.
 ///
 /// # Arguments
 /// * `amount` - Contribution amount
 /// * `min_contribution` - Minimum allowed contribution
-/// * `max_contribution` - Maximum allowed contribution per contributor
+/// * `max_contribution` - Maximum allowed contribution per contributor (0 = no cap)
 /// * `current_contribution` - Current total contribution by this address
 ///
 /// # Returns
@@ -63,18 +118,8 @@ pub fn validate_contribution_amount(
     max_contribution: i128,
     current_contribution: i128,
 ) -> Result<(), ContractError> {
-    if amount < min_contribution {
-        return Err(ContractError::BelowMinimum);
-    }
-    if max_contribution > 0 {
-        let new_total = current_contribution
-            .checked_add(amount)
-            .ok_or(ContractError::Overflow)?;
-        if new_total > max_contribution {
-            return Err(ContractError::ExceedsMaximum);
-        }
-    }
-    Ok(())
+    validate_min_contribution(amount, min_contribution)?;
+    validate_contributor_cap(amount, max_contribution, current_contribution)
 }
 
 /// Validates campaign status for operations.
@@ -157,20 +202,21 @@ pub fn validate_goal_not_reached(total_raised: i128, goal: i128) -> Result<(), C
     Ok(())
 }
 
-/// Validates a new deadline is later than current deadline.
+/// Validates that a new deadline timestamp is strictly later than a
+/// reference point. Used both for extending an existing deadline (reference
+/// = the current stored deadline, e.g. `extend_deadline`/`propose_extension`)
+/// and for setting a fresh deadline that must simply be in the future
+/// (reference = the current ledger time, e.g. `clone_campaign`).
 ///
 /// # Arguments
 /// * `new_deadline` - Proposed new deadline
-/// * `current_deadline` - Current deadline
+/// * `reference` - The timestamp `new_deadline` must exceed
 ///
 /// # Returns
-/// * `Ok(())` if new deadline is later
-/// * `Err(ContractError::InvalidDeadline)` if new deadline is not later
-pub fn validate_deadline_extension(
-    new_deadline: u64,
-    current_deadline: u64,
-) -> Result<(), ContractError> {
-    if new_deadline <= current_deadline {
+/// * `Ok(())` if `new_deadline` is later than `reference`
+/// * `Err(ContractError::InvalidDeadline)` if it is not
+pub fn validate_deadline_extension(new_deadline: u64, reference: u64) -> Result<(), ContractError> {
+    if new_deadline <= reference {
         return Err(ContractError::InvalidDeadline);
     }
     Ok(())

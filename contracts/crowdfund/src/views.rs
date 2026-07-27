@@ -12,8 +12,8 @@ use crate::{
         KEY_TOKEN, KEY_TOTAL, KEY_VESTING,
     },
     types::{
-        CampaignInfo, Category, ContributionRecord, GoalAdjustment, MetadataVersion, PlatformConfig,
-        Status, VestingSchedule, Visibility, FeeMode,
+        CampaignInfo, Category, ContributionRecord, FeeMode, GoalAdjustment, MetadataVersion,
+        PlatformConfig, Status, VestingSchedule, Visibility,
     },
 };
 
@@ -184,7 +184,11 @@ pub(crate) fn get_vesting_info(env: Env) -> Option<VestingSchedule> {
 
 /// Returns the vested amount available to the creator at the current time.
 pub(crate) fn get_vested_amount(env: Env) -> i128 {
-    let vesting = match env.storage().instance().get::<_, VestingSchedule>(&KEY_VESTING) {
+    let vesting = match env
+        .storage()
+        .instance()
+        .get::<_, VestingSchedule>(&KEY_VESTING)
+    {
         Some(v) => v,
         None => return env.storage().instance().get(&KEY_TOTAL).unwrap_or(0),
     };
@@ -233,16 +237,16 @@ pub(crate) fn contributor_list(env: Env, offset: u32, limit: u32) -> Vec<Address
     let persistent = env.storage().persistent();
     let inst = env.storage().instance();
     let count: u32 = inst.get(&DataKey::ContributorCount).unwrap_or(0);
-    
+
     let mut result = Vec::new(&env);
     let end = (offset + limit).min(count);
-    
+
     for i in offset..end {
         if let Some(addr) = persistent.get::<_, Address>(&DataKey::ContributorIndex(i)) {
             result.push_back(addr);
         }
     }
-    
+
     result
 }
 
@@ -262,7 +266,10 @@ pub(crate) fn get_contribution_history(env: Env, contributor: Address) -> Vec<Co
 }
 
 /// Returns the recurring contribution plan for a contributor.
-pub(crate) fn get_recurring_plan(env: Env, contributor: Address) -> Option<crate::types::RecurringPlan> {
+pub(crate) fn get_recurring_plan(
+    env: Env,
+    contributor: Address,
+) -> Option<crate::types::RecurringPlan> {
     env.storage()
         .persistent()
         .get(&DataKey::RecurringPlan(contributor))
@@ -270,7 +277,5 @@ pub(crate) fn get_recurring_plan(env: Env, contributor: Address) -> Option<crate
 
 /// Returns the active extension proposal (if any).
 pub(crate) fn get_extension_proposal(env: Env) -> Option<crate::types::ExtensionProposal> {
-    env.storage()
-        .instance()
-        .get(&DataKey::ExtensionProposal)
+    env.storage().instance().get(&DataKey::ExtensionProposal)
 }
