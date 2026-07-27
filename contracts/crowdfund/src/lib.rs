@@ -305,7 +305,6 @@ pub use types::{
     // #703 Event schema versioning
     EVENT_SCHEMA_VERSION,
 };
-pub use validation::*;
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Vec};
 
