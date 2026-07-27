@@ -39,11 +39,7 @@ fn read_achievement_entry(
     let key = DataKey::Achievement(user.clone(), achievement_type);
 
     // Try the v2 compact record first.
-    if let Some(record) = env
-        .storage()
-        .instance()
-        .get::<_, AchievementRecord>(&key)
-    {
+    if let Some(record) = env.storage().instance().get::<_, AchievementRecord>(&key) {
         return Some(record);
     }
 
@@ -62,11 +58,7 @@ fn read_achievement_entry(
 /// Reconstruct the public [`AchievementNFT`] from a compact record + key
 /// components.  `nft_id` is re-derived via `crate::generate_nft_id` — it is
 /// never stored on ledger in v2.
-fn record_to_nft(
-    env: &Env,
-    user: &Address,
-    record: AchievementRecord,
-) -> AchievementNFT {
+fn record_to_nft(env: &Env, user: &Address, record: AchievementRecord) -> AchievementNFT {
     AchievementNFT {
         nft_id: crate::generate_nft_id(env, user, record.achievement_type),
         user: user.clone(),

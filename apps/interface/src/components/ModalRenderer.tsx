@@ -3,7 +3,8 @@
 import React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useModalStore, type ModalConfig } from "@/store/useModalStore";
+import { useModalSlice } from "@/hooks/useUiSlice";
+import type { ModalConfig } from "@/store/useModalStore";
 
 const sizes: Record<NonNullable<ModalConfig["size"]>, string> = {
   sm: "max-w-sm",
@@ -94,8 +95,7 @@ function ModalItem({
  * Provider wrapping is needed.
  */
 export function ModalRenderer() {
-  const stack = useModalStore((s) => s.stack);
-  const closeModal = useModalStore((s) => s.closeModal);
+  const { stack, closeModal } = useModalSlice();
 
   return (
     <>

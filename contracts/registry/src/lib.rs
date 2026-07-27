@@ -35,9 +35,11 @@
 
 mod admin;
 mod errors;
+mod events;
 mod lookup;
 
 pub use errors::ContractError;
+pub use events::{EventInitialized, EventRegistered};
 
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec};
 

@@ -23,6 +23,58 @@
 //! - **Referral Tracking** - Monitor referral success and rewards
 //! - **Challenge Tracking** - Track participation in limited-time challenges
 //! - **Audit Trail** - Complete history of achievement unlocks
+//!
+//! ## Achievement State Machine
+//!
+//! Each `(user, achievement_type)` pair has exactly two states:
+//!
+//! ```text
+//!   [Locked] --unlock--> [Unlocked]
+//! ```
+//!
+//! - **Locked**: no `DataKey::Achievement(user, achievement_type)` entry exists.
+//!   `has_achievement` returns `false`.
+//! - **Unlocked**: an `AchievementRecord` is stored under that key (points
+//!   already awarded, leaderboard entry already posted, `unlocked` event
+//!   already published). This is terminal — there is no further "claimed"
+//!   state or reversal; `Unlocked` is permanent for the life of the contract.
+//!
+//! There is no separate "eligible" state stored on-chain: eligibility is
+//! evaluated at call time, not persisted.
+//!
+//! **Transitions in are gated by achievement type:**
+//!
+//! - Types `{2, 5, 6, 8, 9, 10, 11, 12, 13}` ("self-declared") — transition
+//!   Locked → Unlocked via [`AchievementsContract::unlock_achievement`],
+//!   callable directly by the user. Eligibility for these is enforced
+//!   off-chain (e.g. by the platform deciding when to let a user submit the
+//!   call); the contract itself only checks the type is valid and not
+//!   already unlocked.
+//! - Types `{1, 3, 4, 7}` ("auto-tracked": First Contribution, Mega Donor,
+//!   Consistent Contributor, Referral Champion) — transition Locked →
+//!   Unlocked *only* via the internal `try_auto_unlock` helper, invoked from
+//!   [`AchievementsContract::record_contribution`] /
+//!   [`AchievementsContract::record_referral`] once the on-chain counters
+//!   they read (`ContributionCount`, `ContributionTotal`, `ReferralCount`)
+//!   cross the relevant threshold. `unlock_achievement` explicitly **rejects**
+//!   these four types with `AchievementNotSelfUnlockable` — see the fix note
+//!   below.
+//!
+//! **Illegal transitions rejected:**
+//! - Unlocked → Unlocked (re-unlocking) → `AchievementAlreadyUnlocked`.
+//! - Locked → Unlocked for an out-of-range type → `InvalidAchievementType`.
+//! - Locked → Unlocked for an auto-tracked type via the manual entry point →
+//!   `AchievementNotSelfUnlockable`.
+//!
+//! **Design/implementation mismatch found and fixed (#928):** prior to this
+//! fix, `unlock_achievement` had no gate on achievement type beyond range
+//! validation, so any user could call
+//! `unlock_achievement(user, 1 /* First Contribution */, "")` — or type 3, 4,
+//! 7 — immediately after initialization, without ever having contributed or
+//! referred anyone, and be credited the full points/leaderboard/NFT for it.
+//! That let the four auto-tracked achievements bypass the on-chain activity
+//! they're supposed to certify. Fixed by rejecting those four types in
+//! `unlock_achievement`.
 
 #![no_std]
 
@@ -44,7 +96,7 @@ pub use storage::*;
 pub use types::*;
 pub use validation::*;
 
-use common::{AccessControl, CommonError};
+use common::{AccessControl, CommonError, EVENT_SCHEMA_VERSION};
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String, Vec};
 
 /// Main achievement contract
@@ -77,7 +129,11 @@ impl AchievementsContract {
 
         env.events().publish(
             ("achievements", "initialized"),
-            (admin.clone(), platform_address),
+            EventInitialized {
+                admin: admin.clone(),
+                platform_address,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
         );
 
         Ok(())
@@ -96,6 +152,10 @@ impl AchievementsContract {
         user.require_auth();
 
         validate_achievement_type(achievement_type)?;
+
+        if is_auto_only_achievement(achievement_type) {
+            return Err(ContractError::AchievementNotSelfUnlockable);
+        }
 
         if has_achievement(&env, &user, achievement_type)? {
             return Err(ContractError::AchievementAlreadyUnlocked);
@@ -150,8 +210,15 @@ impl AchievementsContract {
         let total_points = award_points(&env, &user, points)?;
         update_level(total_points);
 
-        env.events()
-            .publish(("achievements", "points_awarded"), (user, points));
+        env.events().publish(
+            ("achievements", "points_awarded"),
+            EventPointsAwarded {
+                user,
+                points,
+                total_points,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(total_points)
     }
@@ -178,7 +245,12 @@ impl AchievementsContract {
 
         env.events().publish(
             ("achievements", "contribution_recorded"),
-            (user, campaign_id, amount),
+            EventContributionRecorded {
+                user,
+                campaign_id,
+                amount,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
         );
 
         Ok(())
@@ -192,16 +264,25 @@ impl AchievementsContract {
     ) -> Result<(), ContractError> {
         referrer.require_auth();
 
+        const REFERRAL_POINTS: u32 = 50;
+
         store_referral(&env, &referrer, &referee)?;
         let new_count = increment_referral_count(&env, &referrer)?;
 
-        let total_points = award_points(&env, &referrer, 50)?;
+        let total_points = award_points(&env, &referrer, REFERRAL_POINTS)?;
         update_level(total_points);
 
         check_referral_achievements(&env, &referrer, new_count)?;
 
-        env.events()
-            .publish(("achievements", "referral_recorded"), (referrer, referee));
+        env.events().publish(
+            ("achievements", "referral_recorded"),
+            EventReferralRecorded {
+                referrer,
+                referee,
+                points_earned: REFERRAL_POINTS,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(())
     }
@@ -238,8 +319,14 @@ impl AchievementsContract {
             update_level(total_points);
         }
 
-        env.events()
-            .publish(("achievements", "streak_updated"), (user, new_streak));
+        env.events().publish(
+            ("achievements", "streak_updated"),
+            EventStreakUpdated {
+                user,
+                new_streak,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(new_streak)
     }
@@ -256,6 +343,20 @@ const MEGA_DONOR_TYPE: u32 = 3;
 const MEGA_DONOR_TOTAL: i128 = 1_000_000_000;
 const REFERRAL_CHAMPION_TYPE: u32 = 7;
 const REFERRAL_CHAMPION_COUNT: u32 = 3;
+
+/// Achievement types that may only be unlocked by [`try_auto_unlock`] once
+/// their on-chain activity threshold is crossed — never directly via
+/// [`AchievementsContract::unlock_achievement`]. See the state-machine
+/// doc-comment at the top of this file.
+fn is_auto_only_achievement(achievement_type: u32) -> bool {
+    matches!(
+        achievement_type,
+        FIRST_CONTRIBUTION_TYPE
+            | MEGA_DONOR_TYPE
+            | CONSISTENT_CONTRIBUTOR_TYPE
+            | REFERRAL_CHAMPION_TYPE
+    )
+}
 
 /// Perform the shared "unlock" side effects: store the NFT, award points,
 /// refresh the user's level, push a leaderboard entry, and publish an event.
@@ -282,7 +383,13 @@ fn do_unlock(
 
     env.events().publish(
         ("achievements", "unlocked"),
-        (user.clone(), achievement_type, new_level),
+        EventUnlocked {
+            user: user.clone(),
+            achievement_type,
+            points_earned: points,
+            new_level,
+            schema_version: EVENT_SCHEMA_VERSION,
+        },
     );
 
     // Reconstruct full public NFT (nft_id derived, not read from ledger).

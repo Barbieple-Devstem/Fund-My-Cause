@@ -173,7 +173,11 @@ fn test_adversarial_platform_fee_manipulation() {
         &soroban_sdk::String::from_str(&env, "Test"),
         &soroban_sdk::String::from_str(&env, "Test"),
         &None,
-        &Some(crowdfund::PlatformConfig { address: platform.clone(), fee_bps, fee_mode: crowdfund::FeeMode::OnSuccess }),
+        &Some(crowdfund::PlatformConfig {
+            address: platform.clone(),
+            fee_bps,
+            fee_mode: crowdfund::FeeMode::OnSuccess,
+        }),
         &None,
         &crowdfund::Category::Other,
         &None,
@@ -211,7 +215,9 @@ fn test_adversarial_reject_wrong_token() {
     env.ledger().set_timestamp(500);
 
     // Attempt contribution with wrong token
-    let result = c.client.try_contribute(&contributor, &10_000, &wrong_token_id, &None);
+    let result = c
+        .client
+        .try_contribute(&contributor, &10_000, &wrong_token_id, &None);
     assert!(result.is_err());
 }
 
@@ -232,7 +238,8 @@ fn test_adversarial_state_consistency_under_stress() {
         let amount = 1_000i128;
         c.token_admin.mint(&contributor, &amount);
 
-        c.client.contribute(&contributor, &amount, &c.token_id, &None);
+        c.client
+            .contribute(&contributor, &amount, &c.token_id, &None);
 
         let expected_total = (i + 1) as i128 * 1_000;
         assert_eq!(c.client.total_raised(), expected_total);
@@ -372,7 +379,11 @@ fn test_cei_refund_single_no_double_spend() {
 
     // Second call is a no-op — storage is 0, nothing transferred
     c.client.refund_single(&attacker);
-    assert_eq!(c.token.balance(&attacker), amount, "double-spend: balance must not increase");
+    assert_eq!(
+        c.token.balance(&attacker),
+        amount,
+        "double-spend: balance must not increase"
+    );
 }
 
 /// Verify that refund_batch cannot over-pay when the same contributor appears twice.
@@ -398,7 +409,11 @@ fn test_cei_refund_batch_idempotent() {
     batch.push_back(attacker.clone());
     c.client.refund_batch(&batch);
 
-    assert_eq!(c.token.balance(&attacker), amount, "batch double-spend must not occur");
+    assert_eq!(
+        c.token.balance(&attacker),
+        amount,
+        "batch double-spend must not occur"
+    );
 }
 
 /// Verify that withdraw() zeroes the total before transferring, preventing
@@ -474,7 +489,7 @@ fn test_on_contribution_fee_mode_net_vs_gross() {
     client.contribute(&contributor, &contrib_amount, &token_id, &None);
 
     let expected_fee = contrib_amount * fee_bps as i128 / 10_000; // 100
-    let expected_net = contrib_amount - expected_fee;              // 900
+    let expected_net = contrib_amount - expected_fee; // 900
 
     // Net total used for goal progress
     assert_eq!(client.total_raised(), expected_net);
@@ -542,7 +557,10 @@ fn test_adversarial_get_tier_for_amount_never_panics() {
     assert!(c.client.get_tier_for_amount(&99).is_none());
     // At/above thresholds → best qualifying tier, no panic on the extreme value.
     assert_eq!(c.client.get_tier_for_amount(&100).unwrap().min_amount, 100);
-    assert_eq!(c.client.get_tier_for_amount(&i128::MAX).unwrap().min_amount, 1_000);
+    assert_eq!(
+        c.client.get_tier_for_amount(&i128::MAX).unwrap().min_amount,
+        1_000
+    );
 }
 
 /// `refund_batch` iterated a caller-supplied contributor list with
@@ -562,7 +580,8 @@ fn test_adversarial_refund_batch_oversized_and_duplicates() {
     let contributor = Address::generate(&env);
     c.token_admin.mint(&contributor, &10_000);
     env.ledger().set_timestamp(500);
-    c.client.contribute(&contributor, &10_000, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &10_000, &c.token_id, &None);
 
     // Cancel so the campaign is refund-eligible.
     c.client.cancel_campaign();

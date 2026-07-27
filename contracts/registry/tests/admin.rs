@@ -7,6 +7,9 @@
 //! - Unauthorized callers are **rejected**.
 //! - Authorized callers succeed.
 //! - Error codes match `ContractError` variants.
+//! - The admin-only entry-point (`update_status`) specifically rejects
+//!   non-admin and unauthenticated callers with an auth abort — see the
+//!   `update_status() — admin-only` section below for the full rationale.
 //!
 //! Soroban's generated test client exposes two call styles:
 //!   - `client.method(args)` — panics on `Err` (used for happy-path assertions)
@@ -23,7 +26,7 @@ mod common;
 use soroban_sdk::{testutils::Address as _, Address, Env};
 
 use common::{deploy, deploy_and_init};
-use registry::{CampaignStatus, ContractError};
+use registry::{CampaignStatus, ContractError, RegistryContractClient};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // initialize()
@@ -404,6 +407,205 @@ fn test_update_status_moves_campaign_between_buckets() {
     );
     // Global list is unchanged
     assert_eq!(client.list(&0, &10).len(), 1);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// update_status() — admin-only: explicit non-admin / unauthenticated rejection
+// ═══════════════════════════════════════════════════════════════════════════════
+//
+// `update_status` is the registry's *only* entry point gated on the stored
+// admin address (see the module doc-comment's Access Control table).
+// `initialize` also calls `require_auth()`, but on a caller-supplied address
+// with no pre-existing admin to compare against — it isn't a privileged
+// "admin-only" check, so it's out of scope here. `register*` functions are
+// gated on the campaign's own signature, not the admin's, and are already
+// covered by the `*_requires_campaign_auth` tests above.
+//
+// Soroban enforces `require_auth()` at the host level: a call lacking the
+// required signature aborts before the contract's own `Result` logic runs,
+// so `try_update_status` surfaces it as `Err(Err(InvokeError::Abort))`
+// rather than a `ContractError` variant. Asserting that exact shape (instead
+// of a bare `#[should_panic]`) pins the failure down to specifically an auth
+// rejection rather than any other panic.
+//
+// The registry has no role-revocation or admin-transfer entry point (see
+// `src/lib.rs` — `KEY_ADMIN` is set once in `initialize` and never
+// rewritten), so the "admin whose role was just revoked" boundary case does
+// not apply to this contract.
+
+/// Mock exactly one signer for a specific `update_status` invocation, so
+/// `admin.require_auth()` inside the contract only succeeds if `signer` is
+/// that stored admin.
+fn mock_update_status_signer(
+    env: &Env,
+    client: &RegistryContractClient,
+    signer: &Address,
+    campaign_id: &Address,
+    old_status: CampaignStatus,
+    new_status: CampaignStatus,
+) {
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    use soroban_sdk::IntoVal;
+
+    env.set_auths(&[]);
+    env.mock_auths(&[MockAuth {
+        address: signer,
+        invoke: &MockAuthInvoke {
+            contract: &client.address,
+            fn_name: "update_status",
+            args: (campaign_id.clone(), old_status, new_status).into_val(env),
+            sub_invokes: &[],
+        },
+    }]);
+}
+
+#[test]
+fn test_update_status_rejects_non_admin_signer() {
+    let env = Env::default();
+    let (client, _admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.register_with_status(&campaign, &CampaignStatus::Active);
+
+    // A real, distinct address signs the call — but it is not the stored admin.
+    let attacker = Address::generate(&env);
+    mock_update_status_signer(
+        &env,
+        &client,
+        &attacker,
+        &campaign,
+        CampaignStatus::Active,
+        CampaignStatus::Successful,
+    );
+
+    let result = client.try_update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
+    assert_eq!(
+        result,
+        Err(Err(soroban_sdk::InvokeError::Abort)),
+        "update_status must reject a signer that is not the stored admin"
+    );
+
+    // The rejected call must have had no effect on state.
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        0
+    );
+}
+
+#[test]
+fn test_update_status_rejects_campaign_signing_for_itself() {
+    // The campaign is a real, registered actor — but it is not the admin, so
+    // it must not be able to update its own status by self-authorizing.
+    let env = Env::default();
+    let (client, _admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.register_with_status(&campaign, &CampaignStatus::Active);
+
+    mock_update_status_signer(
+        &env,
+        &client,
+        &campaign,
+        &campaign,
+        CampaignStatus::Active,
+        CampaignStatus::Successful,
+    );
+
+    let result = client.try_update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
+    assert_eq!(
+        result,
+        Err(Err(soroban_sdk::InvokeError::Abort)),
+        "update_status must reject the campaign signing for its own status change"
+    );
+}
+
+#[test]
+fn test_update_status_rejects_unauthenticated_caller() {
+    let env = Env::default();
+    let (client, _admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.register_with_status(&campaign, &CampaignStatus::Active);
+
+    // No signature at all — not even a mocked one for a wrong address.
+    env.set_auths(&[]);
+    let result = client.try_update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
+    assert_eq!(
+        result,
+        Err(Err(soroban_sdk::InvokeError::Abort)),
+        "update_status must reject a call carrying no authorization at all"
+    );
+
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn test_update_status_admin_only_signer_succeeds() {
+    // Dedicated authorized-success test: the *stored admin, and only the
+    // stored admin*, signs the invocation (as opposed to the broader
+    // `mock_all_auths()` used by `test_update_status_moves_campaign_between_buckets`).
+    let env = Env::default();
+    let (client, admin) = deploy_and_init(&env);
+    let campaign = Address::generate(&env);
+
+    env.mock_all_auths();
+    client.register_with_status(&campaign, &CampaignStatus::Active);
+
+    mock_update_status_signer(
+        &env,
+        &client,
+        &admin,
+        &campaign,
+        CampaignStatus::Active,
+        CampaignStatus::Successful,
+    );
+
+    client.update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
+
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        0
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        1
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

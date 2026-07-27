@@ -36,6 +36,9 @@ pub enum ContractError {
     ContributionNotFound = 15,
     /// Streak update failed
     StreakUpdateFailed = 16,
+    /// Achievement type is auto-unlocked by on-chain activity tracking and
+    /// cannot be claimed directly through `unlock_achievement`.
+    AchievementNotSelfUnlockable = 17,
 }
 
 impl From<common::CommonError> for ContractError {

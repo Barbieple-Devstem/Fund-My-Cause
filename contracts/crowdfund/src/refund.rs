@@ -4,14 +4,14 @@
 //! or are cancelled. Implements a pull-based refund model where contributors claim their
 //! own refunds individually, avoiding gas limits and single points of failure.
 
-use soroban_sdk::{Address, Env, Vec, token};
+use soroban_sdk::{token, Address, Env, Vec};
 
 use crate::{
     errors::ContractError,
-    storage::{
-        DataKey, KEY_STATUS, KEY_TOTAL, KEY_TOKEN, KEY_DEADLINE,
+    storage::{DataKey, KEY_DEADLINE, KEY_STATUS, KEY_TOKEN, KEY_TOTAL},
+    types::{
+        EventBatchRefundCompleted, EventPartialRefund, EventRefunded, Status, EVENT_SCHEMA_VERSION,
     },
-    types::{Status, EventRefunded, EventBatchRefundCompleted, EventPartialRefund, EVENT_SCHEMA_VERSION},
 };
 
 /// Refunds a single contributor's contribution.
@@ -27,10 +27,7 @@ use crate::{
 /// - `Ok(())` on success
 /// - `Err(ContractError::NotActive)` if campaign is in wrong status for refunds
 /// - `Err(ContractError::NothingToRefund)` if contributor has no balance
-pub(crate) fn refund_single(
-    env: Env,
-    contributor: Address,
-) -> Result<(), ContractError> {
+pub(crate) fn refund_single(env: Env, contributor: Address) -> Result<(), ContractError> {
     let inst = env.storage().instance();
     let status: Status = inst.get(&KEY_STATUS).unwrap_or(Status::Active);
 
@@ -93,10 +90,7 @@ pub(crate) fn refund_single(
 ///
 /// # Returns
 /// The number of successfully refunded contributors
-pub(crate) fn refund_batch(
-    env: Env,
-    contributors: Vec<Address>,
-) -> Result<u32, ContractError> {
+pub(crate) fn refund_batch(env: Env, contributors: Vec<Address>) -> Result<u32, ContractError> {
     let inst = env.storage().instance();
     let status: Status = inst.get(&KEY_STATUS).unwrap_or(Status::Active);
 
@@ -173,7 +167,11 @@ pub(crate) fn refund_partial(
     let new_balance = current - amount;
     persistent.set(&contrib_key, &new_balance);
 
-    let token_address: Address = env.storage().instance().get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
+    let token_address: Address = env
+        .storage()
+        .instance()
+        .get(&KEY_TOKEN)
+        .ok_or(ContractError::InvalidAddress)?;
     token::Client::new(&env, &token_address).transfer(
         &env.current_contract_address(),
         &contributor,

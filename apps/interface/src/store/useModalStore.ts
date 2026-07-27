@@ -11,7 +11,7 @@ export interface ModalConfig {
   onClose?: () => void;
 }
 
-interface ModalStoreState {
+export interface ModalStoreState {
   stack: ModalConfig[];
   counter: number;
   openModal: (config: Omit<ModalConfig, "id">) => string;

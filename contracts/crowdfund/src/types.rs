@@ -1563,12 +1563,14 @@ pub struct EventQfContribution {
     pub contributor_count: u32,
 }
 
-// ── Issue #703: Event schema versioning ──────────────────────────────────────
+// ── Issue #703 / #924: Event schema versioning ───────────────────────────────
 
-/// Current event schema version.  Bump this when the shape of any emitted
-/// event payload changes in a backwards-incompatible way so that indexers can
-/// adapt without guessing.
-pub const EVENT_SCHEMA_VERSION: u32 = 1;
+/// Current event schema version. Re-exported from `common`'s shared event
+/// convention (see `contracts/common/src/events.rs`) so all three contracts
+/// start from the same version number. Bump this when the shape of any
+/// emitted event payload changes in a backwards-incompatible way so that
+/// indexers can adapt without guessing.
+pub use common::EVENT_SCHEMA_VERSION;
 
 // ── Issue #704: Withdrawal streaming ─────────────────────────────────────────
 
@@ -1752,4 +1754,3 @@ pub struct EventIpfsCidUpdated {
     pub cid: String,
     pub timestamp: u64,
 }
-

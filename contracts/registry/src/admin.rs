@@ -12,10 +12,12 @@
 //! organizing principle for this module vs. [`crate::lookup`] (read-only,
 //! no auth, no writes).
 
+use common::EVENT_SCHEMA_VERSION;
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
-    require_initialized, CampaignStatus, ContractError, RegDataKey, KEY_ADMIN, KEY_CAMPAIGNS,
+    require_initialized, CampaignStatus, ContractError, EventInitialized, EventRegistered,
+    RegDataKey, KEY_ADMIN, KEY_CAMPAIGNS,
 };
 
 /// See [`crate::RegistryContract::initialize`].
@@ -27,7 +29,13 @@ pub(crate) fn initialize(env: Env, admin: Address) -> Result<(), ContractError> 
     }
 
     env.storage().instance().set(&KEY_ADMIN, &admin);
-    env.events().publish(("registry", "initialized"), admin);
+    env.events().publish(
+        ("registry", "initialized"),
+        EventInitialized {
+            admin,
+            schema_version: EVENT_SCHEMA_VERSION,
+        },
+    );
 
     Ok(())
 }
@@ -46,8 +54,13 @@ pub(crate) fn register(env: Env, campaign_id: Address) -> Result<(), ContractErr
     if !campaigns.contains(&campaign_id) {
         campaigns.push_back(campaign_id.clone());
         env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-        env.events()
-            .publish(("registry", "registered"), campaign_id);
+        env.events().publish(
+            ("registry", "registered"),
+            EventRegistered {
+                campaign_id,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
     }
 
     Ok(())
@@ -72,8 +85,13 @@ pub(crate) fn register_with_category(
     if !campaigns.contains(&campaign_id) {
         campaigns.push_back(campaign_id.clone());
         env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-        env.events()
-            .publish(("registry", "registered"), campaign_id.clone());
+        env.events().publish(
+            ("registry", "registered"),
+            EventRegistered {
+                campaign_id: campaign_id.clone(),
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
     }
 
     // ── Category-specific list ────────────────────────────────────────────
@@ -110,8 +128,13 @@ pub(crate) fn register_with_status(
     if !campaigns.contains(&campaign_id) {
         campaigns.push_back(campaign_id.clone());
         env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-        env.events()
-            .publish(("registry", "registered"), campaign_id.clone());
+        env.events().publish(
+            ("registry", "registered"),
+            EventRegistered {
+                campaign_id: campaign_id.clone(),
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
     }
 
     let status_key = RegDataKey::StatusList(status as u32);
