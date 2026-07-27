@@ -439,7 +439,8 @@ fn generate_nft_id(env: &Env, user: &Address, achievement_type: u32) -> String {
         hex_buf[i * 2 + 1] = HEX[(byte & 0x0f) as usize];
     }
 
-    let hex_str = core::str::from_utf8(&hex_buf).unwrap();
+    let hex_str = core::str::from_utf8(&hex_buf)
+        .unwrap_or_else(|_| "0000000000000000000000000000000000000000000000000000000000000000");
     String::from_str(env, hex_str)
 }
 
