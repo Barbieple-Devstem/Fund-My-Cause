@@ -1,4 +1,7 @@
-use soroban_sdk::{testutils::{Address as _, Ledger}, token, Address, Env, String, Vec};
+use soroban_sdk::{
+    testutils::{Address as _, Ledger},
+    token, Address, Env, String, Vec,
+};
 
 use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig};
 

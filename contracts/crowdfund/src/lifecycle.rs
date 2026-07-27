@@ -13,11 +13,14 @@ use crate::{
         KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN, KEY_TOTAL, KEY_VESTING, KEY_VISIBILITY,
     },
     types::{
-        Category, GoalAdjustment, MetadataVersion, PlatformConfig, Status, VestingSchedule,
-        Visibility, EventInitialized, EventCampaignCloned, EventCancelled, EventArchived,
+        Category, EventArchived, EventCampaignCloned, EventCancelled, EventInitialized,
+        GoalAdjustment, MetadataVersion, PlatformConfig, Status, VestingSchedule, Visibility,
         EVENT_SCHEMA_VERSION,
     },
-    validation::{validate_category, validate_fee_bps, validate_string_length, validate_goal_not_overflow, validate_address_not_self},
+    validation::{
+        validate_address_not_self, validate_category, validate_fee_bps, validate_goal_not_overflow,
+        validate_string_length,
+    },
 };
 
 /// Initializes a new crowdfunding campaign (called once per contract instance).
@@ -65,7 +68,7 @@ pub(crate) fn initialize(
     if inst.has(&KEY_CREATOR) {
         return Err(ContractError::AlreadyInitialized);
     }
-    
+
     creator.require_auth();
 
     // ── Validate all inputs up-front ─────────────────────────────────────────
@@ -73,19 +76,19 @@ pub(crate) fn initialize(
         return Err(ContractError::InvalidGoal);
     }
     validate_goal_not_overflow(goal)?;
-    
+
     if deadline <= env.ledger().timestamp() {
         return Err(ContractError::InvalidDeadline);
     }
-    
+
     if min_contribution < 0 {
         return Err(ContractError::BelowMinimum);
     }
-    
+
     if max_contribution < 0 || (max_contribution > 0 && max_contribution < min_contribution) {
         return Err(ContractError::ExceedsMaximum);
     }
-    
+
     validate_string_length(&title, 64)?;
     validate_string_length(&description, 512)?;
     validate_category(&category)?;
@@ -131,7 +134,7 @@ pub(crate) fn initialize(
 
     // ── Persistent storage writes (history) ──────────────────────────────────
     let persistent = env.storage().persistent();
-    
+
     let mut goal_history: Vec<GoalAdjustment> = Vec::new(&env);
     goal_history.push_back(GoalAdjustment {
         previous_goal: 0,
@@ -288,12 +291,14 @@ pub(crate) fn clone_campaign(
 pub(crate) fn cancel_campaign(env: Env) -> Result<(), ContractError> {
     let inst = env.storage().instance();
     let status: Status = inst.get(&KEY_STATUS).unwrap_or(Status::Active);
-    
+
     if status != Status::Active {
         return Err(ContractError::NotActive);
     }
 
-    let creator: Address = inst.get(&KEY_CREATOR).ok_or(ContractError::InvalidAddress)?;
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
 
     let total_raised: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
@@ -321,7 +326,9 @@ pub(crate) fn cancel_campaign(env: Env) -> Result<(), ContractError> {
 /// - `Ok(())` on success
 pub(crate) fn archive(env: Env) -> Result<(), ContractError> {
     let inst = env.storage().instance();
-    let creator: Address = inst.get(&KEY_CREATOR).ok_or(ContractError::InvalidAddress)?;
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
 
     let archived_at = env.ledger().timestamp();
@@ -346,9 +353,7 @@ pub(crate) fn archive(env: Env) -> Result<(), ContractError> {
 /// # Returns
 /// `true` if the campaign is archived, `false` otherwise
 pub(crate) fn is_archived(env: Env) -> bool {
-    env.storage()
-        .instance()
-        .has(&KEY_ARCHIVED)
+    env.storage().instance().has(&KEY_ARCHIVED)
 }
 
 /// Gets the timestamp when the campaign was archived.
@@ -356,7 +361,5 @@ pub(crate) fn is_archived(env: Env) -> bool {
 /// # Returns
 /// The archival timestamp, or `None` if not archived
 pub(crate) fn get_archived_at(env: Env) -> Option<u64> {
-    env.storage()
-        .instance()
-        .get(&KEY_ARCHIVED)
+    env.storage().instance().get(&KEY_ARCHIVED)
 }

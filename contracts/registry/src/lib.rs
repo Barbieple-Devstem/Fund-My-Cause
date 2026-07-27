@@ -23,8 +23,11 @@
 #![no_std]
 
 mod errors;
+mod events;
 pub use errors::ContractError;
+pub use events::{EventInitialized, EventRegistered};
 
+use common::EVENT_SCHEMA_VERSION;
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec};
 
 // ── Storage keys ──────────────────────────────────────────────────────────────
@@ -103,8 +106,13 @@ impl RegistryContract {
         }
 
         env.storage().instance().set(&KEY_ADMIN, &admin);
-        env.events()
-            .publish(("registry", "initialized"), admin);
+        env.events().publish(
+            ("registry", "initialized"),
+            EventInitialized {
+                admin,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(())
     }
@@ -142,8 +150,13 @@ impl RegistryContract {
         if !campaigns.contains(&campaign_id) {
             campaigns.push_back(campaign_id.clone());
             env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id);
+            env.events().publish(
+                ("registry", "registered"),
+                EventRegistered {
+                    campaign_id,
+                    schema_version: EVENT_SCHEMA_VERSION,
+                },
+            );
         }
 
         Ok(())
@@ -181,8 +194,13 @@ impl RegistryContract {
         if !campaigns.contains(&campaign_id) {
             campaigns.push_back(campaign_id.clone());
             env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id.clone());
+            env.events().publish(
+                ("registry", "registered"),
+                EventRegistered {
+                    campaign_id: campaign_id.clone(),
+                    schema_version: EVENT_SCHEMA_VERSION,
+                },
+            );
         }
 
         // ── Category-specific list ────────────────────────────────────────────
@@ -232,8 +250,13 @@ impl RegistryContract {
         if !campaigns.contains(&campaign_id) {
             campaigns.push_back(campaign_id.clone());
             env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id.clone());
+            env.events().publish(
+                ("registry", "registered"),
+                EventRegistered {
+                    campaign_id: campaign_id.clone(),
+                    schema_version: EVENT_SCHEMA_VERSION,
+                },
+            );
         }
 
         let status_key = RegDataKey::StatusList(status as u32);
