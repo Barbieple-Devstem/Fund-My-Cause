@@ -3,6 +3,10 @@
  * Tracks object allocations and detects potential leaks.
  */
 
+import { logger } from "@/lib/logger";
+
+const memLogger = logger.child("memory-profiling");
+
 interface AllocationRecord {
   type: string;
   size: number;
@@ -21,7 +25,7 @@ export function startMemoryProfiling(): void {
   isMonitoring = true;
 
   if (performance.memory) {
-    console.log("Memory profiling started");
+    memLogger.debug("profiling started");
   }
 }
 

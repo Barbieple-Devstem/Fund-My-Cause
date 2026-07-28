@@ -28,11 +28,14 @@
 - [RegistryClientConfig](interfaces/RegistryClientConfig.md)
 - [ListOptions](interfaces/ListOptions.md)
 - [ListByCategoryOptions](interfaces/ListByCategoryOptions.md)
+- [WalletProvider](interfaces/WalletProvider.md)
+- [MockWalletProviderConfig](interfaces/MockWalletProviderConfig.md)
 
 ## Type Aliases
 
 - [SignFn](type-aliases/SignFn.md)
 - [Category](type-aliases/Category.md)
+- [WalletProviderState](type-aliases/WalletProviderState.md)
 - [CampaignStatus](type-aliases/CampaignStatus.md)
 
 ## Variables

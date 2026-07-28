@@ -14,9 +14,11 @@ npm install @fund-my-cause/sdk
 
 ## Requirements
 
-| Peer dependency | Version |
-|----------------|---------|
-| `@stellar/stellar-sdk` | `^14.0.0` |
+| Peer dependency | Version | Required for |
+|----------------|---------|---|
+| `@stellar/stellar-sdk` | `^14.0.0` | everything |
+| `@stellar/freighter-api` | `^6.0.0` (optional) | `@fund-my-cause/sdk/wallet`'s `freighterAdapter` |
+| `@walletconnect/sign-client` | `^2.0.0` (optional) | `@fund-my-cause/sdk/wallet`'s `createLobstrAdapter` |
 
 ## Quick start
 
@@ -148,6 +150,98 @@ import { STROOPS_PER_XLM, xlmToStroops, stroopsToXlm } from "@fund-my-cause/sdk"
 > There was previously a duplicate `FmcClient.STROOPS_PER_XLM` static, marked
 > "Unused" in the source. It has been removed — it held the same value as the
 > package-level export above, which is the one to use.
+
+## Wallet connect
+
+Freighter and LOBSTR wallet integrations live under the `@fund-my-cause/sdk/wallet`
+subpath, kept separate from the main entry point so read-only consumers (e.g.
+`examples/campaign-list`) aren't forced to install `@stellar/freighter-api` /
+`@walletconnect/sign-client`. Install whichever of those two peers you need.
+
+```ts
+import {
+  freighterAdapter,
+  createLobstrAdapter,
+  saveWalletSession,
+  loadWalletSession,
+  clearWalletSession,
+  isNetworkMatch,
+  classifySignError,
+  type WalletAdapter,
+} from "@fund-my-cause/sdk/wallet";
+
+const lobstrAdapter = createLobstrAdapter({
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+});
+
+const adapters: Record<"freighter" | "lobstr", WalletAdapter> = {
+  freighter: freighterAdapter,
+  lobstr: lobstrAdapter,
+};
+
+// Connect, persist the session, and sign:
+const address = await adapters.freighter.connect();
+saveWalletSession(address, "freighter");
+
+const signed = await adapters.freighter.signTransaction(xdr, networkPassphrase);
+
+// Restore a session after a page reload:
+const session = loadWalletSession(); // { address, walletType } | null
+
+// Classify a sign/connect failure to decide what to tell the user:
+try {
+  await adapters.freighter.signTransaction(xdr, networkPassphrase);
+} catch (e) {
+  const kind = classifySignError(e); // "cancelled" | "network" | "unknown"
+}
+
+// Detect a wallet set to the wrong network:
+isNetworkMatch(walletPassphrase, expectedPassphrase); // boolean
+```
+
+### `WalletAdapter`
+
+```ts
+interface WalletAdapter {
+  name: string;
+  connect(): Promise<string>;                                          // returns the connected public key
+  signTransaction(xdr: string, networkPassphrase: string): Promise<string>;
+
+  // Optional capabilities — call with `?.` and degrade gracefully.
+  disconnect?(): Promise<void>;                                        // e.g. closes a WalletConnect session
+  getNetwork?(): Promise<WalletNetwork | null>;                        // null when the wallet can't report it
+  onAccountChange?(cb: (change: AccountChange) => void): Unsubscribe;  // user switched account/network
+}
+
+interface WalletNetwork  { network: string; networkPassphrase: string }
+interface AccountChange  { address: string; network: string; networkPassphrase: string }
+type     Unsubscribe     = () => void;
+```
+
+`connect` and `signTransaction` are required; the rest are optional, so check
+before use:
+
+```ts
+// Warn when the wallet is pointed at the wrong network:
+const net = await adapter.getNetwork?.();
+if (net && !isNetworkMatch(net.networkPassphrase, expectedPassphrase)) {
+  // surface a "switch network" prompt
+}
+
+// React to the user switching account or network inside their wallet:
+const unsubscribe = adapter.onAccountChange?.(({ address, networkPassphrase }) => {
+  saveWalletSession(address, "freighter");
+});
+unsubscribe?.(); // on unmount
+```
+
+`freighterAdapter` is a ready-to-use singleton. `createLobstrAdapter(options)`
+is a factory (LOBSTR needs a WalletConnect `projectId`); each call returns an
+independent adapter instance with its own connection state.
+
+This is the single source of wallet-connect logic for the monorepo — do not
+re-implement adapters, session persistence, or error classification in
+`apps/interface` or in `examples/*`; import them from here instead.
 
 ## Error handling
 

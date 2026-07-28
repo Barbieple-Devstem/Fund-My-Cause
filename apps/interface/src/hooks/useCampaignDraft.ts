@@ -39,8 +39,14 @@ interface UseCampaignDraftReturn {
   saveStatus: DraftSaveStatus;
   /** Timestamp of the last successful save */
   lastSaved: Date | null;
-  /** Resolve conflict by either keeping local or remote version */
-  resolveConflict: (resolution: "keep-local" | "keep-remote") => void;
+  /**
+   * Resolve conflict by either keeping local or remote version.
+   * Returns the remote draft for "keep-remote" (so the caller can load it into
+   * the form), or `null` for "keep-local" / when no remote draft exists.
+   */
+  resolveConflict: (
+    resolution: "keep-local" | "keep-remote",
+  ) => CampaignDraftData | null;
 }
 
 /**
