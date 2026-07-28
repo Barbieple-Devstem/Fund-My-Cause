@@ -77,62 +77,103 @@ mod validation;
 mod views;
 
 pub use errors::ContractError;
-pub use security::{ReentrancyGuard, CircuitBreaker, RateLimiter, InputValidator, AccessControl};
+pub use security::{AccessControl, CircuitBreaker, InputValidator, RateLimiter, ReentrancyGuard};
 pub use storage::{
-    CONTRACT_VERSION, MIN_SUPPORTED_VERSION,
-    KEY_ADMIN, KEY_ANALYTICS, KEY_ANALYTICS_DATA, KEY_ARCHIVED, KEY_CATEGORY, KEY_CONTRIBS,
-    KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_DISPUTE_ID, KEY_DISPUTE_VOTE, KEY_DISPUTES, KEY_GOAL,
-    KEY_GOAL_HISTORY, KEY_INSURANCE, KEY_INSURANCE_POOL, KEY_MAX, KEY_META_HIST, KEY_MILESTONE_STATUS,
-    KEY_MILESTONES, KEY_MIN, KEY_NEXT_RELEASE, KEY_PLATFORM, KEY_RATE_LIMIT, KEY_SOCIAL,
-    KEY_START_TIME, KEY_STATUS, KEY_TITLE, KEY_TOKEN, KEY_TOTAL, KEY_VERIFICATION, KEY_VESTING,
-    KEY_VISIBILITY,
+    BASIS_POINTS_MAX,
+    CONTRACT_VERSION,
+    KEY_ADMIN,
+    KEY_ANALYTICS,
+    KEY_ANALYTICS_DATA,
+    KEY_ARCHIVED,
+    KEY_CATEGORY,
     // #457
-    KEY_CONTRACT_VERSION, KEY_VERSION_HISTORY,
-    // #458
-    KEY_LAST_VALIDATION,
+    KEY_CONTRACT_VERSION,
+    KEY_CONTRIBS,
+    KEY_CREATOR,
+    KEY_DEADLINE,
     // #459
     KEY_DEBUG_SNAPSHOT,
-    // #460
-    KEY_PERF_THRESHOLD, KEY_PERF_STATS,
+    KEY_DESC,
+    KEY_DISPUTES,
+    KEY_DISPUTE_ID,
+    KEY_DISPUTE_VOTE,
+    KEY_EMERGENCY_PAUSE,
+    KEY_GOAL,
+    KEY_GOAL_HISTORY,
     // Governance
-    KEY_GOVERNANCE_CONFIG, KEY_GOVERNANCE_NONCE, KEY_EMERGENCY_PAUSE,
-    // #605 Security Hardening
-    KEY_REENTRANCY_LOCK,
+    KEY_GOVERNANCE_CONFIG,
+    KEY_GOVERNANCE_NONCE,
     // #698 Fee Mode
     KEY_GROSS_TOTAL,
+    KEY_INSURANCE,
+    KEY_INSURANCE_POOL,
     // #699 IPFS CID
     KEY_IPFS_CID,
-    // #694 Soft-cap / stretch-goal
-    KEY_SOFT_CAP, KEY_STRETCH_GOAL,
+    // #458
+    KEY_LAST_VALIDATION,
+    KEY_MAX,
+    KEY_META_HIST,
+    KEY_MILESTONES,
+    KEY_MILESTONE_STATUS,
+    KEY_MIN,
+    KEY_NEXT_RELEASE,
+    MAX_BATCH_REFUND_SIZE,
+    MAX_MESSAGE_LENGTH,
+    // #696 Pause timelock
+    KEY_PAUSE_TIMELOCK,
+    KEY_PERF_STATS,
+    // #460
+    KEY_PERF_THRESHOLD,
+    KEY_PLATFORM,
+    KEY_RATE_LIMIT,
+    // #605 Security Hardening
+    KEY_REENTRANCY_LOCK,
     // #695 Released amount tracking
     KEY_RELEASED,
-    // #696 Pause timelock
-    KEY_PAUSE_TIMELOCK, KEY_UNPAUSE_AFTER,
+    KEY_SOCIAL,
+    // #694 Soft-cap / stretch-goal
+    KEY_SOFT_CAP,
+    KEY_START_TIME,
+    KEY_STATUS,
     // #704 Withdrawal streaming
     KEY_STREAM,
+    KEY_STRETCH_GOAL,
+    KEY_TITLE,
+    KEY_TOKEN,
+    KEY_TOTAL,
+    KEY_UNPAUSE_AFTER,
+    KEY_VERIFICATION,
+    KEY_VERSION_HISTORY,
+    KEY_VESTING,
+    KEY_VISIBILITY,
     // DeFi yield
-    KEY_YIELD_CONFIG, KEY_YIELD_TOTAL,
+    KEY_YIELD_CONFIG,
+    KEY_YIELD_TOTAL,
+    MIN_SUPPORTED_VERSION,
+    TTL_INSTANCE_EXTEND_MAX,
+    TTL_INSTANCE_EXTEND_MIN,
+    TTL_PERSISTENT_ENTRY,
 };
 pub use types::{
+    AnalyticsDataPoint,
     CampaignAnalytics,
     CampaignInfo,
     CampaignStats,
     CampaignTemplate,
     Category,
+    // #459
+    ContractStateSnapshot,
     // #416
     ContributionRecord,
     DataKey,
     Delegation,
     Dispute,
     DisputeStatus,
-    // #698
-    FeeMode,
-    // #699
-    EventIpfsCidUpdated,
-    // #443
-    PerformanceMetrics,
-    AnalyticsDataPoint,
+    EventAllowlistRemoved,
+    // #697 Allow/deny list
+    EventAllowlisted,
     EventAnalyticsGenerated,
+    EventArchived,
     EventBatchRefundCompleted,
     EventBlacklistRemoved,
     EventBlacklisted,
@@ -140,29 +181,46 @@ pub use types::{
     EventCampaignCloned,
     EventCampaignIndexed,
     EventCancelled,
+    // #694 Soft-cap / stretch-goal
+    EventCapsConfigured,
     EventCategoryUpdated,
+    EventContractMigrated,
     EventContributed,
     // #419
     EventContributionRecorded,
     EventDeadlineExtended,
+    EventDebugLog,
+    EventDebugSnapshot,
     EventDelegatedContribution,
     EventDelegationCreated,
     EventDelegationRevoked,
+    EventDenylistRemoved,
+    EventDenylisted,
     EventDisputeFiled,
     EventDisputeResolved,
     EventDisputeVoted,
     EventEmergencyApproved,
     EventEmergencyExecuted,
     EventEmergencyInitiated,
+    EventExecutionRecorded,
     EventExtensionExecuted,
     EventExtensionProposed,
     EventExtensionVoted,
     // Issue #420
     EventGoalAdjusted,
+    EventGovernanceConfigUpdated,
+    EventGovernanceEmergencyPaused,
+    EventGovernanceEmergencyResumed,
+    EventGovernanceExecuted,
+    EventGovernanceProposed,
+    EventGovernanceVoted,
     // Event payload types
     EventInitialized,
     EventInsuranceEnabled,
     EventInsurancePayout,
+    EventInvariantViolated,
+    // #699
+    EventIpfsCidUpdated,
     EventMatchingSetup,
     EventMetadataUpdated,
     EventMetadataVersioned,
@@ -170,8 +228,13 @@ pub use types::{
     EventMilestoneRelease,
     EventMilestoneVerified,
     EventMultiSigConfigured,
+    EventOwnershipTransferred,
     EventPartialRefund,
     EventPaused,
+    // #696 Pause timelock
+    EventPausedWithTimelock,
+    EventPerfAlert,
+    EventQfContribution,
     EventRateLimitHit,
     EventRateLimitUpdated,
     EventRecurringCancelled,
@@ -182,89 +245,66 @@ pub use types::{
     EventResumed,
     EventRewardsConfigured,
     EventRewardsDistributed,
+    EventStateValidated,
     EventStatusChanged,
+    EventStreamClaimed,
     EventTemplateApplied,
     EventTierAssigned,
     EventTiersSet,
     EventVerificationUpdated,
+    EventVersionChecked,
     EventVisibilityChanged,
     EventWhitelistOnlySet,
     EventWhitelistRemoved,
     EventWhitelisted,
     EventWithdrawn,
-    EventOwnershipTransferred,
-    EventArchived,
+    EventYieldClaimed,
+    EventYieldConfigured,
+    // #460
+    ExecutionRecord,
     ExtensionProposal,
+    // #698
+    FeeMode,
+    FunctionPerfStats,
     GoalAdjustment,
+    // Governance
+    GovernanceConfig,
+    GovernanceProposal,
     InsuranceConfig,
     MatchingConfig,
     // Issue #423
     MetadataVersion,
     Milestone,
     MilestoneStatus,
+    // #443
+    PerformanceMetrics,
     PlatformConfig,
+    // #634 Quadratic-Funding Hooks
+    QfContributorInput,
+    QfInputs,
     RateLimit,
     RecurringPlan,
     // #418
     RewardConfig,
     RewardTier,
     SearchIndexEntry,
-    Status,
-    TemplateType,
-    VerificationStatus,
-    VestingSchedule,
-    Visibility,
-    // #457
-    VersionMigration,
-    EventVersionChecked,
-    EventContractMigrated,
     // #458
     StateValidationResult,
-    EventStateValidated,
-    EventInvariantViolated,
-    // #459
-    ContractStateSnapshot,
-    EventDebugSnapshot,
-    EventDebugLog,
-    // #460
-    ExecutionRecord,
-    FunctionPerfStats,
-    EventExecutionRecorded,
-    EventPerfAlert,
-    // Governance
-    GovernanceConfig,
-    GovernanceProposal,
-    EventGovernanceProposed,
-    EventGovernanceVoted,
-    EventGovernanceExecuted,
-    EventGovernanceConfigUpdated,
-    EventGovernanceEmergencyPaused,
-    EventGovernanceEmergencyResumed,
+    Status,
+    // #704 Withdrawal streaming
+    StreamConfig,
+    TemplateType,
+    VerificationStatus,
+    // #457
+    VersionMigration,
+    VestingSchedule,
+    Visibility,
     // DeFi
     YieldConfig,
     YieldInfo,
-    EventYieldConfigured,
-    EventYieldClaimed,
-    // #634 Quadratic-Funding Hooks
-    QfContributorInput,
-    QfInputs,
-    EventQfContribution,
-    // #694 Soft-cap / stretch-goal
-    EventCapsConfigured,
-    // #696 Pause timelock
-    EventPausedWithTimelock,
-    // #697 Allow/deny list
-    EventAllowlisted,
-    EventAllowlistRemoved,
-    EventDenylisted,
-    EventDenylistRemoved,
     // #703 Event schema versioning
     EVENT_SCHEMA_VERSION,
-    // #704 Withdrawal streaming
-    StreamConfig,
-    EventStreamClaimed,
 };
-pub use validation::*;
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Vec};
 
@@ -338,19 +378,14 @@ impl CrowdfundContract {
         }
         creator.require_auth();
 
-        if goal <= 0 {
-            return Err(ContractError::InvalidGoal);
-        }
-        validate_goal_not_overflow(goal)?;
-        if deadline <= env.ledger().timestamp() {
-            return Err(ContractError::InvalidDeadline);
-        }
-        if min_contribution < 0 {
-            return Err(ContractError::BelowMinimum);
-        }
-        if max_contribution < 0 || (max_contribution > 0 && max_contribution < min_contribution) {
-            return Err(ContractError::ExceedsMaximum);
-        }
+        validate_initialization(
+            goal,
+            deadline,
+            min_contribution,
+            max_contribution,
+            None,
+            env.ledger().timestamp(),
+        )?;
         validate_string_length(&title, 64)?;
         validate_string_length(&description, 512)?;
         validate_category(&category)?;
@@ -475,7 +510,7 @@ impl CrowdfundContract {
         validate_positive_amount(amount)?;
 
         if let Some(ref msg) = message {
-            if msg.len() > 256 {
+            if msg.len() > MAX_MESSAGE_LENGTH {
                 return Err(ContractError::MessageTooLong);
             }
         }
@@ -509,29 +544,18 @@ impl CrowdfundContract {
 
         // ── Validate deadline ─────────────────────────────────────────────────
         let now = env.ledger().timestamp();
-        if now >= deadline {
-            return Err(ContractError::CampaignEnded);
-        }
+        validate_deadline_not_passed(now, deadline)?;
 
         // ── Validate amount (short-circuit before costlier storage reads) ──────
         // Checking min first avoids the blacklist/whitelist persistent reads
         // for the common rejection case of an amount that's too small.
-        if amount < min {
-            return Err(ContractError::BelowMinimum);
-        }
+        validate_min_contribution(amount, min)?;
 
         // Read contributor's existing balance once; reuse below
         let contrib_key = DataKey::Contribution(contributor.clone());
         let prev_contrib: i128 = env.storage().persistent().get(&contrib_key).unwrap_or(0);
 
-        if max > 0 {
-            let new_total = prev_contrib
-                .checked_add(amount)
-                .ok_or(ContractError::Overflow)?;
-            if new_total > max {
-                return Err(ContractError::ContributorCapExceeded);
-            }
-        }
+        validate_contributor_cap(amount, max, prev_contrib)?;
 
         // ── Check blacklist / whitelist (persistent, per-address) ─────────────
         if env
@@ -610,11 +634,14 @@ impl CrowdfundContract {
         // ── #698: Per-contribution fee deduction (OnContribution mode) ────────
         // Track gross total regardless of fee mode so stats can report both.
         // Uses the `gross_total` value hoisted from the upfront batch above.
-        inst.set(&KEY_GROSS_TOTAL, &(gross_total.checked_add(amount).unwrap_or(gross_total)));
+        let new_gross_total = gross_total
+            .checked_add(amount)
+            .ok_or(ContractError::Overflow)?;
+        inst.set(&KEY_GROSS_TOTAL, &new_gross_total);
 
         let contrib_fee: i128 = if let Some(ref config) = platform_config {
             if config.fee_mode == FeeMode::OnContribution {
-                let f = amount * config.fee_bps as i128 / 10_000;
+                let f = amount * config.fee_bps as i128 / BASIS_POINTS_MAX;
                 if f > 0 {
                     token::Client::new(&env, &token).transfer(
                         &env.current_contract_address(),
@@ -639,17 +666,23 @@ impl CrowdfundContract {
         // Uses the `insurance_config` value hoisted from the upfront batch above.
         let insurance_fee: i128 = insurance_config
             .filter(|c| c.enabled)
-            .map(|c| effective_amount_after_fee * c.fee_bps as i128 / 10_000)
+            .map(|c| effective_amount_after_fee * c.fee_bps as i128 / BASIS_POINTS_MAX)
             .unwrap_or(0);
         let effective_amount = effective_amount_after_fee - insurance_fee;
         if insurance_fee > 0 {
             let fee_key = DataKey::InsuranceFee(contributor.clone());
             let prev_fee: i128 = env.storage().persistent().get(&fee_key).unwrap_or(0);
-            env.storage().persistent().set(&fee_key, &(prev_fee + insurance_fee));
-            env.storage().persistent().extend_ttl(&fee_key, 100, 100);
+            let new_fee = prev_fee
+                .checked_add(insurance_fee)
+                .ok_or(ContractError::Overflow)?;
+            env.storage().persistent().set(&fee_key, &new_fee);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
             let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
-            inst.set(&KEY_INSURANCE_POOL, &(pool + insurance_fee));
+            let new_pool = pool
+                .checked_add(insurance_fee)
+                .ok_or(ContractError::Overflow)?;
+            inst.set(&KEY_INSURANCE_POOL, &new_pool);
         }
 
         // ── Update contributor balance (single write) ─────────────────────────
@@ -659,12 +692,12 @@ impl CrowdfundContract {
         env.storage().persistent().set(&contrib_key, &new_contrib);
         env.storage()
             .persistent()
-            .extend_ttl(&contrib_key, 100, 100);
+            .extend_ttl(&contrib_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         if let Some(msg) = message {
             let msg_key = DataKey::ContributionMessage(contributor.clone());
             env.storage().persistent().set(&msg_key, &msg);
-            env.storage().persistent().extend_ttl(&msg_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         }
 
         // ── Apply matching (cached instance read) ─────────────────────────────
@@ -674,15 +707,23 @@ impl CrowdfundContract {
         let mut matched_amount = 0i128;
         // Uses `matching_config` hoisted from the upfront batch above.
         if let Some(config) = matching_config {
-            let match_amount = (effective_amount * config.match_ratio as i128) / 10_000;
+            let match_amount = (effective_amount * config.match_ratio as i128) / BASIS_POINTS_MAX;
             let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
-            let available_match = config.max_match - total_matched;
+            let available_match = config
+                .max_match
+                .checked_sub(total_matched)
+                .unwrap_or(0)
+                .max(0);
             matched_amount = match_amount.min(available_match).max(0);
             if matched_amount > 0 {
-                inst.set(&DataKey::TotalMatched, &(total_matched + matched_amount));
+                let new_total_matched = total_matched
+                    .checked_add(matched_amount)
+                    .ok_or(ContractError::Overflow)?;
+                inst.set(&DataKey::TotalMatched, &new_total_matched);
                 // Deduct from the escrowed pool so the accounting stays correct
                 let pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
-                inst.set(&DataKey::MatchingPool, &(pool - matched_amount).max(0));
+                let new_pool = pool.checked_sub(matched_amount).unwrap_or(0).max(0);
+                inst.set(&DataKey::MatchingPool, &new_pool);
             }
         }
 
@@ -702,7 +743,7 @@ impl CrowdfundContract {
             env.storage().persistent().set(&presence_key, &true);
             env.storage()
                 .persistent()
-                .extend_ttl(&presence_key, 100, 100);
+                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
             // O(1) indexed write: store address at its insertion-order index.
             // Previously used an O(n) Vec append into KEY_CONTRIBS; with many
@@ -710,10 +751,11 @@ impl CrowdfundContract {
             // on every new contribution.
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &contributor);
-            env.storage().persistent().extend_ttl(&index_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
             // Use cached `count` — single write
-            inst.set(&DataKey::ContributorCount, &(count + 1));
+            let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
+            inst.set(&DataKey::ContributorCount, &new_count);
         }
 
         // Track updated contributor count for events
@@ -740,7 +782,7 @@ impl CrowdfundContract {
         env.storage().persistent().set(&history_key, &history);
         env.storage()
             .persistent()
-            .extend_ttl(&history_key, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         // ── #418: Assign reward tier based on updated cumulative total ────────
         if let Some(tiers) = inst.get::<_, Vec<RewardTier>>(&DataKey::RewardTiers) {
@@ -764,13 +806,15 @@ impl CrowdfundContract {
                 env.storage()
                     .persistent()
                     .set(&DataKey::ContributorTier(contributor.clone()), &tier);
-                env.storage()
-                    .persistent()
-                    .extend_ttl(&DataKey::ContributorTier(contributor.clone()), 100, 100);
+                env.storage().persistent().extend_ttl(
+                    &DataKey::ContributorTier(contributor.clone()),
+                    100,
+                    100,
+                );
             }
         }
 
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         // ── #419: Emit detailed contribution-recorded event ───────────────────
         env.events().publish(
@@ -856,9 +900,7 @@ impl CrowdfundContract {
         creator.require_auth();
 
         let now = env.ledger().timestamp();
-        if now < deadline {
-            return Err(ContractError::CampaignStillActive);
-        }
+        validate_deadline_passed(now, deadline)?;
         if total < success_threshold {
             return Err(ContractError::GoalNotReached);
         }
@@ -891,7 +933,10 @@ impl CrowdfundContract {
                 payout
             } else {
                 let elapsed = now - v.cliff;
-                payout * elapsed as i128 / v.duration as i128
+                payout
+                    .checked_mul(elapsed as i128)
+                    .ok_or(ContractError::Overflow)?
+                    / v.duration as i128
             };
             token_client.transfer(&env.current_contract_address(), &creator, &vested);
             payout = vested;
@@ -902,7 +947,7 @@ impl CrowdfundContract {
         // ── Batch all instance writes ─────────────────────────────────────────
         inst.set(&KEY_TOTAL, &0i128);
         inst.set(&KEY_STATUS, &Status::Successful);
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         // ── Refund unused matching funds to sponsor on completion ─────────────
         let matching_pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
@@ -970,7 +1015,7 @@ impl CrowdfundContract {
                 claimed: 0,
             },
         );
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
         Ok(())
     }
 
@@ -1053,15 +1098,21 @@ impl CrowdfundContract {
             &payout,
         );
 
-        stream.claimed += claimable;
-        let remaining = total - stream.claimed;
+        stream.claimed = stream
+            .claimed
+            .checked_add(claimable)
+            .ok_or(ContractError::Overflow)?;
+        let remaining = total
+            .checked_sub(stream.claimed)
+            .ok_or(ContractError::Overflow)?
+            .max(0);
 
         inst.set(&KEY_STREAM, &stream);
         if remaining == 0 {
             inst.set(&KEY_STATUS, &Status::Successful);
             inst.set(&KEY_TOTAL, &0i128);
         }
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         env.events().publish(
             ("campaign", "stream_claimed"),
@@ -1157,7 +1208,7 @@ impl CrowdfundContract {
         env.storage().persistent().set(&KEY_META_HIST, &meta_hist);
         env.storage()
             .persistent()
-            .extend_ttl(&KEY_META_HIST, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.events().publish(
             ("campaign", "metadata_updated"),
@@ -1169,7 +1220,10 @@ impl CrowdfundContract {
         );
         env.events().publish(
             ("campaign", "metadata_versioned"),
-            EventMetadataVersioned { version, timestamp: now },
+            EventMetadataVersioned {
+                version,
+                timestamp: now,
+            },
         );
 
         // Re-index campaign after metadata update
@@ -1212,7 +1266,10 @@ impl CrowdfundContract {
         let now = env.ledger().timestamp();
         env.events().publish(
             ("campaign", "ipfs_cid_updated"),
-            EventIpfsCidUpdated { cid, timestamp: now },
+            EventIpfsCidUpdated {
+                cid,
+                timestamp: now,
+            },
         );
         Ok(())
     }
@@ -1250,9 +1307,7 @@ impl CrowdfundContract {
         creator.require_auth();
 
         let old_deadline: u64 = inst.get(&KEY_DEADLINE).unwrap();
-        if new_deadline <= old_deadline {
-            return Err(ContractError::InvalidDeadline);
-        }
+        validate_deadline_extension(new_deadline, old_deadline)?;
         inst.set(&KEY_DEADLINE, &new_deadline);
         env.events().publish(
             ("campaign", "deadline_extended"),
@@ -1318,9 +1373,9 @@ impl CrowdfundContract {
         env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
         env.storage()
             .persistent()
-            .extend_ttl(&KEY_GOAL_HISTORY, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         env.events().publish(
             ("campaign", "goal_adjusted"),
@@ -1362,9 +1417,7 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let status: Status = inst.get(&KEY_STATUS).unwrap();
         // Allow cancellation from Active or Paused state
-        if status == Status::Cancelled
-            || status == Status::Successful
-            || status == Status::Refunded
+        if status == Status::Cancelled || status == Status::Successful || status == Status::Refunded
         {
             return Err(ContractError::NotActive);
         }
@@ -1412,10 +1465,7 @@ impl CrowdfundContract {
         let status: Status = inst.get(&KEY_STATUS).unwrap();
 
         // Only completed campaigns can be archived
-        if status == Status::Active
-            || status == Status::Paused
-            || status == Status::Archived
-        {
+        if status == Status::Active || status == Status::Paused || status == Status::Archived {
             return Err(ContractError::NotActive);
         }
 
@@ -1493,6 +1543,15 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let status: Status = inst.get(&KEY_STATUS).unwrap();
 
+        // `withdraw()` resets KEY_TOTAL to 0 and moves status to `Successful`,
+        // which would otherwise make `validate_refund_eligibility` see
+        // `total(0) < goal` and treat an already-paid-out campaign as an
+        // eligible-for-refund "failed" one — attempting to pay contributors
+        // a second time out of a contract balance withdraw() already drained.
+        if status == Status::Successful {
+            return Err(ContractError::AlreadyWithdrawn);
+        }
+
         if status != Status::Cancelled {
             validate_refund_eligibility(
                 env.ledger().timestamp(),
@@ -1514,8 +1573,11 @@ impl CrowdfundContract {
                 if released > 0 && total > 0 {
                     // unreleased_ratio = (total - released) / total
                     // contributor_refund = amount * unreleased_ratio
-                    let unreleased = (total - released).max(0);
-                    amount * unreleased / total
+                    let unreleased = total.saturating_sub(released).max(0);
+                    amount
+                        .checked_mul(unreleased)
+                        .ok_or(ContractError::Overflow)?
+                        / total
                 } else {
                     amount
                 }
@@ -1563,6 +1625,13 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let status: Status = inst.get(&KEY_STATUS).unwrap();
 
+        // See the matching guard in `refund_single` for why this is needed:
+        // without it, a post-withdraw batch refund would see `total(0) < goal`
+        // and try to pay contributors out of an already-drained balance.
+        if status == Status::Successful {
+            return Err(ContractError::AlreadyWithdrawn);
+        }
+
         if status != Status::Cancelled {
             validate_refund_eligibility(
                 env.ledger().timestamp(),
@@ -1577,8 +1646,7 @@ impl CrowdfundContract {
         let token_client = token::Client::new(&env, &token_address);
 
         // Cap batch size to avoid resource exhaustion
-        const MAX_BATCH: u32 = 25;
-        let limit = contributors.len().min(MAX_BATCH);
+        let limit = contributors.len().min(MAX_BATCH_REFUND_SIZE as usize);
         let mut refunded: u32 = 0;
 
         for contributor in contributors.iter().take(limit as usize) {
@@ -1737,9 +1805,7 @@ impl CrowdfundContract {
         }
 
         // ── Multi-sig check: if a minimum approval count is configured, verify it ─
-        let required: u32 = inst
-            .get(&DataKey::EmergencyApproversRequired)
-            .unwrap_or(0);
+        let required: u32 = inst.get(&DataKey::EmergencyApproversRequired).unwrap_or(0);
         if required > 0 {
             let count: u32 = inst.get(&DataKey::EmergencyApprovalCount).unwrap_or(0);
             if count < required {
@@ -1851,10 +1917,7 @@ impl CrowdfundContract {
     /// * `Err(ContractError::EmergencyLocked)` if no emergency has been initiated
     /// * `Err(ContractError::Unauthorized)` if multi-sig is not configured or approver
     ///   is not in the authorised list
-    pub fn approve_emergency_withdrawal(
-        env: Env,
-        approver: Address,
-    ) -> Result<(), ContractError> {
+    pub fn approve_emergency_withdrawal(env: Env, approver: Address) -> Result<(), ContractError> {
         approver.require_auth();
 
         let inst = env.storage().instance();
@@ -1866,9 +1929,7 @@ impl CrowdfundContract {
         }
 
         // Multi-sig must be configured
-        let required: u32 = inst
-            .get(&DataKey::EmergencyApproversRequired)
-            .unwrap_or(0);
+        let required: u32 = inst.get(&DataKey::EmergencyApproversRequired).unwrap_or(0);
         if required == 0 {
             return Err(ContractError::Unauthorized);
         }
@@ -1901,7 +1962,7 @@ impl CrowdfundContract {
             .set(&DataKey::EmergencyApproval(approver.clone()), &lock_until);
 
         let count: u32 = inst.get(&DataKey::EmergencyApprovalCount).unwrap_or(0);
-        let new_count = count + 1;
+        let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::EmergencyApprovalCount, &new_count);
 
         env.events().publish(
@@ -1984,18 +2045,14 @@ impl CrowdfundContract {
         };
 
         // ── Validate core parameters ──────────────────────────────────────────
-        if goal <= 0 {
-            return Err(ContractError::InvalidGoal);
-        }
-        validate_goal_not_overflow(goal)?;
-        if deadline <= env.ledger().timestamp() {
-            return Err(ContractError::InvalidDeadline);
-        }
-        if max_contribution < 0
-            || (max_contribution > 0 && max_contribution < min_contribution)
-        {
-            return Err(ContractError::ExceedsMaximum);
-        }
+        validate_initialization(
+            goal,
+            deadline,
+            min_contribution,
+            max_contribution,
+            None,
+            env.ledger().timestamp(),
+        )?;
         validate_string_length(&title, 64)?;
         validate_string_length(&description, 512)?;
 
@@ -2198,7 +2255,7 @@ impl CrowdfundContract {
         );
 
         inst.set(&DataKey::MatchingPool, &0i128);
-        inst.extend_ttl(17280, 518400);
+        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
         env.events().publish(
             ("campaign", "matching_sponsor_refunded"),
@@ -2284,9 +2341,13 @@ impl CrowdfundContract {
         inst.set(&KEY_UNPAUSE_AFTER, &unpause_after);
         env.events().publish(
             ("campaign", "paused_with_timelock"),
-            EventPausedWithTimelock { timestamp: now, unpause_after },
+            EventPausedWithTimelock {
+                timestamp: now,
+                unpause_after,
+            },
         );
-        env.events().publish(("campaign", "paused"), EventPaused { timestamp: now });
+        env.events()
+            .publish(("campaign", "paused"), EventPaused { timestamp: now });
         env.events().publish(
             ("campaign", "status_changed"),
             EventStatusChanged {
@@ -2334,7 +2395,8 @@ impl CrowdfundContract {
             return Err(ContractError::EmergencyLocked);
         }
         inst.set(&KEY_STATUS, &Status::Active);
-        env.events().publish(("campaign", "resumed"), EventResumed { timestamp: now });
+        env.events()
+            .publish(("campaign", "resumed"), EventResumed { timestamp: now });
         env.events().publish(
             ("campaign", "status_changed"),
             EventStatusChanged {
@@ -2436,9 +2498,7 @@ impl CrowdfundContract {
         creator.require_auth();
 
         let current_deadline: u64 = inst.get(&KEY_DEADLINE).unwrap();
-        if new_deadline <= current_deadline {
-            return Err(ContractError::InvalidDeadline);
-        }
+        validate_deadline_extension(new_deadline, current_deadline)?;
 
         let now = env.ledger().timestamp();
         let voting_ends_at = now + 604800; // 7 days
@@ -2642,7 +2702,7 @@ impl CrowdfundContract {
             .set(&DataKey::Whitelist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Whitelist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "whitelisted"), EventWhitelisted { address });
         Ok(())
@@ -2685,7 +2745,7 @@ impl CrowdfundContract {
             .set(&DataKey::Blacklist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Blacklist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "blacklisted"), EventBlacklisted { address });
         Ok(())
@@ -2867,7 +2927,7 @@ impl CrowdfundContract {
             .set(&DataKey::Delegation(delegator.clone()), &delegation);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Delegation(delegator.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events().publish(
             ("campaign", "delegation_created"),
             EventDelegationCreated {
@@ -2911,15 +2971,16 @@ impl CrowdfundContract {
 
         let delegated_key = DataKey::DelegatedContribution(delegator.clone());
         let delegated_so_far: i128 = env.storage().persistent().get(&delegated_key).unwrap_or(0);
-        if delegated_so_far + amount > delegation.amount {
+        let new_delegated = delegated_so_far
+            .checked_add(amount)
+            .ok_or(ContractError::Overflow)?;
+        if new_delegated > delegation.amount {
             return Err(ContractError::ExceedsMaximum);
         }
 
         // Perform the contribution as if delegator is contributing
         let min: i128 = env.storage().instance().get(&KEY_MIN).unwrap();
-        if amount < min {
-            return Err(ContractError::BelowMinimum);
-        }
+        validate_min_contribution(amount, min)?;
 
         let status: Status = env.storage().instance().get(&KEY_STATUS).unwrap();
         if status != Status::Active {
@@ -2927,9 +2988,18 @@ impl CrowdfundContract {
         }
 
         let deadline: u64 = env.storage().instance().get(&KEY_DEADLINE).unwrap();
-        if env.ledger().timestamp() >= deadline {
-            return Err(ContractError::CampaignEnded);
-        }
+        validate_deadline_not_passed(env.ledger().timestamp(), deadline)?;
+
+        // ── Per-contributor cap (#927: this path previously never enforced ────
+        // the campaign's per-contributor max_contribution at all — only the
+        // delegation's own `delegation.amount` limit above — so a delegated
+        // contribution could silently bypass the campaign cap that direct
+        // `contribute()` calls enforce. Reusing the same shared helper closes
+        // that gap.
+        let max: i128 = env.storage().instance().get(&KEY_MAX).unwrap_or(0);
+        let key = DataKey::Contribution(delegator.clone());
+        let prev: i128 = env.storage().persistent().get(&key).unwrap_or(0);
+        validate_contributor_cap(amount, max, prev)?;
 
         // Check whitelist/blacklist
         if env
@@ -2967,18 +3037,14 @@ impl CrowdfundContract {
             &amount,
         );
 
-        let key = DataKey::Contribution(delegator.clone());
-        let prev: i128 = env.storage().persistent().get(&key).unwrap_or(0);
         let new_amount = prev.checked_add(amount).ok_or(ContractError::Overflow)?;
         env.storage().persistent().set(&key, &new_amount);
-        env.storage().persistent().extend_ttl(&key, 100, 100);
+        env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
+        env.storage().persistent().set(&delegated_key, &new_delegated);
         env.storage()
             .persistent()
-            .set(&delegated_key, &(delegated_so_far + amount));
-        env.storage()
-            .persistent()
-            .extend_ttl(&delegated_key, 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         let total: i128 = env.storage().instance().get(&KEY_TOTAL).unwrap();
         let new_total = total.checked_add(amount).ok_or(ContractError::Overflow)?;
@@ -2994,7 +3060,7 @@ impl CrowdfundContract {
             env.storage().persistent().set(&presence_key, &true);
             env.storage()
                 .persistent()
-                .extend_ttl(&presence_key, 100, 100);
+                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
             let count: u32 = env
                 .storage()
                 .instance()
@@ -3003,10 +3069,11 @@ impl CrowdfundContract {
             // O(1) indexed write, same pattern as contribute()
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &delegator);
-            env.storage().persistent().extend_ttl(&index_key, 100, 100);
+            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
             env.storage()
                 .instance()
-                .set(&DataKey::ContributorCount, &(count + 1));
+                .set(&DataKey::ContributorCount, &new_count);
         }
 
         env.events().publish(
@@ -3156,10 +3223,8 @@ impl CrowdfundContract {
 
         let tier_count = tiers.len();
         env.storage().instance().set(&DataKey::RewardTiers, &tiers);
-        env.events().publish(
-            ("campaign", "tiers_set"),
-            EventTiersSet { tier_count },
-        );
+        env.events()
+            .publish(("campaign", "tiers_set"), EventTiersSet { tier_count });
         Ok(())
     }
 
@@ -3466,8 +3531,14 @@ impl CrowdfundContract {
         // Progress is measured against the soft_cap when set, otherwise the hard goal.
         let progress_target = if soft_cap > 0 { soft_cap } else { goal };
         let progress_bps = if progress_target > 0 {
-            let raw = (total_raised * 10_000) / progress_target;
-            if raw > 10_000 { 10_000 } else { raw as u32 }
+            // Use saturating_mul to avoid overflow on very large total_raised values;
+            // if the result saturates we cap at 10_000 (100%) anyway.
+            let raw = (total_raised.saturating_mul(10_000)) / progress_target;
+            if raw > 10_000 {
+                10_000
+            } else {
+                raw as u32
+            }
         } else {
             0
         };
@@ -3503,8 +3574,7 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let count: u32 = inst.get(&DataKey::ContributorCount).unwrap_or(0);
 
-        let mut contributors: soroban_sdk::Vec<QfContributorInput> =
-            soroban_sdk::Vec::new(&env);
+        let mut contributors: soroban_sdk::Vec<QfContributorInput> = soroban_sdk::Vec::new(&env);
 
         for i in 0..count {
             if let Some(addr) = env
@@ -3692,12 +3762,16 @@ impl CrowdfundContract {
         let inst = env.storage().instance();
         let total_raised: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
         let goal: i128 = inst.get(&KEY_GOAL).unwrap();
-        let start_time: u64 = inst.get(&KEY_START_TIME).unwrap_or(env.ledger().timestamp());
+        let start_time: u64 = inst
+            .get(&KEY_START_TIME)
+            .unwrap_or(env.ledger().timestamp());
         let now = env.ledger().timestamp();
 
-        // Calculate success rate in basis points
+        // Calculate success rate in basis points.
+        // Use saturating_mul to prevent overflow on very large total_raised; the
+        // result is capped at 10_000 anyway so saturation is the correct behaviour.
         let success_rate_bps = if goal > 0 {
-            let raw = (total_raised * 10_000) / goal;
+            let raw = total_raised.saturating_mul(10_000) / goal;
             if raw > 10_000 {
                 10_000
             } else {
@@ -3750,38 +3824,41 @@ impl CrowdfundContract {
             for record in history.iter() {
                 let time_since_start = record.timestamp.saturating_sub(start_time);
 
+                // Use saturating_add: amounts are validated positive on entry, but
+                // accumulating many contributions could theoretically overflow i128.
                 if time_since_start > mid_point {
-                    recent_sum += record.amount;
-                    recent_count += 1;
+                    recent_sum = recent_sum.saturating_add(record.amount);
+                    recent_count = recent_count.saturating_add(1);
                 } else {
-                    earlier_sum += record.amount;
-                    earlier_count += 1;
+                    earlier_sum = earlier_sum.saturating_add(record.amount);
+                    earlier_count = earlier_count.saturating_add(1);
                 }
             }
         }
 
-        // Calculate trending: positive if recent > earlier, negative if recent < earlier
+        // Calculate trending: positive if recent > earlier, negative if recent < earlier.
+        // All multiplications by 100 use saturating_mul; the final cast to i32
+        // saturates to i32::MAX/MIN if the scaled ratio is out of range, which is
+        // far preferable to a panic or silent wrap.
         let trending = if earlier_count > 0 && recent_count > 0 {
             let earlier_avg = earlier_sum / earlier_count as i128;
             let recent_avg = recent_sum / recent_count as i128;
-            let diff = recent_avg - earlier_avg;
+            let diff = recent_avg.saturating_sub(earlier_avg);
             // Scale to a reasonable range (-100 to 100)
-            if diff > 0 {
-                ((diff * 100) / earlier_avg.max(1)) as i32
-            } else {
-                ((diff * 100) / earlier_avg.max(1)) as i32
-            }
+            let scaled = diff.saturating_mul(100) / earlier_avg.max(1);
+            scaled.min(i32::MAX as i128).max(i32::MIN as i128) as i32
         } else if recent_count > 0 && earlier_count == 0 {
             50 // Positive trend if only recent contributions
         } else {
             0 // Stable or no data
         };
 
-        // Calculate estimated time to reach goal
+        // Calculate estimated time to reach goal.
+        // days_needed * 86400: use saturating_mul so a huge backlog doesn't panic.
         let estimated_time_to_goal: u64 = if contribution_velocity > 0 && total_raised < goal {
-            let remaining = goal - total_raised;
+            let remaining = goal.saturating_sub(total_raised);
             let days_needed = remaining / contribution_velocity;
-            (days_needed * 86400).max(0) as u64 // Convert back to seconds
+            days_needed.saturating_mul(86400).max(0) as u64
         } else if total_raised >= goal {
             0 // Goal already reached
         } else {
@@ -4033,14 +4110,9 @@ impl CrowdfundContract {
         let status: Status = inst.get(&KEY_STATUS).unwrap();
         if status != Status::Cancelled {
             let deadline: u64 = inst.get(&KEY_DEADLINE).unwrap();
-            if env.ledger().timestamp() < deadline {
-                return Err(ContractError::CampaignStillActive);
-            }
             let goal: i128 = inst.get(&KEY_GOAL).unwrap();
             let total: i128 = inst.get(&KEY_TOTAL).unwrap();
-            if total >= goal {
-                return Err(ContractError::GoalReached);
-            }
+            validate_refund_eligibility(env.ledger().timestamp(), deadline, total, goal)?;
         }
 
         let fee_key = DataKey::InsuranceFee(contributor.clone());
@@ -4177,9 +4249,10 @@ impl CrowdfundContract {
             .ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::TotalRewardsDistributed, &total);
 
-        env.storage()
-            .persistent()
-            .set(&DataKey::RewardsClaimed(contributor.clone()), &reward_amount);
+        env.storage().persistent().set(
+            &DataKey::RewardsClaimed(contributor.clone()),
+            &reward_amount,
+        );
 
         env.events().publish(
             ("campaign", "rewards_distributed"),
@@ -4249,10 +4322,7 @@ impl CrowdfundContract {
         env: Env,
         category: Category,
     ) -> Result<Option<SearchIndexEntry>, ContractError> {
-        let index: Option<SearchIndexEntry> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::SearchIndex);
+        let index: Option<SearchIndexEntry> = env.storage().persistent().get(&DataKey::SearchIndex);
 
         match index {
             Some(entry) if entry.category == category => Ok(Some(entry)),
@@ -4276,10 +4346,7 @@ impl CrowdfundContract {
         env: Env,
         visibility: Visibility,
     ) -> Result<Option<SearchIndexEntry>, ContractError> {
-        let index: Option<SearchIndexEntry> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::SearchIndex);
+        let index: Option<SearchIndexEntry> = env.storage().persistent().get(&DataKey::SearchIndex);
 
         match index {
             Some(entry) if entry.visibility == visibility => Ok(Some(entry)),
@@ -4297,10 +4364,7 @@ impl CrowdfundContract {
     /// * `Ok(Some(SearchIndexEntry))` if index exists
     /// * `Ok(None)` if index not yet created
     pub fn get_search_index(env: Env) -> Result<Option<SearchIndexEntry>, ContractError> {
-        let index: Option<SearchIndexEntry> = env
-            .storage()
-            .persistent()
-            .get(&DataKey::SearchIndex);
+        let index: Option<SearchIndexEntry> = env.storage().persistent().get(&DataKey::SearchIndex);
         Ok(index)
     }
 
@@ -4335,9 +4399,7 @@ impl CrowdfundContract {
             return Err(ContractError::InvalidGoal);
         }
         validate_goal_not_overflow(new_goal)?;
-        if new_deadline <= env.ledger().timestamp() {
-            return Err(ContractError::InvalidDeadline);
-        }
+        validate_deadline_extension(new_deadline, env.ledger().timestamp())?;
 
         // Copy metadata from current campaign
         let title: String = inst.get(&KEY_TITLE).unwrap();
@@ -4448,8 +4510,12 @@ impl CrowdfundContract {
             to_version: CONTRACT_VERSION,
             timestamp: now,
         });
-        env.storage().persistent().set(&KEY_VERSION_HISTORY, &history);
-        env.storage().persistent().extend_ttl(&KEY_VERSION_HISTORY, 100, 100);
+        env.storage()
+            .persistent()
+            .set(&KEY_VERSION_HISTORY, &history);
+        env.storage()
+            .persistent()
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.events().publish(
             ("contract", "migrated"),
@@ -4500,7 +4566,10 @@ impl CrowdfundContract {
             failed += 1;
             env.events().publish(
                 ("contract", "invariant_violated"),
-                EventInvariantViolated { invariant_id: 1, timestamp: now },
+                EventInvariantViolated {
+                    invariant_id: 1,
+                    timestamp: now,
+                },
             );
         }
 
@@ -4511,7 +4580,10 @@ impl CrowdfundContract {
             failed += 1;
             env.events().publish(
                 ("contract", "invariant_violated"),
-                EventInvariantViolated { invariant_id: 2, timestamp: now },
+                EventInvariantViolated {
+                    invariant_id: 2,
+                    timestamp: now,
+                },
             );
         }
 
@@ -4522,7 +4594,10 @@ impl CrowdfundContract {
             failed += 1;
             env.events().publish(
                 ("contract", "invariant_violated"),
-                EventInvariantViolated { invariant_id: 3, timestamp: now },
+                EventInvariantViolated {
+                    invariant_id: 3,
+                    timestamp: now,
+                },
             );
         }
 
@@ -4534,7 +4609,10 @@ impl CrowdfundContract {
             failed += 1;
             env.events().publish(
                 ("contract", "invariant_violated"),
-                EventInvariantViolated { invariant_id: 4, timestamp: now },
+                EventInvariantViolated {
+                    invariant_id: 4,
+                    timestamp: now,
+                },
             );
         }
 
@@ -4620,7 +4698,10 @@ impl CrowdfundContract {
         let now = env.ledger().timestamp();
         env.events().publish(
             ("debug", "log"),
-            EventDebugLog { message, timestamp: now },
+            EventDebugLog {
+                message,
+                timestamp: now,
+            },
         );
         Ok(())
     }
@@ -4649,7 +4730,9 @@ impl CrowdfundContract {
         let admin: Address = env.storage().instance().get(&KEY_ADMIN).unwrap();
         admin.require_auth();
 
-        env.storage().instance().set(&KEY_PERF_THRESHOLD, &threshold_ms);
+        env.storage()
+            .instance()
+            .set(&KEY_PERF_THRESHOLD, &threshold_ms);
         Ok(())
     }
 
@@ -4677,15 +4760,15 @@ impl CrowdfundContract {
         let now = env.ledger().timestamp();
         let stats_key = DataKey::PerfStats(function_name.clone());
 
-        let mut stats: FunctionPerfStats = env
-            .storage()
-            .persistent()
-            .get(&stats_key)
-            .unwrap_or(FunctionPerfStats {
-                call_count: 0,
-                total_duration_ms: 0,
-                max_duration_ms: 0,
-            });
+        let mut stats: FunctionPerfStats =
+            env.storage()
+                .persistent()
+                .get(&stats_key)
+                .unwrap_or(FunctionPerfStats {
+                    call_count: 0,
+                    total_duration_ms: 0,
+                    max_duration_ms: 0,
+                });
 
         stats.call_count += 1;
         stats.total_duration_ms = stats.total_duration_ms.saturating_add(duration_ms);
@@ -4694,7 +4777,7 @@ impl CrowdfundContract {
         }
 
         env.storage().persistent().set(&stats_key, &stats);
-        env.storage().persistent().extend_ttl(&stats_key, 100, 100);
+        env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         env.events().publish(
             ("perf", "execution_recorded"),
@@ -4740,7 +4823,11 @@ impl CrowdfundContract {
     /// Only the creator can call this function. Milestones define target amounts
     /// that trigger fund releases when reached and verified.
     pub fn set_milestones(env: Env, milestones: Vec<Milestone>) -> Result<(), ContractError> {
-        let creator: Address = env.storage().instance().get(&KEY_CREATOR).ok_or(ContractError::NotCreator)?;
+        let creator: Address = env
+            .storage()
+            .instance()
+            .get(&KEY_CREATOR)
+            .ok_or(ContractError::NotCreator)?;
         creator.require_auth();
 
         if milestones.len() > storage::MAX_MILESTONES {
@@ -4764,7 +4851,11 @@ impl CrowdfundContract {
     /// Only the creator can call this function. Verifies that the milestone
     /// amount has been reached and marks it as verified for fund release.
     pub fn verify_milestone(env: Env, milestone_index: u32) -> Result<(), ContractError> {
-        let creator: Address = env.storage().instance().get(&KEY_CREATOR).ok_or(ContractError::NotCreator)?;
+        let creator: Address = env
+            .storage()
+            .instance()
+            .get(&KEY_CREATOR)
+            .ok_or(ContractError::NotCreator)?;
         creator.require_auth();
 
         let mut milestones: Vec<Milestone> = env
@@ -4817,7 +4908,11 @@ impl CrowdfundContract {
         contributor: Address,
         status: VerificationStatus,
     ) -> Result<(), ContractError> {
-        let creator: Address = env.storage().instance().get(&KEY_CREATOR).ok_or(ContractError::NotCreator)?;
+        let creator: Address = env
+            .storage()
+            .instance()
+            .get(&KEY_CREATOR)
+            .ok_or(ContractError::NotCreator)?;
         creator.require_auth();
 
         env.storage()
@@ -4902,12 +4997,8 @@ impl CrowdfundContract {
     ) -> Result<u32, ContractError> {
         filer.require_auth();
 
-        let mut dispute_id: u32 = env
-            .storage()
-            .persistent()
-            .get(&KEY_DISPUTE_ID)
-            .unwrap_or(0);
-        dispute_id += 1;
+        let mut dispute_id: u32 = env.storage().persistent().get(&KEY_DISPUTE_ID).unwrap_or(0);
+        dispute_id = dispute_id.checked_add(1).ok_or(ContractError::Overflow)?;
 
         let dispute = Dispute {
             id: dispute_id,
@@ -4972,14 +5063,22 @@ impl CrowdfundContract {
         for i in 0..disputes.len() {
             let mut dispute = disputes.get(i).ok_or(ContractError::DisputeNotFound)?;
             if dispute.id == dispute_id {
-                if dispute.status != DisputeStatus::Filed && dispute.status != DisputeStatus::InReview {
+                if dispute.status != DisputeStatus::Filed
+                    && dispute.status != DisputeStatus::InReview
+                {
                     return Err(ContractError::DisputeVotingEnded);
                 }
 
                 if in_favor {
-                    dispute.votes_for += vote_weight;
+                    dispute.votes_for = dispute
+                        .votes_for
+                        .checked_add(vote_weight)
+                        .ok_or(ContractError::Overflow)?;
                 } else {
-                    dispute.votes_against += vote_weight;
+                    dispute.votes_against = dispute
+                        .votes_against
+                        .checked_add(vote_weight)
+                        .ok_or(ContractError::Overflow)?;
                 }
                 dispute.status = DisputeStatus::InReview;
                 disputes.set(i, dispute);
@@ -5013,7 +5112,11 @@ impl CrowdfundContract {
     /// Only the creator can call this function. Resolves the dispute and
     /// determines the outcome based on votes.
     pub fn resolve_dispute(env: Env, dispute_id: u32) -> Result<(), ContractError> {
-        let creator: Address = env.storage().instance().get(&KEY_CREATOR).ok_or(ContractError::NotCreator)?;
+        let creator: Address = env
+            .storage()
+            .instance()
+            .get(&KEY_CREATOR)
+            .ok_or(ContractError::NotCreator)?;
         creator.require_auth();
 
         let mut disputes: Vec<Dispute> = env
@@ -5168,7 +5271,7 @@ impl CrowdfundContract {
         validate_fee_bps(platform_fee_bps)?;
 
         let nonce: u32 = inst.get(&KEY_GOVERNANCE_NONCE).unwrap_or(0);
-        let new_nonce = nonce + 1;
+        let new_nonce = nonce.checked_add(1).ok_or(ContractError::Overflow)?;
         let now = env.ledger().timestamp();
 
         let proposal = GovernanceProposal {
@@ -5250,18 +5353,12 @@ impl CrowdfundContract {
 
         // Idempotency check
         let vote_key = DataKey::GovernanceVote(proposal_nonce, governor.clone());
-        let has_voted: bool = env
-            .storage()
-            .persistent()
-            .get(&vote_key)
-            .unwrap_or(false);
+        let has_voted: bool = env.storage().persistent().get(&vote_key).unwrap_or(false);
         if has_voted {
             return Err(ContractError::GovernanceAlreadyVoted);
         }
 
-        env.storage()
-            .persistent()
-            .set(&vote_key, &true);
+        env.storage().persistent().set(&vote_key, &true);
 
         proposal.approvals = proposal
             .approvals
@@ -5270,8 +5367,7 @@ impl CrowdfundContract {
 
         // If threshold met, start timelock
         if proposal.approvals >= config.required_approvals && proposal.timelock_until == 0 {
-            proposal.timelock_until =
-                env.ledger().timestamp() + config.timelock_delay;
+            proposal.timelock_until = env.ledger().timestamp() + config.timelock_delay;
         }
 
         env.storage()
@@ -5390,12 +5486,10 @@ impl CrowdfundContract {
             return Ok(());
         }
 
-        env.storage()
-            .persistent()
-            .set(&approval_key, &true);
+        env.storage().persistent().set(&approval_key, &true);
 
         let count: u32 = inst.get(&DataKey::EmergencyPauseApprovals).unwrap_or(0);
-        let new_count = count + 1;
+        let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::EmergencyPauseApprovals, &new_count);
 
         // Trigger pause when majority approves
@@ -5444,12 +5538,10 @@ impl CrowdfundContract {
             return Ok(());
         }
 
-        env.storage()
-            .persistent()
-            .set(&approval_key, &true);
+        env.storage().persistent().set(&approval_key, &true);
 
         let count: u32 = inst.get(&DataKey::EmergencyPauseApprovals).unwrap_or(0);
-        let new_count = count + 1;
+        let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::EmergencyPauseApprovals, &new_count);
 
         // Resume when majority approves
@@ -5573,14 +5665,25 @@ impl CrowdfundContract {
             &pool,
         );
 
-        let start_time: u64 = inst.get(&KEY_START_TIME).unwrap_or_else(|| env.ledger().timestamp());
-        let config = YieldConfig { reward_token: reward_token.clone(), pool, rate_bps, start_time };
+        let start_time: u64 = inst
+            .get(&KEY_START_TIME)
+            .unwrap_or_else(|| env.ledger().timestamp());
+        let config = YieldConfig {
+            reward_token: reward_token.clone(),
+            pool,
+            rate_bps,
+            start_time,
+        };
         inst.set(&KEY_YIELD_CONFIG, &config);
         inst.set(&KEY_YIELD_TOTAL, &0i128);
 
         env.events().publish(
             ("defi", "yield_configured"),
-            EventYieldConfigured { reward_token, pool, rate_bps },
+            EventYieldConfigured {
+                reward_token,
+                pool,
+                rate_bps,
+            },
         );
         Ok(())
     }
@@ -5625,10 +5728,14 @@ impl CrowdfundContract {
         // Use i128 arithmetic; scale by 1e9 to preserve precision
         let seconds_per_year: i128 = 365 * 24 * 3600;
         let share_numerator = contrib_amount;
-        let accrued = config.pool
-            .checked_mul(config.rate_bps as i128).ok_or(ContractError::Overflow)?
-            .checked_mul(elapsed as i128).ok_or(ContractError::Overflow)?
-            .checked_mul(share_numerator).ok_or(ContractError::Overflow)?
+        let accrued = config
+            .pool
+            .checked_mul(config.rate_bps as i128)
+            .ok_or(ContractError::Overflow)?
+            .checked_mul(elapsed as i128)
+            .ok_or(ContractError::Overflow)?
+            .checked_mul(share_numerator)
+            .ok_or(ContractError::Overflow)?
             / (10_000 * seconds_per_year * total_raised);
 
         let yield_key = DataKey::YieldInfo(contributor.clone());
@@ -5636,7 +5743,10 @@ impl CrowdfundContract {
             .storage()
             .persistent()
             .get(&yield_key)
-            .unwrap_or(YieldInfo { claimed: 0, reward_debt: 0 });
+            .unwrap_or(YieldInfo {
+                claimed: 0,
+                reward_debt: 0,
+            });
 
         let claimable = accrued.saturating_sub(info.claimed);
         if claimable <= 0 {
@@ -5653,9 +5763,20 @@ impl CrowdfundContract {
         // Update accounting
         env.storage().persistent().set(
             &yield_key,
-            &YieldInfo { claimed: info.claimed + payout, reward_debt: accrued },
+            &YieldInfo {
+                claimed: info
+                    .claimed
+                    .checked_add(payout)
+                    .ok_or(ContractError::Overflow)?,
+                reward_debt: accrued,
+            },
         );
-        inst.set(&KEY_YIELD_TOTAL, &(distributed + payout));
+        inst.set(
+            &KEY_YIELD_TOTAL,
+            &(distributed
+                .checked_add(payout)
+                .ok_or(ContractError::Overflow)?),
+        );
 
         // Transfer yield tokens to contributor
         token::Client::new(&env, &config.reward_token).transfer(
@@ -5666,7 +5787,10 @@ impl CrowdfundContract {
 
         env.events().publish(
             ("defi", "yield_claimed"),
-            EventYieldClaimed { contributor, amount: payout },
+            EventYieldClaimed {
+                contributor,
+                amount: payout,
+            },
         );
         Ok(payout)
     }
@@ -5700,7 +5824,8 @@ impl CrowdfundContract {
         let elapsed = now.saturating_sub(config.start_time).min(365 * 24 * 3600);
         let seconds_per_year: i128 = 365 * 24 * 3600;
 
-        let accrued = config.pool
+        let accrued = config
+            .pool
             .saturating_mul(config.rate_bps as i128)
             .saturating_mul(elapsed as i128)
             .saturating_mul(contrib_amount)
@@ -5710,7 +5835,10 @@ impl CrowdfundContract {
             .storage()
             .persistent()
             .get(&DataKey::YieldInfo(contributor))
-            .unwrap_or(YieldInfo { claimed: 0, reward_debt: 0 });
+            .unwrap_or(YieldInfo {
+                claimed: 0,
+                reward_debt: 0,
+            });
 
         accrued.saturating_sub(info.claimed).max(0)
     }
@@ -5725,11 +5853,7 @@ impl CrowdfundContract {
     ///   Pass 0 to leave unset.
     ///
     /// Must be called while the campaign is `Active`.
-    pub fn set_caps(
-        env: Env,
-        soft_cap: i128,
-        stretch_goal: i128,
-    ) -> Result<(), ContractError> {
+    pub fn set_caps(env: Env, soft_cap: i128, stretch_goal: i128) -> Result<(), ContractError> {
         let inst = env.storage().instance();
         let status: Status = inst.get(&KEY_STATUS).unwrap();
         if status != Status::Active {
@@ -5755,7 +5879,10 @@ impl CrowdfundContract {
 
         env.events().publish(
             ("campaign", "caps_configured"),
-            EventCapsConfigured { soft_cap, stretch_goal },
+            EventCapsConfigured {
+                soft_cap,
+                stretch_goal,
+            },
         );
         Ok(())
     }
@@ -5776,7 +5903,9 @@ impl CrowdfundContract {
         admin.require_auth();
 
         let released: i128 = inst.get(&KEY_RELEASED).unwrap_or(0);
-        let new_released = released.checked_add(amount).ok_or(ContractError::Overflow)?;
+        let new_released = released
+            .checked_add(amount)
+            .ok_or(ContractError::Overflow)?;
         inst.set(&KEY_RELEASED, &new_released);
         Ok(())
     }
@@ -5814,7 +5943,7 @@ impl CrowdfundContract {
             .set(&DataKey::Whitelist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Whitelist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "allowlisted"), EventAllowlisted { address });
         Ok(())
@@ -5845,7 +5974,7 @@ impl CrowdfundContract {
             .set(&DataKey::Blacklist(address.clone()), &true);
         env.storage()
             .persistent()
-            .extend_ttl(&DataKey::Blacklist(address.clone()), 100, 100);
+            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
         env.events()
             .publish(("campaign", "denylisted"), EventDenylisted { address });
         Ok(())

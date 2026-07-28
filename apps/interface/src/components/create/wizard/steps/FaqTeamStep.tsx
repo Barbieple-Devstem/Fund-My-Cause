@@ -2,7 +2,9 @@
 
 import { Trash2, PlusCircle } from "lucide-react";
 import type { FAQ, TeamMember } from "@/types/campaign";
-import { inputCls } from "../fields";
+import { Input, Textarea } from "@fund-my-cause/components";
+import { fieldStyles } from "../fields";
+import { FORM_FIELD_CLS } from "@/lib/formStyles";
 import type { CampaignFormData } from "../types";
 
 export interface FaqTeamStepProps {
@@ -68,8 +70,10 @@ export function FaqTeamStep({
             className="space-y-2 rounded-xl border border-gray-700 p-3"
           >
             <div className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
+              <Input
+                {...fieldStyles}
+                fieldClassName={`${FORM_FIELD_CLS} flex-1`}
+                aria-label="FAQ question"
                 placeholder="Question"
                 value={faq.question}
                 onChange={(e) => updateFaq(faq.id, "question", e.target.value)}
@@ -83,9 +87,10 @@ export function FaqTeamStep({
                 <Trash2 size={14} />
               </button>
             </div>
-            <textarea
+            <Textarea
+              {...fieldStyles}
               rows={2}
-              className={inputCls}
+              aria-label="FAQ answer"
               placeholder="Answer"
               value={faq.answer}
               onChange={(e) => updateFaq(faq.id, "answer", e.target.value)}
@@ -114,8 +119,10 @@ export function FaqTeamStep({
             className="space-y-2 rounded-xl border border-gray-700 p-3"
           >
             <div className="flex items-center gap-2">
-              <input
-                className={inputCls + " flex-1"}
+              <Input
+                {...fieldStyles}
+                fieldClassName={`${FORM_FIELD_CLS} flex-1`}
+                aria-label="Team member name"
                 placeholder="Name"
                 value={m.name}
                 onChange={(e) => updateMember(m.id, "name", e.target.value)}
@@ -129,20 +136,23 @@ export function FaqTeamStep({
                 <Trash2 size={14} />
               </button>
             </div>
-            <input
-              className={inputCls}
+            <Input
+              {...fieldStyles}
+              aria-label="Team member role"
               placeholder="Role (e.g. Lead Developer)"
               value={m.role}
               onChange={(e) => updateMember(m.id, "role", e.target.value)}
             />
-            <input
-              className={inputCls}
+            <Input
+              {...fieldStyles}
+              aria-label="Team member bio"
               placeholder="Bio (optional)"
               value={m.bio ?? ""}
               onChange={(e) => updateMember(m.id, "bio", e.target.value)}
             />
-            <input
-              className={inputCls}
+            <Input
+              {...fieldStyles}
+              aria-label="Team member avatar URL"
               placeholder="Avatar URL (optional)"
               value={m.avatarUrl ?? ""}
               onChange={(e) => updateMember(m.id, "avatarUrl", e.target.value)}

@@ -27,21 +27,13 @@ export async function fetchXlmPrice(): Promise<number | null> {
 
 /**
  * Format an XLM amount with an optional USD estimate.
- * @param {number} xlm - Amount in XLM
- * @param {number|null} price - Current XLM/USD price, or null to omit USD estimate
- * @returns {string} Formatted string like "15,400 XLM (~$2,156 USD)" or "15,400 XLM"
+ *
+ * Re-exported under its historical name — the implementation lives in
+ * `@fund-my-cause/shared-utils` so the card, detail and comparison views all
+ * format amounts identically.
+ *
  * @example
  * formatXlm(15400, 0.14)  // "15,400 XLM (~$2,156 USD)"
  * formatXlm(15400, null)  // "15,400 XLM"
  */
-export function formatXlm(xlm: number, price: number | null): string {
-  const xlmStr = xlm.toLocaleString(undefined, { maximumFractionDigits: 7 });
-  if (price === null) return `${xlmStr} XLM`;
-  const usd = xlm * price;
-  const usdStr = usd.toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-  return `${xlmStr} XLM (~${usdStr} USD)`;
-}
+export { formatXlmWithUsd as formatXlm } from "@fund-my-cause/shared-utils";

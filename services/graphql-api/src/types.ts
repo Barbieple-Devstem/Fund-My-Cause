@@ -1,5 +1,6 @@
 import type { RedisClientType } from "redis";
 import type DataLoader from "dataloader";
+import type pino from "pino";
 import type { PubSubService } from "./services/pubsub.js";
 // Canonical source: @fund-my-cause/types. Values are PascalCase ("Active",
 // not "ACTIVE"), matching the crowdfund contract's Status enum. The public
@@ -198,6 +199,11 @@ export interface Context {
     isAuthenticated: boolean;
   };
   redis: RedisClientType;
+  /** Trace ID for this request — generated once in the Apollo context factory
+   *  and forwarded as X-Trace-ID to all downstream HTTP calls. */
+  traceId: string;
+  /** Request-scoped pino logger with trace_id pre-bound. */
+  log: pino.Logger;
 }
 
 // API Response types

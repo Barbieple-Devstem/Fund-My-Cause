@@ -1,20 +1,22 @@
 import { useEffect, useCallback } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useXlmBalance } from "@/hooks/useXlmBalance";
-import { useWalletStore } from "@/store/useWalletStore";
+import { useWalletSlice } from "@/hooks/useWalletSlice";
 
 export function useWallet() {
-  const address = useWalletStore((s) => s.address);
-  const isConnecting = useWalletStore((s) => s.isConnecting);
-  const isAutoConnecting = useWalletStore((s) => s.isAutoConnecting);
-  const isSigning = useWalletStore((s) => s.isSigning);
-  const error = useWalletStore((s) => s.error);
-  const networkMismatch = useWalletStore((s) => s.networkMismatch);
-  const walletNetwork = useWalletStore((s) => s.walletNetwork);
-  const setShowWalletSelect = useWalletStore((s) => s.setShowWalletSelect);
-  const disconnectAction = useWalletStore((s) => s.disconnect);
-  const signTxAction = useWalletStore((s) => s.signTx);
-  const autoRestore = useWalletStore((s) => s.autoRestore);
+  const {
+    address,
+    isConnecting,
+    isAutoConnecting,
+    isSigning,
+    error,
+    networkMismatch,
+    walletNetwork,
+    setShowWalletSelect,
+    disconnect: disconnectAction,
+    signTx: signTxAction,
+    autoRestore,
+  } = useWalletSlice();
 
   const { addToast } = useToast();
   const { balance: xlmBalance, refresh: refreshBalance } =

@@ -8,7 +8,8 @@ import {
   validateMinContribution,
 } from "@/lib/validation";
 import { CATEGORY_TAXONOMY } from "@/lib/categories";
-import { Field, FieldWithError, inputCls } from "../fields";
+import { Input, Select, Textarea } from "@fund-my-cause/components";
+import { fieldStyles } from "../fields";
 import type { StepProps } from "../types";
 
 /**
@@ -31,109 +32,84 @@ export function BasicInfoStep({ data, set }: StepProps) {
 
   return (
     <div className="space-y-4">
-      <Field label="Contract ID">
-        <input
-          className={inputCls}
-          placeholder="C..."
-          value={data.contractId}
-          onChange={(e) => set("contractId", e.target.value)}
-        />
-      </Field>
-      <Field label="Token Address">
-        <input
-          className={inputCls}
-          placeholder="C..."
-          value={data.token}
-          onChange={(e) => set("token", e.target.value)}
-        />
-      </Field>
-      <FieldWithError
+      <Input
+        {...fieldStyles}
+        label="Contract ID"
+        placeholder="C..."
+        value={data.contractId}
+        onChange={(e) => set("contractId", e.target.value)}
+      />
+      <Input
+        {...fieldStyles}
+        label="Token Address"
+        placeholder="C..."
+        value={data.token}
+        onChange={(e) => set("token", e.target.value)}
+      />
+      <Input
+        {...fieldStyles}
         label="Title"
         error={titleError}
-        fieldName="title"
         required
-      >
-        <input
-          className={inputCls}
-          placeholder="My Campaign"
-          value={data.title}
-          onChange={(e) => set("title", e.target.value)}
-        />
-      </FieldWithError>
-      <FieldWithError
+        placeholder="My Campaign"
+        value={data.title}
+        onChange={(e) => set("title", e.target.value)}
+      />
+      <Textarea
+        {...fieldStyles}
         label="Description"
         error={descError}
-        fieldName="description"
         required
-      >
-        <textarea
-          rows={3}
-          className={inputCls}
-          placeholder="What are you raising funds for?"
-          value={data.description}
-          onChange={(e) => set("description", e.target.value)}
-        />
-      </FieldWithError>
-      <Field label="Category">
-        <select
-          className={inputCls}
-          value={data.category}
-          onChange={(e) => set("category", e.target.value)}
-        >
-          <option value="">Select a category…</option>
-          {CATEGORY_TAXONOMY.map((cat) => (
-            <option key={cat.slug} value={cat.slug}>
-              {cat.emoji} {cat.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+        rows={3}
+        placeholder="What are you raising funds for?"
+        value={data.description}
+        onChange={(e) => set("description", e.target.value)}
+      />
+      <Select
+        {...fieldStyles}
+        label="Category"
+        placeholder="Select a category…"
+        value={data.category}
+        onChange={(e) => set("category", e.target.value)}
+        options={CATEGORY_TAXONOMY.map((cat) => ({
+          value: cat.slug,
+          label: `${cat.emoji} ${cat.label}`,
+        }))}
+      />
       <div className="grid grid-cols-2 gap-4">
-        <FieldWithError
+        <Input
+          {...fieldStyles}
           label="Goal (XLM)"
           error={goalError}
-          fieldName="goal"
           required
-        >
-          <input
-            type="number"
-            min="1"
-            className={inputCls}
-            placeholder="10000"
-            value={data.goal}
-            onChange={(e) => set("goal", e.target.value)}
-          />
-        </FieldWithError>
-        <FieldWithError
+          type="number"
+          min="1"
+          placeholder="10000"
+          value={data.goal}
+          onChange={(e) => set("goal", e.target.value)}
+        />
+        <Input
+          {...fieldStyles}
           label="Min Contribution (XLM)"
           error={minContribError}
-          fieldName="minContribution"
           required
-        >
-          <input
-            type="number"
-            min="1"
-            className={inputCls}
-            placeholder="1"
-            value={data.minContribution}
-            onChange={(e) => set("minContribution", e.target.value)}
-          />
-        </FieldWithError>
+          type="number"
+          min="1"
+          placeholder="1"
+          value={data.minContribution}
+          onChange={(e) => set("minContribution", e.target.value)}
+        />
       </div>
-      <FieldWithError
+      <Input
+        {...fieldStyles}
         label="Deadline"
         error={deadlineError}
-        fieldName="deadline"
         required
-      >
-        <input
-          type="date"
-          className={inputCls}
-          value={data.deadline}
-          min={new Date().toISOString().split("T")[0]}
-          onChange={(e) => set("deadline", e.target.value)}
-        />
-      </FieldWithError>
+        type="date"
+        value={data.deadline}
+        min={new Date().toISOString().split("T")[0]}
+        onChange={(e) => set("deadline", e.target.value)}
+      />
     </div>
   );
 }

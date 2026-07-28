@@ -4,12 +4,12 @@
 
 mod common;
 
+use crate::common::{setup, Campaign};
+use proptest::prelude::*;
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     Address, Env,
 };
-use crate::common::{setup, Campaign};
-use proptest::prelude::*;
 
 #[test]
 fn test_invariant_total_raised_matches_sum_of_contributions() {
@@ -103,7 +103,8 @@ fn test_invariant_contribution_zero_after_refund() {
 
     env.ledger().set_timestamp(500);
     c.token_admin.mint(&contributor, &amount);
-    c.client.contribute(&contributor, &amount, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &amount, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
     assert!(c.client.try_withdraw().is_err());
@@ -127,7 +128,8 @@ fn test_invariant_no_double_refund() {
 
     env.ledger().set_timestamp(500);
     c.token_admin.mint(&contributor, &amount);
-    c.client.contribute(&contributor, &amount, &c.token_id, &None);
+    c.client
+        .contribute(&contributor, &amount, &c.token_id, &None);
 
     env.ledger().set_timestamp(deadline + 1);
     assert!(c.client.try_withdraw().is_err());

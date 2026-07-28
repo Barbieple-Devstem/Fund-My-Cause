@@ -7,13 +7,27 @@
  */
 
 import React from "react";
-import { getAccessibleInputProps, getErrorId } from "@/lib/accessibleFormUtils";
+import { FormField } from "@fund-my-cause/components";
+import {
+  FORM_ERROR_CLS,
+  FORM_FIELD_CLS,
+  FORM_INPUT_CLS,
+  FORM_LABEL_CLS,
+} from "@/lib/formStyles";
 
-export const inputCls =
-  "w-full bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl px-4 py-2 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:border-indigo-500";
-export const labelCls = "block text-sm text-gray-600 dark:text-gray-400 mb-1";
+/** Styling the steps hand to every shared form primitive. */
+export const fieldStyles = {
+  unstyled: true as const,
+  className: FORM_INPUT_CLS,
+  fieldClassName: FORM_FIELD_CLS,
+  labelClassName: FORM_LABEL_CLS,
+  errorClassName: FORM_ERROR_CLS,
+};
 
-/** A labelled field with no validation feedback. */
+/**
+ * Label wrapper for controls the shared primitives don't cover (uploaders and
+ * other composite widgets). Real inputs use `Input` / `Select` / `Textarea`.
+ */
 export function Field({
   label,
   children,
@@ -22,72 +36,13 @@ export function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className={labelCls}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-export interface FieldWithErrorProps {
-  label: string;
-  error?: string | null;
-  children: React.ReactNode;
-  /** The field name used to generate accessible IDs for aria-describedby / aria-errormessage */
-  fieldName?: string;
-  /** Whether the field is required */
-  required?: boolean;
-  /** Whether there are additional instructions for this field */
-  hasInstructions?: boolean;
-}
-
-/** A labelled field that renders an inline, screen-reader-announced error. */
-export function FieldWithError({
-  label,
-  error,
-  children,
-  fieldName,
-  required,
-  hasInstructions,
-}: FieldWithErrorProps) {
-  const accessibleProps = fieldName
-    ? getAccessibleInputProps(fieldName, !!required, error, hasInstructions)
-    : {};
-
-  const childrenWithProps = React.Children.map(children, (child) => {
-    if (React.isValidElement(child) && fieldName) {
-      return React.cloneElement(
-        child,
-        accessibleProps as Record<string, unknown>,
-      );
-    }
-    return child;
-  });
-
-  return (
-    <div>
-      <label className={labelCls}>
-        {label}
-        {required && (
-          <span aria-hidden="true" className="text-red-500 ml-0.5">
-            *
-          </span>
-        )}
-      </label>
-      {childrenWithProps}
-      {error && fieldName && (
-        <p
-          id={getErrorId(fieldName)}
-          role="alert"
-          className="text-red-500 dark:text-red-400 text-xs mt-1"
-        >
-          {error}
-        </p>
-      )}
-      {error && !fieldName && (
-        <p className="text-red-500 dark:text-red-400 text-xs mt-1">{error}</p>
-      )}
-    </div>
+    <FormField
+      label={label}
+      className={FORM_FIELD_CLS}
+      labelClassName={FORM_LABEL_CLS}
+    >
+      {() => children}
+    </FormField>
   );
 }
 

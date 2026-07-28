@@ -23,6 +23,58 @@
 //! - **Referral Tracking** - Monitor referral success and rewards
 //! - **Challenge Tracking** - Track participation in limited-time challenges
 //! - **Audit Trail** - Complete history of achievement unlocks
+//!
+//! ## Achievement State Machine
+//!
+//! Each `(user, achievement_type)` pair has exactly two states:
+//!
+//! ```text
+//!   [Locked] --unlock--> [Unlocked]
+//! ```
+//!
+//! - **Locked**: no `DataKey::Achievement(user, achievement_type)` entry exists.
+//!   `has_achievement` returns `false`.
+//! - **Unlocked**: an `AchievementRecord` is stored under that key (points
+//!   already awarded, leaderboard entry already posted, `unlocked` event
+//!   already published). This is terminal — there is no further "claimed"
+//!   state or reversal; `Unlocked` is permanent for the life of the contract.
+//!
+//! There is no separate "eligible" state stored on-chain: eligibility is
+//! evaluated at call time, not persisted.
+//!
+//! **Transitions in are gated by achievement type:**
+//!
+//! - Types `{2, 5, 6, 8, 9, 10, 11, 12, 13}` ("self-declared") — transition
+//!   Locked → Unlocked via [`AchievementsContract::unlock_achievement`],
+//!   callable directly by the user. Eligibility for these is enforced
+//!   off-chain (e.g. by the platform deciding when to let a user submit the
+//!   call); the contract itself only checks the type is valid and not
+//!   already unlocked.
+//! - Types `{1, 3, 4, 7}` ("auto-tracked": First Contribution, Mega Donor,
+//!   Consistent Contributor, Referral Champion) — transition Locked →
+//!   Unlocked *only* via the internal `try_auto_unlock` helper, invoked from
+//!   [`AchievementsContract::record_contribution`] /
+//!   [`AchievementsContract::record_referral`] once the on-chain counters
+//!   they read (`ContributionCount`, `ContributionTotal`, `ReferralCount`)
+//!   cross the relevant threshold. `unlock_achievement` explicitly **rejects**
+//!   these four types with `AchievementNotSelfUnlockable` — see the fix note
+//!   below.
+//!
+//! **Illegal transitions rejected:**
+//! - Unlocked → Unlocked (re-unlocking) → `AchievementAlreadyUnlocked`.
+//! - Locked → Unlocked for an out-of-range type → `InvalidAchievementType`.
+//! - Locked → Unlocked for an auto-tracked type via the manual entry point →
+//!   `AchievementNotSelfUnlockable`.
+//!
+//! **Design/implementation mismatch found and fixed (#928):** prior to this
+//! fix, `unlock_achievement` had no gate on achievement type beyond range
+//! validation, so any user could call
+//! `unlock_achievement(user, 1 /* First Contribution */, "")` — or type 3, 4,
+//! 7 — immediately after initialization, without ever having contributed or
+//! referred anyone, and be credited the full points/leaderboard/NFT for it.
+//! That let the four auto-tracked achievements bypass the on-chain activity
+//! they're supposed to certify. Fixed by rejecting those four types in
+//! `unlock_achievement`.
 
 #![no_std]
 
@@ -44,7 +96,7 @@ pub use storage::*;
 pub use types::*;
 pub use validation::*;
 
-use common::{AccessControl, CommonError};
+use common::{AccessControl, CommonError, EVENT_SCHEMA_VERSION};
 use soroban_sdk::{contract, contractimpl, Address, Bytes, Env, String, Vec};
 
 /// Main achievement contract
@@ -58,7 +110,19 @@ pub struct AchievementsContract;
 #[allow(deprecated)]
 #[contractimpl]
 impl AchievementsContract {
-    /// Initialize the achievements contract
+    /// Initializes the achievements contract with admin and platform addresses.
+    ///
+    /// Must be called exactly once immediately after contract deployment.
+    /// Subsequent calls return an error.
+    ///
+    /// # Parameters
+    ///
+    /// * `admin` — The address authorized to call admin-only functions like `award_user_points`.
+    /// * `platform_address` — The platform address for event tracking and auditing.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::AlreadyInitialized`] (mapped from `CommonError::AlreadyInitialized`) if the contract has already been initialized.
     pub fn initialize(
         env: Env,
         admin: Address,
@@ -77,16 +141,36 @@ impl AchievementsContract {
 
         env.events().publish(
             ("achievements", "initialized"),
-            (admin.clone(), platform_address),
+            EventInitialized {
+                admin: admin.clone(),
+                platform_address,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
         );
 
         Ok(())
     }
 
-    /// Unlock an achievement for a user.
+    /// Unlocks an achievement for a user and awards associated points.
     ///
-    /// Returns `AchievementAlreadyUnlocked` if the user already holds this
-    /// achievement type — repeated calls must not re-award points.
+    /// Stores the achievement NFT, awards points based on achievement type,
+    /// updates the user's level, and adds an entry to the achievements leaderboard.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user unlocking the achievement. Must sign the transaction.
+    /// * `achievement_type` — A u32 identifier for the achievement type (1-13). See error for invalid types.
+    /// * `metadata` — Optional string metadata associated with the achievement unlock (e.g., campaign ID).
+    ///
+    /// # Return Value
+    ///
+    /// Returns the newly created [`AchievementNFT`] with populated fields including
+    /// the derived `nft_id` (hash-based), user address, achievement type, unlock timestamp, and metadata.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidAchievementType`] if `achievement_type` is not in the range 1-13.
+    /// * [`ContractError::AchievementAlreadyUnlocked`] if the user has already unlocked this achievement type.
     pub fn unlock_achievement(
         env: Env,
         user: Address,
@@ -97,6 +181,10 @@ impl AchievementsContract {
 
         validate_achievement_type(achievement_type)?;
 
+        if is_auto_only_achievement(achievement_type) {
+            return Err(ContractError::AchievementNotSelfUnlockable);
+        }
+
         if has_achievement(&env, &user, achievement_type)? {
             return Err(ContractError::AchievementAlreadyUnlocked);
         }
@@ -104,12 +192,45 @@ impl AchievementsContract {
         do_unlock(&env, &user, achievement_type, metadata)
     }
 
-    /// Get user achievements
+    /// Retrieves all achievements unlocked by a user.
+    ///
+    /// Reconstructs the full [`AchievementNFT`] entries for each achievement
+    /// the user has unlocked, deriving the `nft_id` from the stored achievement data.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose achievements to retrieve.
+    ///
+    /// # Return Value
+    ///
+    /// Returns a vector of [`AchievementNFT`] structs, one per unlocked achievement.
+    /// Empty vector if the user has not unlocked any achievements.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn get_achievements(env: Env, user: Address) -> Result<Vec<AchievementNFT>, ContractError> {
         get_user_achievements(&env, &user)
     }
 
-    /// Get leaderboard entries
+    /// Retrieves the top leaderboard entries for a given leaderboard type.
+    ///
+    /// Leaderboard type 0 = Points, 1 = Achievements, 2 = Referrals.
+    /// Entries are returned in descending order by score.
+    ///
+    /// # Parameters
+    ///
+    /// * `leaderboard_type` — The u32 type identifier: 0 (Points), 1 (Achievements), or 2 (Referrals).
+    /// * `limit` — Maximum number of top entries to return (as u32).
+    ///
+    /// # Return Value
+    ///
+    /// Returns a vector of [`LeaderboardEntry`] structs, sorted by score descending,
+    /// with at most `limit` entries.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidLeaderboardType`] if `leaderboard_type` is not 0, 1, or 2.
     pub fn get_leaderboard_entries(
         env: Env,
         leaderboard_type: u32,
@@ -122,23 +243,88 @@ impl AchievementsContract {
         )
     }
 
-    /// Get a user's rank on a leaderboard (1-based). Errors with
-    /// `UserNotFound` if the user has no entry on that leaderboard.
+    /// Retrieves a user's rank on a specific leaderboard (1-based ranking).
+    ///
+    /// Leaderboard type 0 = Points, 1 = Achievements, 2 = Referrals.
+    /// Rank 1 is the highest score, rank 2 is second-highest, etc.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose rank to retrieve.
+    /// * `leaderboard_type` — The u32 type identifier: 0 (Points), 1 (Achievements), or 2 (Referrals).
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's 1-based rank (u32) on the specified leaderboard.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidLeaderboardType`] if `leaderboard_type` is not 0, 1, or 2.
+    /// * [`ContractError::UserNotFound`] if the user has no entry on that leaderboard.
     pub fn get_rank(env: Env, user: Address, leaderboard_type: u32) -> Result<u32, ContractError> {
         leaderboard::get_user_rank(&env, &user, validate_leaderboard_type(leaderboard_type)?)
     }
 
-    /// Get user points
+    /// Retrieves the total accumulated points for a user.
+    ///
+    /// Points are earned through achievement unlocks, contributions, referrals, and streaks.
+    /// Used to calculate the user's level (level = points / 100 + 1, capped at 100).
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose points to retrieve.
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's total accumulated points as a u32.
+    /// Returns 0 if the user has no points record.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn get_points(env: Env, user: Address) -> Result<u32, ContractError> {
         get_user_points(&env, &user)
     }
 
-    /// Get user level
+    /// Retrieves the user's current level based on accumulated points.
+    ///
+    /// Level is calculated from points as: `level = min((points / 100) + 1, 100)`.
+    /// The level is derived dynamically from points on every read; no separate
+    /// Level storage entry is maintained after #920.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose level to retrieve.
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's level as a u32 in the range 1-100.
+    /// Returns 1 if the user has no points record.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn get_level(env: Env, user: Address) -> Result<u32, ContractError> {
         get_user_level(&env, &user)
     }
 
-    /// Award points to a user. Admin-only.
+    /// Awards points to a user. Admin-only operation.
+    ///
+    /// Adds the specified points to the user's total, updates their level accordingly,
+    /// and publishes a "points_awarded" event.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user to award points to.
+    /// * `points` — The number of points to award (u32).
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's new total points after the award.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::Unauthorized`] if the caller is not the admin address set during initialization.
     pub fn award_user_points(env: Env, user: Address, points: u32) -> Result<u32, ContractError> {
         let admin: Address = env
             .storage()
@@ -147,18 +333,42 @@ impl AchievementsContract {
             .ok_or(ContractError::Unauthorized)?;
         AccessControl::require_role_auth(&admin);
 
-        award_points(&env, &user, points)?;
-        update_level(&env, &user)?;
+        let total_points = award_points(&env, &user, points)?;
+        update_level(total_points);
 
-        let total_points = get_user_points(&env, &user)?;
-
-        env.events()
-            .publish(("achievements", "points_awarded"), (user, points));
+        env.events().publish(
+            ("achievements", "points_awarded"),
+            EventPointsAwarded {
+                user,
+                points,
+                total_points,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(total_points)
     }
 
-    /// Record a contribution for achievement tracking
+    /// Records a user contribution and evaluates contribution-based achievements.
+    ///
+    /// Stores the contribution, awards points based on amount, updates level,
+    /// and automatically unlocks achievements like "First Contribution",
+    /// "Consistent Contributor", and "Mega Donor" when milestones are reached.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user making the contribution. Must sign the transaction.
+    /// * `campaign_id` — A string identifier for the campaign receiving the contribution.
+    /// * `amount` — The contribution amount in stroops (i128). Must be positive.
+    ///   Points awarded = `(amount / 1,000,000).clamp(1, 1000)`.
+    ///
+    /// # Return Value
+    ///
+    /// Returns `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// * [`ContractError::InvalidAmount`] if `amount` is not positive.
     pub fn record_contribution(
         env: Env,
         user: Address,
@@ -170,23 +380,45 @@ impl AchievementsContract {
         validate_amount(amount)?;
 
         store_contribution(&env, &user, &campaign_id, amount)?;
-        increment_contribution_stats(&env, &user, amount)?;
+        let (new_count, new_total) = increment_contribution_stats(&env, &user, amount)?;
 
         let points = calculate_contribution_points(amount);
-        award_points(&env, &user, points)?;
-        update_level(&env, &user)?;
+        let total_points = award_points(&env, &user, points)?;
+        update_level(total_points);
 
-        check_contribution_achievements(&env, &user)?;
+        check_contribution_achievements(&env, &user, new_count, new_total)?;
 
         env.events().publish(
             ("achievements", "contribution_recorded"),
-            (user, campaign_id, amount),
+            EventContributionRecorded {
+                user,
+                campaign_id,
+                amount,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
         );
 
         Ok(())
     }
 
-    /// Record a referral success
+    /// Records a successful referral and evaluates referral-based achievements.
+    ///
+    /// Stores the referral relationship, awards fixed points (50) to the referrer,
+    /// updates their level, and automatically unlocks "Referral Champion" achievement
+    /// once the referrer reaches 3 successful referrals.
+    ///
+    /// # Parameters
+    ///
+    /// * `referrer` — The address of the user who made the referral. Must sign the transaction.
+    /// * `referee` — The address of the user being referred.
+    ///
+    /// # Return Value
+    ///
+    /// Returns `Ok(())` on success.
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn record_referral(
         env: Env,
         referrer: Address,
@@ -194,21 +426,47 @@ impl AchievementsContract {
     ) -> Result<(), ContractError> {
         referrer.require_auth();
 
+        const REFERRAL_POINTS: u32 = 50;
+
         store_referral(&env, &referrer, &referee)?;
-        increment_referral_count(&env, &referrer)?;
+        let new_count = increment_referral_count(&env, &referrer)?;
 
-        award_points(&env, &referrer, 50)?;
-        update_level(&env, &referrer)?;
+        let total_points = award_points(&env, &referrer, REFERRAL_POINTS)?;
+        update_level(total_points);
 
-        check_referral_achievements(&env, &referrer)?;
+        check_referral_achievements(&env, &referrer, new_count)?;
 
-        env.events()
-            .publish(("achievements", "referral_recorded"), (referrer, referee));
+        env.events().publish(
+            ("achievements", "referral_recorded"),
+            EventReferralRecorded {
+                referrer,
+                referee,
+                points_earned: REFERRAL_POINTS,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(())
     }
 
-    /// Update user contribution streak
+    /// Updates the user's contribution streak counter.
+    ///
+    /// If this is the first contribution tracked or the last contribution was
+    /// more than 1 day ago, resets the streak to 1. If the last contribution
+    /// was within 1 day, increments the current streak. Every 7-day milestone
+    /// awards a 100-point bonus.
+    ///
+    /// # Parameters
+    ///
+    /// * `user` — The address of the user whose streak to update. Must sign the transaction.
+    ///
+    /// # Return Value
+    ///
+    /// Returns the user's new streak count (u32).
+    ///
+    /// # Errors
+    ///
+    /// May return an error if internal storage operations fail (unlikely in normal operation).
     pub fn update_streak(env: Env, user: Address) -> Result<u32, ContractError> {
         user.require_auth();
 
@@ -236,12 +494,18 @@ impl AchievementsContract {
         env.storage().instance().set(&streak_key, &new_streak);
 
         if new_streak > 0 && new_streak % 7 == 0 {
-            award_points(&env, &user, 100)?; // Bonus for 7-day streak
-            update_level(&env, &user)?;
+            let total_points = award_points(&env, &user, 100)?; // Bonus for 7-day streak
+            update_level(total_points);
         }
 
-        env.events()
-            .publish(("achievements", "streak_updated"), (user, new_streak));
+        env.events().publish(
+            ("achievements", "streak_updated"),
+            EventStreakUpdated {
+                user,
+                new_streak,
+                schema_version: EVENT_SCHEMA_VERSION,
+            },
+        );
 
         Ok(new_streak)
     }
@@ -259,6 +523,20 @@ const MEGA_DONOR_TOTAL: i128 = 1_000_000_000;
 const REFERRAL_CHAMPION_TYPE: u32 = 7;
 const REFERRAL_CHAMPION_COUNT: u32 = 3;
 
+/// Achievement types that may only be unlocked by [`try_auto_unlock`] once
+/// their on-chain activity threshold is crossed — never directly via
+/// [`AchievementsContract::unlock_achievement`]. See the state-machine
+/// doc-comment at the top of this file.
+fn is_auto_only_achievement(achievement_type: u32) -> bool {
+    matches!(
+        achievement_type,
+        FIRST_CONTRIBUTION_TYPE
+            | MEGA_DONOR_TYPE
+            | CONSISTENT_CONTRIBUTOR_TYPE
+            | REFERRAL_CHAMPION_TYPE
+    )
+}
+
 /// Perform the shared "unlock" side effects: store the NFT, award points,
 /// refresh the user's level, push a leaderboard entry, and publish an event.
 /// Callers are responsible for checking `has_achievement` first.
@@ -269,27 +547,38 @@ fn do_unlock(
     achievement_type: u32,
     metadata: String,
 ) -> Result<AchievementNFT, ContractError> {
-    let nft = AchievementNFT {
-        user: user.clone(),
-        achievement_type,
-        unlocked_at: env.ledger().timestamp(),
-        metadata,
-        nft_id: generate_nft_id(env, user, achievement_type),
-    };
+    let unlocked_at = env.ledger().timestamp();
 
-    store_achievement(env, user, &nft)?;
+    // Store compact record (v2) — no `user` or `nft_id` on ledger.
+    store_achievement(env, user, achievement_type, unlocked_at, metadata.clone())?;
 
     let points = get_achievement_points(achievement_type);
-    award_points(env, user, points)?;
-    let new_level = update_level(env, user)?;
+    let total_points = award_points(env, user, points)?;
+    // update_level is a pure derivation from the points total we already have
+    // in hand — no separate Points re-read, no Level write.
+    let new_level = update_level(total_points);
 
     add_leaderboard_entry(env, user, points, LeaderboardType::Achievements)?;
 
     env.events().publish(
         ("achievements", "unlocked"),
-        (user.clone(), achievement_type, new_level),
+        EventUnlocked {
+            user: user.clone(),
+            achievement_type,
+            points_earned: points,
+            new_level,
+            schema_version: EVENT_SCHEMA_VERSION,
+        },
     );
 
+    // Reconstruct full public NFT (nft_id derived, not read from ledger).
+    let nft = AchievementNFT {
+        user: user.clone(),
+        achievement_type,
+        unlocked_at,
+        metadata,
+        nft_id: generate_nft_id(env, user, achievement_type),
+    };
     Ok(nft)
 }
 
@@ -305,13 +594,11 @@ fn try_auto_unlock(env: &Env, user: &Address, achievement_type: u32) -> Result<(
     Ok(())
 }
 
-/// Recomputes and persists `user`'s level from their current points, mirroring
-/// [`points::calculate_level_from_points`]. Returns the new level.
-fn update_level(env: &Env, user: &Address) -> Result<u32, ContractError> {
-    let points = get_user_points(env, user)?;
-    let level = points::calculate_level_from_points(points);
-    points::set_user_level(env, user, level)?;
-    Ok(level)
+/// Derives a level from an already-known points total (e.g. just returned by
+/// [`award_points`]) — no storage read, since the caller already has the
+/// current total in hand.
+fn update_level(points: u32) -> u32 {
+    points::calculate_level_from_points(points)
 }
 
 /// Generate a unique NFT id by hashing the user's address and achievement
@@ -331,15 +618,20 @@ fn generate_nft_id(env: &Env, user: &Address, achievement_type: u32) -> String {
         hex_buf[i * 2 + 1] = HEX[(byte & 0x0f) as usize];
     }
 
-    let hex_str = core::str::from_utf8(&hex_buf).unwrap();
+    let hex_str = core::str::from_utf8(&hex_buf)
+        .unwrap_or_else(|_| "0000000000000000000000000000000000000000000000000000000000000000");
     String::from_str(env, hex_str)
 }
 
-/// Store achievement
-fn store_achievement(env: &Env, user: &Address, nft: &AchievementNFT) -> Result<(), ContractError> {
-    let key = DataKey::Achievement(user.clone(), nft.achievement_type);
-    env.storage().instance().set(&key, nft);
-    Ok(())
+/// Store achievement as a compact [`AchievementRecord`] (v2 layout).
+fn store_achievement(
+    env: &Env,
+    user: &Address,
+    achievement_type: u32,
+    unlocked_at: u64,
+    metadata: String,
+) -> Result<(), ContractError> {
+    achievements::store_achievement_record(env, user, achievement_type, unlocked_at, metadata)
 }
 
 /// Get achievement points based on type
@@ -380,26 +672,26 @@ fn store_contribution(
     Ok(())
 }
 
-/// Increment the aggregate contribution count/total used by
-/// [`check_contribution_achievements`].
+/// Increment the aggregate contribution count/total, returning the new
+/// `(count, total)` so [`check_contribution_achievements`] can use them
+/// directly instead of re-reading `DataKey::ContributionCount`/`ContributionTotal`
+/// right after this just wrote them.
 fn increment_contribution_stats(
     env: &Env,
     user: &Address,
     amount: i128,
-) -> Result<(), ContractError> {
+) -> Result<(u32, i128), ContractError> {
     let count_key = DataKey::ContributionCount(user.clone());
     let count: u32 = env.storage().instance().get(&count_key).unwrap_or(0);
-    env.storage()
-        .instance()
-        .set(&count_key, &(count.saturating_add(1)));
+    let new_count = count.saturating_add(1);
+    env.storage().instance().set(&count_key, &new_count);
 
     let total_key = DataKey::ContributionTotal(user.clone());
     let total: i128 = env.storage().instance().get(&total_key).unwrap_or(0);
-    env.storage()
-        .instance()
-        .set(&total_key, &(total.saturating_add(amount)));
+    let new_total = total.saturating_add(amount);
+    env.storage().instance().set(&total_key, &new_total);
 
-    Ok(())
+    Ok((new_count, new_total))
 }
 
 /// Store referral record
@@ -410,32 +702,27 @@ fn store_referral(env: &Env, referrer: &Address, referee: &Address) -> Result<()
     Ok(())
 }
 
-/// Increment the referral count used by [`check_referral_achievements`].
-fn increment_referral_count(env: &Env, referrer: &Address) -> Result<(), ContractError> {
+/// Increment the referral count, returning the new count so
+/// [`check_referral_achievements`] can use it directly instead of re-reading
+/// `DataKey::ReferralCount` right after this just wrote it.
+fn increment_referral_count(env: &Env, referrer: &Address) -> Result<u32, ContractError> {
     let key = DataKey::ReferralCount(referrer.clone());
     let count: u32 = env.storage().instance().get(&key).unwrap_or(0);
-    env.storage()
-        .instance()
-        .set(&key, &(count.saturating_add(1)));
-    Ok(())
+    let new_count = count.saturating_add(1);
+    env.storage().instance().set(&key, &new_count);
+    Ok(new_count)
 }
 
 /// Check for contribution-based achievements: unlocks "First Contribution" on
 /// the first recorded contribution, "Consistent Contributor" once the user
 /// has contributed `CONSISTENT_CONTRIBUTOR_COUNT` times, and "Mega Donor"
 /// once their cumulative contribution total reaches `MEGA_DONOR_TOTAL`.
-fn check_contribution_achievements(env: &Env, user: &Address) -> Result<(), ContractError> {
-    let count: u32 = env
-        .storage()
-        .instance()
-        .get(&DataKey::ContributionCount(user.clone()))
-        .unwrap_or(0);
-    let total: i128 = env
-        .storage()
-        .instance()
-        .get(&DataKey::ContributionTotal(user.clone()))
-        .unwrap_or(0);
-
+fn check_contribution_achievements(
+    env: &Env,
+    user: &Address,
+    count: u32,
+    total: i128,
+) -> Result<(), ContractError> {
     if count >= 1 {
         try_auto_unlock(env, user, FIRST_CONTRIBUTION_TYPE)?;
     }
@@ -451,13 +738,11 @@ fn check_contribution_achievements(env: &Env, user: &Address) -> Result<(), Cont
 
 /// Check for referral-based achievements: unlocks "Referral Champion" once
 /// the referrer has `REFERRAL_CHAMPION_COUNT` successful referrals.
-fn check_referral_achievements(env: &Env, referrer: &Address) -> Result<(), ContractError> {
-    let count: u32 = env
-        .storage()
-        .instance()
-        .get(&DataKey::ReferralCount(referrer.clone()))
-        .unwrap_or(0);
-
+fn check_referral_achievements(
+    env: &Env,
+    referrer: &Address,
+    count: u32,
+) -> Result<(), ContractError> {
     if count >= REFERRAL_CHAMPION_COUNT {
         try_auto_unlock(env, referrer, REFERRAL_CHAMPION_TYPE)?;
     }

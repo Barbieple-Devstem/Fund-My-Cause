@@ -15,6 +15,8 @@ import { AuthService } from "./services/auth.js";
 import { RateLimiterService } from "./services/rate-limiter.js";
 import { typeDefs } from "./schema.js";
 import { resolvers } from "./resolvers.js";
+import { logger, requestLogger } from "./logger.js";
+import { resolveTraceId, TRACE_ID_HEADER } from "@fund-my-cause/shared-utils";
 import type { Context } from "./types.js";
 
 const PORT = process.env.GRAPHQL_PORT ? parseInt(process.env.GRAPHQL_PORT) : 4000;
@@ -26,7 +28,7 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 // Validate JWT_SECRET at startup
 if (!JWT_SECRET || JWT_SECRET.trim() === "") {
-  console.error("FATAL: JWT_SECRET environment variable is required and must not be empty");
+  logger.fatal("JWT_SECRET environment variable is required and must not be empty");
   process.exit(1);
 }
 
@@ -38,12 +40,12 @@ const knownDefaults = [
 
 // Check for known defaults before length check
 if (knownDefaults.includes(JWT_SECRET)) {
-  console.error("FATAL: JWT_SECRET appears to be a default/example value and must be changed");
+  logger.fatal("JWT_SECRET appears to be a default/example value and must be changed");
   process.exit(1);
 }
 
 if (JWT_SECRET.length < 32) {
-  console.error("FATAL: JWT_SECRET must be at least 32 characters for secure operation");
+  logger.fatal("JWT_SECRET must be at least 32 characters for secure operation");
   process.exit(1);
 }
 
@@ -57,13 +59,11 @@ const VALIDATED_JWT_SECRET: string = JWT_SECRET;
  */
 async function startServer() {
   try {
-    console.log(`🚀 Starting GraphQL API Server...`);
-    console.log(`   Environment: ${NODE_ENV}`);
-    console.log(`   Port: ${PORT}`);
+    logger.info({ env: NODE_ENV, port: PORT }, "Starting GraphQL API Server");
 
     // Initialize Redis connection
     const redis = await createRedisClient();
-    console.log("✅ Redis connection established");
+    logger.info("Redis connection established");
 
     // Initialize services
     const cacheService = new CacheService(redis);
@@ -80,7 +80,7 @@ async function startServer() {
     const authService = new AuthService(VALIDATED_JWT_SECRET);
     const rateLimiter = new RateLimiterService(redis);
 
-    console.log("✅ Services initialized");
+    logger.info("Services initialized");
 
     // Create Express app
     const app = express();
@@ -88,10 +88,12 @@ async function startServer() {
 
     // CORS configuration
     const corsOptions = {
-      origin: process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",") : ["http://localhost:3000", "http://localhost:5173"],
+      origin: process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(",")
+        : ["http://localhost:3000", "http://localhost:5173"],
       credentials: true,
       methods: ["GET", "POST", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Trace-ID"],
     };
 
     app.use(cors(corsOptions));
@@ -126,11 +128,20 @@ async function startServer() {
         const resp = await fetch(RPC_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getHealth", params: [] }),
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getHealth",
+            params: [],
+          }),
           signal: AbortSignal.timeout(3000),
         });
         rpcLatencyMs = Date.now() - t0;
-        rpcStatus = resp.ok ? (rpcLatencyMs < 500 ? "healthy" : "degraded") : "unhealthy";
+        rpcStatus = resp.ok
+          ? rpcLatencyMs < 500
+            ? "healthy"
+            : "degraded"
+          : "unhealthy";
       } catch {
         rpcStatus = "unhealthy";
       }
@@ -147,9 +158,9 @@ async function startServer() {
         uptime: process.uptime(),
         timestamp: new Date().toISOString(),
         components: {
-          api:   { status: apiStatus,   latencyMs: Date.now() - start },
+          api: { status: apiStatus, latencyMs: Date.now() - start },
           cache: { status: cacheStatus, latencyMs: cacheLatencyMs },
-          rpc:   { status: rpcStatus,   latencyMs: rpcLatencyMs },
+          rpc: { status: rpcStatus, latencyMs: rpcLatencyMs },
         },
       };
 
@@ -182,7 +193,7 @@ async function startServer() {
       plugins: [
         {
           async serverWillStart() {
-            console.log("✅ Apollo Server starting");
+            logger.info("Apollo Server starting");
             return {
               async drainServer() {
                 await pubsub.close();
@@ -194,102 +205,139 @@ async function startServer() {
     });
 
     await apolloServer.start();
-    console.log("✅ Apollo Server started");
+    logger.info("Apollo Server started");
 
     // Setup WebSocket server for subscriptions
     const wsServer = new WebSocketServer({ server: httpServer, path: "/graphql" });
-
     useServer({ schema }, wsServer);
-    console.log("✅ WebSocket server configured");
+    logger.info("WebSocket server configured");
 
     // Apply Apollo middleware
-    app.post("/graphql", expressMiddleware(apolloServer, {
-      context: async ({ req, res }) => {
-        try {
-          // Rate limiting
-          const ip = req.ip || "unknown";
-          await rateLimiter.checkIpLimit(ip);
+    app.post(
+      "/graphql",
+      expressMiddleware(apolloServer, {
+        context: async ({ req, res }) => {
+          // ── Trace ID ──────────────────────────────────────────────────────
+          // Resolve (or generate) a trace ID for this request.  The resolved
+          // ID is injected into the Apollo Context so every resolver can read
+          // it, and it is echoed back in the response header so callers can
+          // correlate their own logs.
+          const traceId = resolveTraceId(
+            req.headers as Record<string, string | string[] | undefined>,
+          );
+          const log = requestLogger(traceId);
 
-          // Extract and verify JWT token
-          let user: any = undefined;
-          const authHeader = req.headers.authorization;
-          if (authHeader) {
-            const token = authService.extractTokenFromHeader(authHeader);
-            if (token) {
-              const decoded = authService.verifyToken(token);
-              if (decoded) {
-                // Check user rate limit
-                await rateLimiter.checkUserLimit(decoded.address);
-                user = {
-                  address: decoded.address,
-                  isAuthenticated: true,
-                };
+          // Echo the trace ID back to the caller regardless of auth outcome.
+          res.set(TRACE_ID_HEADER, traceId);
+
+          try {
+            // Rate limiting
+            const ip = req.ip || "unknown";
+            await rateLimiter.checkIpLimit(ip);
+
+            // Extract and verify JWT token
+            let user: any = undefined;
+            const authHeader = req.headers.authorization;
+            if (authHeader) {
+              const token = authService.extractTokenFromHeader(authHeader);
+              if (token) {
+                const decoded = authService.verifyToken(token);
+                if (decoded) {
+                  await rateLimiter.checkUserLimit(decoded.address);
+                  user = {
+                    address: decoded.address,
+                    isAuthenticated: true,
+                  };
+                }
               }
             }
-          }
 
-          return {
-            cache: cacheService,
-            contractService,
-            dataLoader: dataLoaders,
-            pubsub,
-            authService,
-            user,
-            redis,
-          } as Context;
-        } catch (error: any) {
-          console.error("Context error:", error);
-          if (error.retryAfter) {
-            res.set("Retry-After", error.retryAfter.toString());
+            log.info(
+              { ip, authenticated: !!user, userAddress: user?.address },
+              "GraphQL request received",
+            );
+
+            return {
+              cache: cacheService,
+              contractService,
+              dataLoader: dataLoaders,
+              pubsub,
+              authService,
+              user,
+              redis,
+              traceId,
+              log,
+            } as Context;
+          } catch (error: any) {
+            log.error(
+              { err: error, ip: req.ip || "unknown" },
+              "Context build error",
+            );
+            if (error.retryAfter) {
+              res.set("Retry-After", error.retryAfter.toString());
+            }
+            throw error;
           }
-          throw error;
-        }
-      },
-    }));
+        },
+      }),
+    );
 
     // Error handling middleware
-    app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-      console.error("Request error:", err);
+    app.use(
+      (
+        err: any,
+        req: express.Request,
+        res: express.Response,
+        _next: express.NextFunction,
+      ) => {
+        logger.error({ err }, "Unhandled request error");
 
-      if (err.message?.includes("rate limit")) {
-        return res.status(429).json({
-          error: err.message,
-          retryAfter: err.retryAfter || 60,
+        if (err.message?.includes("rate limit")) {
+          return res.status(429).json({
+            error: err.message,
+            retryAfter: err.retryAfter || 60,
+          });
+        }
+
+        res.status(500).json({
+          error:
+            NODE_ENV === "production" ? "Internal server error" : err.message,
         });
-      }
-
-      res.status(500).json({
-        error: NODE_ENV === "production" ? "Internal server error" : err.message,
-      });
-    });
+      },
+    );
 
     // Start server
     await new Promise<void>((resolve, reject) => {
-      httpServer.listen(PORT, "0.0.0.0", () => {
-        console.log(`\n🎉 GraphQL API Server is running!`);
-        console.log(`📝 GraphQL Endpoint: http://localhost:${PORT}/graphql`);
-        console.log(`🔔 WebSocket Subscriptions: ws://localhost:${PORT}/graphql`);
-        console.log(`💚 Health Check: http://localhost:${PORT}/health`);
-        console.log(`📊 Metrics: http://localhost:${PORT}/metrics\n`);
-        resolve();
-      }).on("error", reject);
+      httpServer
+        .listen(PORT, "0.0.0.0", () => {
+          logger.info(
+            {
+              graphqlEndpoint: `http://localhost:${PORT}/graphql`,
+              wsEndpoint: `ws://localhost:${PORT}/graphql`,
+              healthEndpoint: `http://localhost:${PORT}/health`,
+            },
+            "GraphQL API Server running",
+          );
+          resolve();
+        })
+        .on("error", reject);
     });
 
     // Graceful shutdown
-    const signals = ["SIGTERM", "SIGINT"];
+    const signals = ["SIGTERM", "SIGINT"] as const;
     signals.forEach((signal) => {
       process.on(signal, async () => {
-        console.log(`\n🛑 Received ${signal}, shutting down gracefully...`);
+        logger.info({ signal }, "Shutdown signal received, stopping gracefully");
         await apolloServer.stop();
         await pubsub.close();
         httpServer.close(() => {
-          console.log("✅ Server closed");
+          logger.info("Server closed");
           process.exit(0);
         });
       });
     });
   } catch (error) {
-    console.error("❌ Failed to start server:", error);
+    logger.fatal({ err: error }, "Failed to start server");
     process.exit(1);
   }
 }

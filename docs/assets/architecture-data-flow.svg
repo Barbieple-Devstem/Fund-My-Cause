@@ -1,0 +1,254 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1360 1560" width="1360" height="1560" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>Fund-My-Cause verified data flow: apps/interface, services, contracts</title>
+  <desc>Architecture diagram of the Fund-My-Cause monorepo showing four verified structural seams: dual frontend-to-chain paths, two independently versioned Soroban RPC clients, a type-sharing gap between services, and two disconnected alerting stacks.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155"/>
+    </marker>
+    <marker id="arrowDashed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/>
+    </marker>
+    <marker id="arrowWarn" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#d97706"/>
+    </marker>
+  </defs>
+
+  <style>
+    .panel      { fill: #ffffff; stroke: #cbd5e1; stroke-width: 1.5; rx: 10; }
+    .panelTitle { font-size: 19px; font-weight: 700; fill: #0f172a; }
+    .panelSub   { font-size: 13px; fill: #475569; }
+    .seamTag    { font-size: 12px; font-weight: 700; fill: #7c2d12; letter-spacing: .06em; }
+    .seamBadge  { fill: #fef3c7; stroke: #d97706; stroke-width: 1.5; rx: 5; }
+    .box        { fill: #f8fafc; stroke: #94a3b8; stroke-width: 1.5; rx: 8; }
+    .boxApp     { fill: #eef2ff; stroke: #6366f1; stroke-width: 1.5; rx: 8; }
+    .boxSvc     { fill: #ecfdf5; stroke: #10b981; stroke-width: 1.5; rx: 8; }
+    .boxChain   { fill: #e0e7ff; stroke: #4338ca; stroke-width: 1.5; rx: 8; }
+    .boxWarn    { fill: #fff7ed; stroke: #ea580c; stroke-width: 1.5; rx: 8; }
+    .boxMuted   { fill: #f1f5f9; stroke: #64748b; stroke-width: 1.5; rx: 8; }
+    .h          { font-size: 14px; font-weight: 700; fill: #0f172a; }
+    .t          { font-size: 12px; fill: #334155; }
+    .m          { font-size: 11px; fill: #64748b; }
+    .edge       { stroke: #334155; stroke-width: 1.8; fill: none; marker-end: url(#arrow); }
+    .edgeDash   { stroke: #7c3aed; stroke-width: 1.6; fill: none; stroke-dasharray: 6 4; marker-end: url(#arrowDashed); }
+    .edgeWarn   { stroke: #d97706; stroke-width: 1.8; fill: none; marker-end: url(#arrowWarn); }
+    .edgeCut    { stroke: #dc2626; stroke-width: 2.5; fill: none; stroke-dasharray: 9 6; }
+    .lbl        { font-size: 11px; font-weight: 600; fill: #1e293b; }
+    .lblWarn    { font-size: 11px; font-weight: 700; fill: #b45309; }
+    .lblCut     { font-size: 12px; font-weight: 700; fill: #b91c1c; }
+    .note       { font-size: 12px; fill: #7c2d12; }
+  </style>
+
+  <rect width="1360" height="1560" fill="#ffffff"/>
+
+  <!-- ══ Header ══════════════════════════════════════════════════════════ -->
+  <text x="40" y="46" font-size="25" font-weight="700" fill="#0f172a">Fund-My-Cause — verified data flow</text>
+  <text x="40" y="70" class="panelSub">apps/interface · services/* · packages/types · contracts/crowdfund — as built, verified against the tree on 2026-07-26.</text>
+  <text x="40" y="90" class="panelSub">Four structural seams are labelled below. Source: docs/assets/architecture-data-flow.mmd</text>
+
+  <!-- ══ SEAM 1 — dual frontend → chain paths ════════════════════════════ -->
+  <rect x="40" y="115" width="1280" height="405" class="panel"/>
+  <rect x="56" y="131" width="196" height="24" class="seamBadge"/>
+  <text x="66" y="148" class="seamTag">SEAM 1 · DUAL FE PATHS</text>
+  <text x="270" y="149" class="panelTitle">Two independent frontend → chain paths</text>
+  <text x="56" y="180" class="panelSub">apps/interface reads chain state twice over. Neither path funnels through the other, so the two can disagree at any moment.</text>
+
+  <!-- interface -->
+  <rect x="66" y="205" width="290" height="290" class="boxApp"/>
+  <text x="80" y="228" class="h">apps/interface</text>
+  <text x="80" y="246" class="m">Next.js 16 · @stellar/stellar-sdk 14.6.1</text>
+
+  <rect x="82" y="262" width="258" height="46" class="box"/>
+  <text x="94" y="281" class="t">React routes &amp; components</text>
+  <text x="94" y="298" class="m">components/ui/CampaignCard.tsx</text>
+
+  <rect x="82" y="322" width="258" height="60" class="boxWarn"/>
+  <text x="94" y="341" class="t">lib/soroban.ts — 616 lines</text>
+  <text x="94" y="358" class="m">SorobanRpc.Server + Horizon.Server</text>
+  <text x="94" y="374" class="m">constructed inline, per call</text>
+
+  <rect x="82" y="396" width="258" height="46" class="box"/>
+  <text x="94" y="415" class="t">app/status/page.tsx</text>
+  <text x="94" y="432" class="m">fetch NEXT_PUBLIC_GRAPHQL_URL/status</text>
+
+  <path d="M 211 308 L 211 322" class="edge"/>
+  <path d="M 211 382 L 211 396" stroke="#cbd5e1" stroke-width="1.5" fill="none" stroke-dasharray="3 3"/>
+
+  <!-- path A label -->
+  <path d="M 356 352 L 600 352" class="edge"/>
+  <text x="372" y="343" class="lbl">PATH A — direct RPC reads + tx submission</text>
+
+  <!-- graphql-api -->
+  <rect x="600" y="205" width="300" height="200" class="boxSvc"/>
+  <text x="614" y="228" class="h">services/graphql-api</text>
+  <text x="614" y="246" class="m">Apollo Server 4</text>
+
+  <rect x="616" y="262" width="268" height="40" class="box"/>
+  <text x="628" y="287" class="t">resolvers.ts — 404 lines</text>
+
+  <rect x="616" y="316" width="268" height="72" class="boxWarn"/>
+  <text x="628" y="335" class="t">services/contract.ts — 479 lines</text>
+  <text x="628" y="352" class="m">ContractService</text>
+  <text x="628" y="371" class="m">own rpc.Server instance (SDK 14.6.1)</text>
+
+  <path d="M 356 419 L 480 419 L 480 282 L 616 282" class="edge"/>
+  <text x="372" y="411" class="lbl">PATH B — HTTP → GraphQL service</text>
+
+  <path d="M 750 302 L 750 316" class="edge"/>
+
+  <!-- redis -->
+  <rect x="616" y="418" width="130" height="40" class="boxMuted"/>
+  <text x="628" y="443" class="t">Redis cache</text>
+  <path d="M 660 405 L 660 418" class="edge"/>
+
+  <!-- chain -->
+  <rect x="960" y="205" width="330" height="290" class="boxChain"/>
+  <text x="974" y="228" class="h">Stellar / Soroban</text>
+
+  <rect x="976" y="248" width="298" height="40" class="box"/>
+  <text x="988" y="273" class="t">Soroban RPC node</text>
+
+  <rect x="976" y="302" width="298" height="40" class="box"/>
+  <text x="988" y="327" class="t">Horizon</text>
+
+  <rect x="976" y="380" width="298" height="52" class="box"/>
+  <text x="988" y="401" class="t">contracts/crowdfund</text>
+  <text x="988" y="419" class="m">Rust → WASM</text>
+
+  <path d="M 900 300 L 930 300 L 930 268 L 976 268" class="edge"/>
+  <path d="M 356 352 L 356 322 L 940 322 L 940 268 L 976 268" class="edge" opacity="0"/>
+  <path d="M 900 352 L 930 352 L 930 322 L 976 322" class="edge"/>
+  <path d="M 1125 288 L 1125 380" class="edge"/>
+  <path d="M 1180 342 L 1180 380" class="edge"/>
+
+  <text x="976" y="460" class="m">Both paths land on the same node and the same</text>
+  <text x="976" y="477" class="m">contract state — independently, uncoordinated.</text>
+
+  <!-- ══ SEAM 2 — dual RPC clients ═══════════════════════════════════════ -->
+  <rect x="40" y="545" width="1280" height="310" class="panel"/>
+  <rect x="56" y="561" width="212" height="24" class="seamBadge"/>
+  <text x="66" y="578" class="seamTag">SEAM 2 · DUAL RPC CLIENTS</text>
+  <text x="286" y="579" class="panelTitle">Two Soroban RPC clients, pinned to different SDK majors</text>
+  <text x="56" y="610" class="panelSub">Each service constructs its own client. No shared factory, no shared retry, timeout or error-mapping policy — and the two SDK majors expose different APIs.</text>
+
+  <rect x="66" y="635" width="380" height="185" class="boxSvc"/>
+  <text x="80" y="658" class="h">services/graphql-api</text>
+  <rect x="82" y="672" width="348" height="130" class="boxWarn"/>
+  <text x="94" y="693" class="t">ContractService</text>
+  <text x="94" y="711" class="m">src/services/contract.ts:63</text>
+  <text x="94" y="734" class="t">new SorobanRpc.Server(config.rpcUrl)</text>
+  <text x="94" y="756" class="m">import { rpc as SorobanRpc } from "@stellar/stellar-sdk"</text>
+  <rect x="94" y="768" width="216" height="24" class="seamBadge"/>
+  <text x="104" y="785" class="lblWarn">@stellar/stellar-sdk 14.6.1 (pinned)</text>
+
+  <rect x="486" y="635" width="380" height="185" class="boxSvc"/>
+  <text x="500" y="658" class="h">services/indexer</text>
+  <rect x="502" y="672" width="348" height="130" class="boxWarn"/>
+  <text x="514" y="693" class="t">SorobanRPCClient</text>
+  <text x="514" y="711" class="m">src/rpc-client.ts:26</text>
+  <text x="514" y="734" class="t">new SorobanRpc.Server(config.url, {…})</text>
+  <text x="514" y="756" class="m">import { SorobanRpc } from "@stellar/stellar-sdk"</text>
+  <rect x="514" y="768" width="216" height="24" class="seamBadge"/>
+  <text x="524" y="785" class="lblWarn">@stellar/stellar-sdk ^12.0.0 (range)</text>
+
+  <rect x="906" y="635" width="384" height="185" class="boxApp"/>
+  <text x="920" y="658" class="h">apps/interface</text>
+  <rect x="922" y="672" width="352" height="130" class="box"/>
+  <text x="934" y="693" class="t">lib/soroban.ts</text>
+  <text x="934" y="711" class="m">src/lib/soroban.ts:133, :480</text>
+  <text x="934" y="734" class="t">new SorobanRpc.Server(RPC_URL)</text>
+  <text x="934" y="756" class="m">plus new Horizon.Server(HORIZON_URL) ×3</text>
+  <rect x="934" y="768" width="216" height="24" class="seamBadge"/>
+  <text x="944" y="785" class="lblWarn">@stellar/stellar-sdk 14.6.1 (pinned)</text>
+
+  <path d="M 446 737 L 486 737" class="edgeCut" marker-end="none"/>
+  <text x="404" y="838" class="lblCut">no shared factory ✕</text>
+  <path d="M 866 737 L 906 737" class="edgeCut" marker-end="none"/>
+  <text x="824" y="838" class="lblCut">no shared factory ✕</text>
+
+  <!-- ══ SEAM 3 — type-sharing gap ═══════════════════════════════════════ -->
+  <rect x="40" y="880" width="1280" height="300" class="panel"/>
+  <rect x="56" y="896" width="208" height="24" class="seamBadge"/>
+  <text x="66" y="913" class="seamTag">SEAM 3 · TYPE-SHARING GAP</text>
+  <text x="282" y="914" class="panelTitle">packages/types is only consumed in full by the frontend</text>
+  <text x="56" y="945" class="panelSub">The package exports the whole domain, but the two services barely touch it. Event shapes in particular are redefined per service — there is no shared event schema.</text>
+
+  <rect x="66" y="970" width="360" height="190" class="boxMuted"/>
+  <text x="80" y="993" class="h">packages/types</text>
+  <rect x="82" y="1007" width="328" height="42" class="box"/>
+  <text x="94" y="1026" class="t">CampaignStatus, CAMPAIGN_STATUS_VALUES</text>
+  <text x="94" y="1042" class="m">src/soroban.ts</text>
+  <rect x="82" y="1061" width="328" height="82" class="box"/>
+  <text x="94" y="1080" class="t">Campaign, FAQ, TeamMember, Milestone,</text>
+  <text x="94" y="1097" class="t">Comment, Api*Response, CampaignInfo …</text>
+  <text x="94" y="1121" class="m">src/campaign.ts · milestone.ts · comment.ts · api.ts</text>
+
+  <rect x="640" y="970" width="330" height="56" class="boxApp"/>
+  <text x="654" y="991" class="t">apps/interface</text>
+  <text x="654" y="1011" class="m">re-exports the full domain via src/types/*</text>
+  <path d="M 426 1000 L 640 1000" class="edgeDash"/>
+  <text x="446" y="992" class="lbl">imports everything</text>
+
+  <rect x="640" y="1042" width="330" height="56" class="boxSvc"/>
+  <text x="654" y="1063" class="t">services/graphql-api</text>
+  <text x="654" y="1083" class="m">CampaignStatus only — rest re-declared in src/types.ts</text>
+  <path d="M 426 1070 L 640 1070" class="edgeWarn"/>
+  <text x="446" y="1062" class="lblWarn">imports 1 symbol</text>
+
+  <rect x="640" y="1114" width="330" height="56" class="boxWarn"/>
+  <text x="654" y="1135" class="t">services/indexer</text>
+  <text x="654" y="1155" class="m">no dependency — defines its own IndexerEvent</text>
+  <path d="M 426 1140 L 640 1140" class="edgeCut" marker-end="none"/>
+  <text x="446" y="1132" class="lblCut">imports nothing ✕</text>
+
+  <rect x="1000" y="1042" width="300" height="128" class="box"/>
+  <text x="1014" y="1064" class="h">Consequence</text>
+  <text x="1014" y="1086" class="m">graphql-api src/types.ts re-declares</text>
+  <text x="1014" y="1103" class="m">ContractStatus, ContractCategory and</text>
+  <text x="1014" y="1120" class="m">RawCampaignInfo. indexer declares</text>
+  <text x="1014" y="1137" class="m">IndexerEvent. Nothing keeps the three</text>
+  <text x="1014" y="1154" class="m">definitions in step with the contract.</text>
+
+  <!-- ══ SEAM 4 — disconnected alerting ══════════════════════════════════ -->
+  <rect x="40" y="1205" width="1280" height="320" class="panel"/>
+  <rect x="56" y="1221" width="234" height="24" class="seamBadge"/>
+  <text x="66" y="1238" class="seamTag">SEAM 4 · DISCONNECTED ALERTING</text>
+  <text x="308" y="1239" class="panelTitle">Two parallel alerting stacks with no link between them</text>
+  <text x="56" y="1270" class="panelSub">alertmanager.yml declares no webhook_configs, so no Prometheus alert ever reaches monitoring-service. Metrics flow one way; alerts never flow back.</text>
+
+  <rect x="66" y="1295" width="470" height="205" class="boxMuted"/>
+  <text x="80" y="1318" class="h">infrastructure/monitoring — Prometheus stack</text>
+  <rect x="82" y="1332" width="438" height="42" class="box"/>
+  <text x="94" y="1351" class="t">prometheus.yml</text>
+  <text x="94" y="1367" class="m">job 'fund-my-cause-app' → localhost:9091</text>
+  <rect x="82" y="1386" width="438" height="42" class="box"/>
+  <text x="94" y="1405" class="t">prometheus-alerts.yml · log-alert-rules.yml</text>
+  <text x="94" y="1421" class="m">alert rules, severity + category labels</text>
+  <rect x="82" y="1440" width="438" height="46" class="boxWarn"/>
+  <text x="94" y="1459" class="t">alertmanager.yml</text>
+  <text x="94" y="1476" class="m">receivers: PagerDuty + Slack only — no webhook_configs</text>
+  <path d="M 301 1374 L 301 1386" class="edge"/>
+  <path d="M 301 1428 L 301 1440" class="edge"/>
+
+  <rect x="820" y="1295" width="470" height="205" class="boxSvc"/>
+  <text x="834" y="1318" class="h">services/monitoring-service — in-process engine</text>
+  <rect x="836" y="1332" width="438" height="42" class="box"/>
+  <text x="848" y="1351" class="t">POST /alerts · POST /incidents · GET /metrics</text>
+  <text x="848" y="1367" class="m">express app on port 9091 — no external caller</text>
+  <rect x="836" y="1386" width="438" height="42" class="box"/>
+  <text x="848" y="1405" class="t">incident-response.ts</text>
+  <text x="848" y="1421" class="m">rules engine + auto-remediation</text>
+  <rect x="836" y="1440" width="438" height="46" class="box"/>
+  <text x="848" y="1459" class="t">pagerduty-integration.ts</text>
+  <text x="848" y="1476" class="m">its own PagerDuty client, separate from Alertmanager's</text>
+  <path d="M 1055 1374 L 1055 1386" class="edge"/>
+  <path d="M 1055 1428 L 1055 1440" class="edge"/>
+
+  <path d="M 536 1352 L 836 1352" class="edgeWarn"/>
+  <text x="560" y="1344" class="lblWarn">scrapes :9091/metrics (job name mislabelled)</text>
+
+  <path d="M 836 1463 L 536 1463" class="edgeCut" marker-end="none"/>
+  <text x="576" y="1455" class="lblCut">✕  no alert path back — alertmanager has no webhook to POST /alerts</text>
+
+  <text x="576" y="1494" class="note">Both stacks page PagerDuty independently. An incident can be opened twice, or by only one side.</text>
+</svg>

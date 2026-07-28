@@ -1,59 +1,67 @@
-/// Event types and handlers for the achievements contract
-use soroban_sdk::String;
+//! Typed event payloads for the achievements contract.
+//!
+//! Follows the shared convention documented in `common::events` (issue
+//! #924): topic = `("achievements", event_name)`, named fields (never raw
+//! tuples), identifying fields first, `schema_version` last. Only events
+//! actually emitted by `lib.rs` are defined here — see each struct's doc
+//! comment for its topic and call site.
+use soroban_sdk::{contracttype, Address, String};
 
-/// Achievement unlocked event
-pub struct AchievementUnlockedEvent {
-    pub user: String,
+/// Topic: `("achievements", "initialized")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventInitialized {
+    pub admin: Address,
+    pub platform_address: Address,
+    pub schema_version: u32,
+}
+
+/// Topic: `("achievements", "unlocked")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventUnlocked {
+    pub user: Address,
     pub achievement_type: u32,
-    pub level: u32,
     pub points_earned: u32,
-}
-
-/// Points awarded event
-pub struct PointsAwardedEvent {
-    pub user: String,
-    pub points: u32,
-    pub reason: String,
-}
-
-/// Level up event
-pub struct LevelUpEvent {
-    pub user: String,
     pub new_level: u32,
-    pub total_points: u32,
+    pub schema_version: u32,
 }
 
-/// Contribution recorded event
-pub struct ContributionRecordedEvent {
-    pub user: String,
+/// Topic: `("achievements", "points_awarded")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventPointsAwarded {
+    pub user: Address,
+    pub points: u32,
+    pub total_points: u32,
+    pub schema_version: u32,
+}
+
+/// Topic: `("achievements", "contribution_recorded")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventContributionRecorded {
+    pub user: Address,
     pub campaign_id: String,
     pub amount: i128,
+    pub schema_version: u32,
 }
 
-/// Referral recorded event
-pub struct ReferralRecordedEvent {
-    pub referrer: String,
-    pub referee: String,
+/// Topic: `("achievements", "referral_recorded")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventReferralRecorded {
+    pub referrer: Address,
+    pub referee: Address,
     pub points_earned: u32,
+    pub schema_version: u32,
 }
 
-/// Streak updated event
-pub struct StreakUpdatedEvent {
-    pub user: String,
+/// Topic: `("achievements", "streak_updated")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventStreakUpdated {
+    pub user: Address,
     pub new_streak: u32,
-}
-
-/// Challenge completed event
-pub struct ChallengeCompletedEvent {
-    pub user: String,
-    pub challenge_id: String,
-    pub rank: u32,
-    pub reward: i128,
-}
-
-/// Milestone reached event
-pub struct MilestoneReachedEvent {
-    pub user: String,
-    pub milestone_type: u32,
-    pub value: u32,
+    pub schema_version: u32,
 }

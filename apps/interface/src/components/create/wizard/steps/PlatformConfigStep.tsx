@@ -1,7 +1,8 @@
 "use client";
 
 import { validateFeeBps } from "@/lib/validation";
-import { Field, FieldWithError, inputCls } from "../fields";
+import { Input } from "@fund-my-cause/components";
+import { fieldStyles } from "../fields";
 import type { StepProps } from "../types";
 
 /**
@@ -18,28 +19,24 @@ export function PlatformConfigStep({ data, set }: StepProps) {
       <p className="text-sm text-gray-400">
         Optional. Leave blank to skip the platform fee.
       </p>
-      <Field label="Platform Fee Address">
-        <input
-          className={inputCls}
-          placeholder="G... or C..."
-          value={data.feeAddress}
-          onChange={(e) => set("feeAddress", e.target.value)}
-        />
-      </Field>
-      <FieldWithError
+      <Input
+        {...fieldStyles}
+        label="Platform Fee Address"
+        placeholder="G... or C..."
+        value={data.feeAddress}
+        onChange={(e) => set("feeAddress", e.target.value)}
+      />
+      <Input
+        {...fieldStyles}
         label="Fee (basis points, e.g. 250 = 2.5%)"
         error={feeError}
-      >
-        <input
-          type="number"
-          min="0"
-          max="10000"
-          className={inputCls}
-          placeholder="0"
-          value={data.feeBps}
-          onChange={(e) => set("feeBps", e.target.value)}
-        />
-      </FieldWithError>
+        type="number"
+        min="0"
+        max="10000"
+        placeholder="0"
+        value={data.feeBps}
+        onChange={(e) => set("feeBps", e.target.value)}
+      />
     </div>
   );
 }

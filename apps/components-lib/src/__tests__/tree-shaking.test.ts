@@ -29,13 +29,62 @@ describe("tree-shaking: per-component imports", () => {
     expect(ProgressBar).toBeDefined();
   });
 
+  it("should export FormField from form-field entry point", () => {
+    const { FormField } = require("../FormField.entry.ts");
+    expect(FormField).toBeDefined();
+  });
+
+  it("should export Select from select entry point", () => {
+    const { Select } = require("../Select.entry.ts");
+    expect(Select).toBeDefined();
+  });
+
+  it("should export Textarea from textarea entry point", () => {
+    const { Textarea } = require("../Textarea.entry.ts");
+    expect(Textarea).toBeDefined();
+  });
+
+  it("should export CampaignHeader from campaign-header entry point", () => {
+    const { CampaignHeader } = require("../CampaignHeader.entry.ts");
+    expect(CampaignHeader).toBeDefined();
+  });
+
+  it("should export CampaignProgress from campaign-progress entry point", () => {
+    const { CampaignProgress } = require("../CampaignProgress.entry.ts");
+    expect(CampaignProgress).toBeDefined();
+  });
+
+  it("should export CampaignActions from campaign-actions entry point", () => {
+    const { CampaignActions } = require("../CampaignActions.entry.ts");
+    expect(CampaignActions).toBeDefined();
+  });
+
   it("should allow importing entire library from index", () => {
-    const { Button, Input, Modal, Card, ProgressBar, cn } = require("../index.ts");
+    const {
+      Button,
+      Input,
+      Modal,
+      Card,
+      ProgressBar,
+      FormField,
+      Select,
+      Textarea,
+      CampaignHeader,
+      CampaignProgress,
+      CampaignActions,
+      cn,
+    } = require("../index.ts");
     expect(Button).toBeDefined();
     expect(Input).toBeDefined();
     expect(Modal).toBeDefined();
     expect(Card).toBeDefined();
     expect(ProgressBar).toBeDefined();
+    expect(FormField).toBeDefined();
+    expect(Select).toBeDefined();
+    expect(Textarea).toBeDefined();
+    expect(CampaignHeader).toBeDefined();
+    expect(CampaignProgress).toBeDefined();
+    expect(CampaignActions).toBeDefined();
     expect(cn).toBeDefined();
   });
 });

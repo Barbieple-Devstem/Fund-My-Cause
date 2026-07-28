@@ -5,7 +5,8 @@ import { validateVideoUrl } from "@/lib/validation";
 import { ImageUploader } from "@/components/ui/ImageUploader";
 import { VideoUploader } from "@/components/ui/VideoUploader";
 import { logError } from "@/lib/errorLogger";
-import { Field, inputCls } from "../fields";
+import { Input } from "@fund-my-cause/components";
+import { Field, fieldStyles } from "../fields";
 import type { StepProps } from "../types";
 
 /**
@@ -52,12 +53,13 @@ export function MediaStep({ data, set }: StepProps) {
               <p className="text-xs text-gray-500 mb-2">
                 Or enter a video URL directly:
               </p>
-              <input
+              <Input
+                {...fieldStyles}
                 type="url"
+                aria-label="Campaign video URL"
                 placeholder="https://youtube.com/watch?v=... or https://example.com/video.mp4"
                 value={data.videoUrl}
                 onChange={(e) => set("videoUrl", e.target.value)}
-                className={inputCls}
               />
             </div>
           )}

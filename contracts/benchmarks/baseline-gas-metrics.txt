@@ -1,0 +1,111 @@
+# Regression Benchmark Baseline
+# Gas metrics and instructions for crowdfund, registry, and achievements contracts
+# Generated: 2026-07-27
+#
+# This file serves as the baseline for regression detection. To establish/update:
+# 1. Run: cargo bench --bench contract_benchmarks --bench registry_benchmarks --bench achievements_benchmarks
+# 2. Extract median values from criterion output
+# 3. Update this file with new values
+# 4. Commit as baseline snapshot
+#
+# Regression Threshold: 15% increase in instructions/gas
+#
+# Format: function_name | median_instructions | median_cpu_cycles | notes
+
+## CROWDFUND CONTRACT BENCHMARKS
+
+# Contribution Operations
+contribute_single | TBD | TBD | Single new contributor
+contribute_multiple_10 | TBD | TBD | 10 sequential contributors
+contribute_repeat_contributor | TBD | TBD | Existing contributor second contribution
+contribute_with_message | TBD | TBD | Contribution with attached message
+contribute_with_platform_fee | TBD | TBD | OnContribution fee deduction
+contribute_50th_contributor | TBD | TBD | 50 indexed contributor entries
+
+# Refund Operations
+refund_single | TBD | TBD | Single refund after cancellation
+refund_batch_25 | TBD | TBD | Batch refund of 25 contributors
+refund_batch_edge_cases | TBD | TBD | Refund with insurance/matching
+
+# Withdrawal Operations
+withdraw_successful | TBD | TBD | Creator withdrawal after goal reached
+withdraw_with_vesting | TBD | TBD | Vesting cliff + linear release
+withdraw_with_platform_fee | TBD | TBD | OnSuccess fee deduction
+
+# Campaign Management
+initialize | TBD | TBD | Campaign initialization
+cancel_campaign | TBD | TBD | Campaign cancellation
+extend_deadline | TBD | TBD | Deadline extension
+adjust_goal | TBD | TBD | Goal adjustment mid-campaign
+
+# Rate Limiting
+set_rate_limit | TBD | TBD | Configure rate limit
+rate_limit_enforcement | TBD | TBD | Rate limit check during contribute
+
+# Insurance
+enable_insurance | TBD | TBD | Enable insurance coverage
+insurance_payout | TBD | TBD | Insurance fee aggregation
+
+# Matching/Sponsorship
+setup_matching | TBD | TBD | Configure sponsor matching
+matching_calculation | TBD | TBD | Match amount computation during contribute
+
+## REGISTRY CONTRACT BENCHMARKS
+
+register_campaign | TBD | TBD | Register campaign in registry
+verify_campaign | TBD | TBD | Campaign verification status update
+search_campaigns | TBD | TBD | Indexed search operation
+
+## ACHIEVEMENTS CONTRACT BENCHMARKS
+
+award_badge | TBD | TBD | Single badge award
+update_points | TBD | TBD | Contribution points update
+claim_rewards | TBD | TBD | Reward claim operation
+milestone_unlock | TBD | TBD | Achievement milestone unlock
+
+## Regression Detection Workflow
+
+### Step 1: Establish Baseline
+  cargo bench --bench contract_benchmarks 2>&1 | tee benchmark_output.txt
+  # Manually review output and update this file with TBD → actual values
+
+### Step 2: Run on New Code
+  cargo bench --bench contract_benchmarks 2>&1 | tee new_output.txt
+
+### Step 3: Compare (Manual)
+  - Extract median CPU cycles from both files
+  - Calculate % change: (new - baseline) / baseline * 100
+  - Flag if any function shows > 15% regression
+
+### Step 4: CI Integration (Planned)
+  - Automated script to parse criterion output
+  - Fail CI if regression > 15%
+  - Generate HTML diff report for review
+
+## Critical Entry Points Covered
+
+✓ initialize/initialize_from_template (campaign setup)
+✓ contribute (core funding flow)
+✓ refund_single (pull-based refund)
+✓ refund_batch (batch refund optimization)
+✓ withdraw (creator payout)
+✓ cancel_campaign (cancellation flow)
+✓ set_rate_limit (rate limiting setup)
+✓ extend_deadline (deadline management)
+✓ adjust_goal (goal adjustments)
+✓ enable_insurance (insurance setup)
+✓ contribute with platform fees (fee modes)
+✓ contribute with matching (sponsor matching)
+✓ Emergency withdrawal flows (admin recovery)
+✓ Streaming withdrawal (scheduled release)
+
+## Known Gaps (To Be Implemented)
+
+- [ ] Milestone verification benchmarks (registry)
+- [ ] Delegation contribution flows
+- [ ] Governance voting scenarios
+- [ ] Multi-sig emergency withdrawal
+- [ ] Dispute resolution workflow
+- [ ] Asset whitelist/blacklist enforcement
+- [ ] Vesting cliff reached edge case
+- [ ] Concurrent contribution stress test (instrumented)

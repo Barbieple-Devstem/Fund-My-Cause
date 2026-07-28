@@ -13,7 +13,11 @@ fn setup_campaign(
     deadline: u64,
     min_contribution: i128,
     max_contribution: i128,
-) -> (CrowdfundContractClient<'_>, Address, token::StellarAssetClient<'_>) {
+) -> (
+    CrowdfundContractClient<'_>,
+    Address,
+    token::StellarAssetClient<'_>,
+) {
     env.mock_all_auths();
     let creator = Address::generate(env);
     let token_admin = Address::generate(env);
@@ -89,7 +93,11 @@ fn test_upgrade_with_platform_fee_preserves_config() {
         &String::from_str(&env, "Test"),
         &String::from_str(&env, "Test"),
         &None,
-        &Some(PlatformConfig { address: platform.clone(), fee_bps: 500, fee_mode: crowdfund::FeeMode::OnSuccess }),
+        &Some(PlatformConfig {
+            address: platform.clone(),
+            fee_bps: 500,
+            fee_mode: crowdfund::FeeMode::OnSuccess,
+        }),
         &None,
         &Category::Other,
         &None,
@@ -279,7 +287,10 @@ fn test_refund_full_campaign_after_upgrade() {
     client.refund_single(&contributor);
 
     assert_eq!(client.contribution(&contributor), 0);
-    assert_eq!(token::Client::new(&env, &token_id).balance(&contributor), 5_000);
+    assert_eq!(
+        token::Client::new(&env, &token_id).balance(&contributor),
+        5_000
+    );
 }
 
 #[test]
@@ -430,7 +441,11 @@ fn test_migration_preserves_complex_state() {
         &String::from_str(&env, "Complex"),
         &String::from_str(&env, "Complex campaign"),
         &None,
-        &Some(PlatformConfig { address: platform.clone(), fee_bps: 250, fee_mode: crowdfund::FeeMode::OnSuccess }),
+        &Some(PlatformConfig {
+            address: platform.clone(),
+            fee_bps: 250,
+            fee_mode: crowdfund::FeeMode::OnSuccess,
+        }),
         &None,
         &Category::Technology,
         &None,

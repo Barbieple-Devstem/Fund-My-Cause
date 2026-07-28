@@ -8,7 +8,20 @@ use soroban_sdk::{
     testutils::{Address as _, Ledger},
     Address, Env, String, Vec,
 };
+use common::test_utils::setup_env;
 
+/// Sets up a test crowdfund contract with a token and initial configuration.
+///
+/// # Parameters
+///
+/// * `env` — The test environment (typically from `setup_env()`).
+/// * `deadline` — Campaign deadline as a Unix timestamp.
+/// * `goal` — Funding goal in stroops (i128).
+/// * `min_contribution` — Minimum allowed contribution per contributor.
+///
+/// # Returns
+///
+/// A tuple of (creator_address, token_id, client, token_admin_client).
 fn setup_contract(
     env: &Env,
     deadline: u64,
@@ -20,7 +33,6 @@ fn setup_contract(
     CrowdfundContractClient<'_>,
     token::StellarAssetClient<'_>,
 ) {
-    env.mock_all_auths();
 
     let creator = Address::generate(env);
     let token_admin = Address::generate(env);
@@ -52,7 +64,7 @@ fn setup_contract(
 
 #[test]
 fn initialize_and_contribute_updates_state() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
     let goal = 10_000i128;
     let min_contribution = 100i128;
@@ -79,7 +91,7 @@ fn initialize_and_contribute_updates_state() {
 
 #[test]
 fn cancel_allows_refund_before_deadline() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, token_id, client, token_admin_client) =
@@ -101,7 +113,7 @@ fn cancel_allows_refund_before_deadline() {
 
 #[test]
 fn test_get_performance_metrics() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 100_000u64;
     let goal = 10_000i128;
     let min_contribution = 100i128;
@@ -133,7 +145,7 @@ fn test_get_performance_metrics() {
 
 #[test]
 fn test_performance_metrics_with_no_contributions() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 100_000u64;
     let goal = 10_000i128;
     let min_contribution = 100i128;
@@ -152,7 +164,7 @@ fn test_performance_metrics_with_no_contributions() {
 
 #[test]
 fn test_performance_metrics_goal_reached() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 100_000u64;
     let goal = 10_000i128;
     let min_contribution = 100i128;
@@ -175,8 +187,7 @@ fn test_performance_metrics_goal_reached() {
 
 #[test]
 fn invalid_platform_fee_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
 
     let creator = Address::generate(&env);
     let token_admin = Address::generate(&env);
@@ -212,8 +223,7 @@ fn invalid_platform_fee_is_rejected() {
 
 #[test]
 fn accepted_token_whitelist_is_enforced() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
 
     let creator = Address::generate(&env);
     let token_admin = Address::generate(&env);
@@ -255,7 +265,7 @@ fn accepted_token_whitelist_is_enforced() {
 
 #[test]
 fn refund_batch_refunds_multiple_contributors() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, token_id, client, token_admin_client) =
@@ -295,7 +305,7 @@ fn refund_batch_refunds_multiple_contributors() {
 
 #[test]
 fn refund_batch_skips_already_refunded() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, token_id, client, token_admin_client) =
@@ -317,7 +327,7 @@ fn refund_batch_skips_already_refunded() {
 
 #[test]
 fn refund_batch_fails_when_campaign_still_active() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, token_id, client, token_admin_client) =
@@ -338,7 +348,7 @@ fn refund_batch_fails_when_campaign_still_active() {
 
 #[test]
 fn pause_blocks_contributions_and_unpause_resumes() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, token_id, client, token_admin_client) =
@@ -362,7 +372,7 @@ fn pause_blocks_contributions_and_unpause_resumes() {
 
 #[test]
 fn pause_allows_refunds_when_cancelled() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, token_id, client, token_admin_client) =
@@ -381,7 +391,7 @@ fn pause_allows_refunds_when_cancelled() {
 
 #[test]
 fn unpause_fails_when_not_paused() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, _token_id, client, _) = setup_contract(&env, deadline, 100_000, 100);
@@ -392,7 +402,7 @@ fn unpause_fails_when_not_paused() {
 
 #[test]
 fn pause_fails_when_not_active() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
 
     let (_creator, _token_id, client, _) = setup_contract(&env, deadline, 100_000, 100);
@@ -417,7 +427,6 @@ fn setup_contract_with_max(
     CrowdfundContractClient<'_>,
     token::StellarAssetClient<'_>,
 ) {
-    env.mock_all_auths();
 
     let creator = Address::generate(env);
     let token_admin = Address::generate(env);
@@ -449,7 +458,7 @@ fn setup_contract_with_max(
 
 #[test]
 fn contribute_within_max_succeeds() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_max(&env, 1_000, 10_000, 100, 500);
 
@@ -462,7 +471,7 @@ fn contribute_within_max_succeeds() {
 
 #[test]
 fn contribute_exceeding_max_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_max(&env, 1_000, 10_000, 100, 500);
 
@@ -475,7 +484,7 @@ fn contribute_exceeding_max_is_rejected() {
 
 #[test]
 fn cumulative_contribution_exceeding_max_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_max(&env, 1_000, 10_000, 100, 500);
 
@@ -489,7 +498,7 @@ fn cumulative_contribution_exceeding_max_is_rejected() {
 
 #[test]
 fn no_max_limit_allows_large_contribution() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) = setup_contract(&env, 1_000, 10_000, 100);
 
     let contributor = Address::generate(&env);
@@ -501,7 +510,7 @@ fn no_max_limit_allows_large_contribution() {
 
 #[test]
 fn max_contribution_view_returns_stored_value() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract_with_max(&env, 1_000, 10_000, 100, 750);
 
     assert_eq!(client.max_contribution(), 750);
@@ -509,8 +518,7 @@ fn max_contribution_view_returns_stored_value() {
 
 #[test]
 fn initialize_with_max_below_min_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
 
     let creator = Address::generate(&env);
     let token_admin = Address::generate(&env);
@@ -541,8 +549,7 @@ fn initialize_with_max_below_min_is_rejected() {
 
 #[test]
 fn initialize_with_empty_title_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
 
     let creator = Address::generate(&env);
     let token_admin = Address::generate(&env);
@@ -571,8 +578,7 @@ fn initialize_with_empty_title_is_rejected() {
 
 #[test]
 fn initialize_with_title_too_long_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
 
     let creator = Address::generate(&env);
     let token_admin = Address::generate(&env);
@@ -606,8 +612,7 @@ fn initialize_with_title_too_long_is_rejected() {
 
 #[test]
 fn initialize_with_self_fee_address_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
 
     let creator = Address::generate(&env);
     let token_admin = Address::generate(&env);
@@ -640,7 +645,7 @@ fn initialize_with_self_fee_address_is_rejected() {
 
 #[test]
 fn contribute_with_zero_amount_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     let contributor = Address::generate(&env);
@@ -650,7 +655,7 @@ fn contribute_with_zero_amount_is_rejected() {
 
 #[test]
 fn contribute_with_negative_amount_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     let contributor = Address::generate(&env);
@@ -660,7 +665,7 @@ fn contribute_with_negative_amount_is_rejected() {
 
 #[test]
 fn update_metadata_with_empty_title_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 100);
 
     let result = client.try_update_metadata(&Some(String::from_str(&env, "")), &None, &None);
@@ -669,7 +674,7 @@ fn update_metadata_with_empty_title_is_rejected() {
 
 #[test]
 fn update_metadata_with_valid_title_succeeds() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 100);
 
     client.update_metadata(&Some(String::from_str(&env, "New Title")), &None, &None);
@@ -680,7 +685,7 @@ fn update_metadata_with_valid_title_succeeds() {
 
 #[test]
 fn set_rate_limit_stores_struct_and_get_returns_it() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     client.set_rate_limit(&500, &3_600);
@@ -691,7 +696,7 @@ fn set_rate_limit_stores_struct_and_get_returns_it() {
 
 #[test]
 fn set_rate_limit_zero_clears_existing_limit() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     client.set_rate_limit(&500, &3_600);
@@ -703,7 +708,7 @@ fn set_rate_limit_zero_clears_existing_limit() {
 
 #[test]
 fn set_rate_limit_rejects_negative_amount() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     let result = client.try_set_rate_limit(&-1, &3_600);
@@ -712,7 +717,7 @@ fn set_rate_limit_rejects_negative_amount() {
 
 #[test]
 fn set_rate_limit_rejects_zero_window_when_enabling() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     let result = client.try_set_rate_limit(&500, &0);
@@ -721,7 +726,7 @@ fn set_rate_limit_rejects_zero_window_when_enabling() {
 
 #[test]
 fn contribute_exceeding_rate_limit_in_window_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -742,7 +747,7 @@ fn contribute_exceeding_rate_limit_in_window_is_rejected() {
 
 #[test]
 fn contribute_within_rate_limit_succeeds() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -760,7 +765,7 @@ fn contribute_within_rate_limit_succeeds() {
 
 #[test]
 fn rate_limit_resets_after_window_elapses() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 100_000, 1_000_000, 100);
 
@@ -781,7 +786,7 @@ fn rate_limit_resets_after_window_elapses() {
 
 #[test]
 fn disabled_rate_limit_allows_large_contributions() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 100_000, 1_000_000, 100);
 
@@ -798,14 +803,14 @@ fn disabled_rate_limit_allows_large_contributions() {
 
 #[test]
 fn default_visibility_is_public() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 100);
     assert_eq!(client.get_visibility(), Visibility::Public);
 }
 
 #[test]
 fn set_visibility_updates_storage() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 100);
 
     client.set_visibility(&Visibility::Unlisted);
@@ -817,7 +822,7 @@ fn set_visibility_updates_storage() {
 
 #[test]
 fn private_visibility_blocks_non_whitelisted_contributors() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -832,7 +837,7 @@ fn private_visibility_blocks_non_whitelisted_contributors() {
 
 #[test]
 fn private_visibility_allows_whitelisted_contributors() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -847,7 +852,7 @@ fn private_visibility_allows_whitelisted_contributors() {
 
 #[test]
 fn unlisted_visibility_allows_any_contributor() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -863,7 +868,7 @@ fn unlisted_visibility_allows_any_contributor() {
 
 #[test]
 fn delegate_contribution_then_contribute_on_behalf() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -888,7 +893,7 @@ fn delegate_contribution_then_contribute_on_behalf() {
 
 #[test]
 fn contribute_on_behalf_rejects_exceeding_delegated_amount() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -905,7 +910,7 @@ fn contribute_on_behalf_rejects_exceeding_delegated_amount() {
 
 #[test]
 fn revoke_delegation_blocks_further_contributions() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -925,7 +930,7 @@ fn revoke_delegation_blocks_further_contributions() {
 
 #[test]
 fn contribute_on_behalf_without_delegation_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 100);
 
@@ -939,7 +944,7 @@ fn contribute_on_behalf_without_delegation_is_rejected() {
 
 #[test]
 fn delegate_contribution_rejects_non_positive_amount() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 10_000, 100_000, 100);
 
     let delegator = Address::generate(&env);
@@ -953,7 +958,7 @@ fn delegate_contribution_rejects_non_positive_amount() {
 
 #[test]
 fn setup_and_execute_recurring_contribution() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000_000u64;
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, deadline, 1_000_000, 100);
@@ -996,7 +1001,7 @@ fn setup_and_execute_recurring_contribution() {
 
 #[test]
 fn setup_recurring_rejects_invalid_parameters() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000_000, 1_000_000, 100);
 
     let contributor = Address::generate(&env);
@@ -1017,7 +1022,7 @@ fn setup_recurring_rejects_invalid_parameters() {
 
 #[test]
 fn execute_recurring_after_end_date_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000_000u64;
     let (_creator, _token_id, client, token_admin_client) =
         setup_contract(&env, deadline, 1_000_000, 100);
@@ -1035,7 +1040,7 @@ fn execute_recurring_after_end_date_is_rejected() {
 
 #[test]
 fn cancel_recurring_removes_plan() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000_000, 1_000_000, 100);
 
     let contributor = Address::generate(&env);
@@ -1064,7 +1069,6 @@ fn setup_contract_with_vesting(
     CrowdfundContractClient<'_>,
     token::StellarAssetClient<'_>,
 ) {
-    env.mock_all_auths();
 
     let creator = Address::generate(env);
     let token_admin = Address::generate(env);
@@ -1096,7 +1100,7 @@ fn setup_contract_with_vesting(
 
 #[test]
 fn get_vesting_info_returns_configured_schedule() {
-    let env = Env::default();
+    let env = setup_env();
     let cliff = 2_000u64;
     let duration = 1_000u64;
     let (_creator, _token_id, client, _) =
@@ -1109,7 +1113,7 @@ fn get_vesting_info_returns_configured_schedule() {
 
 #[test]
 fn get_vested_amount_returns_zero_before_cliff() {
-    let env = Env::default();
+    let env = setup_env();
     // cliff=2000, deadline=1000 — cliff is after deadline so we can test pre-cliff
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_vesting(&env, 1_000, 500, 2_000, 1_000);
@@ -1125,7 +1129,7 @@ fn get_vested_amount_returns_zero_before_cliff() {
 
 #[test]
 fn get_vested_amount_returns_full_after_cliff_plus_duration() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_vesting(&env, 1_000, 500, 2_000, 1_000);
 
@@ -1140,7 +1144,7 @@ fn get_vested_amount_returns_full_after_cliff_plus_duration() {
 
 #[test]
 fn get_vested_amount_linear_between_cliff_and_end() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_vesting(&env, 1_000, 1_000, 2_000, 1_000);
 
@@ -1155,7 +1159,7 @@ fn get_vested_amount_linear_between_cliff_and_end() {
 
 #[test]
 fn withdraw_before_cliff_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     // deadline=1000, cliff=2000
     let (creator, token_id, client, token_admin_client) =
         setup_contract_with_vesting(&env, 1_000, 500, 2_000, 1_000);
@@ -1176,7 +1180,7 @@ fn withdraw_before_cliff_is_rejected() {
 
 #[test]
 fn withdraw_after_cliff_transfers_vested_amount() {
-    let env = Env::default();
+    let env = setup_env();
     // deadline=1000, cliff=2000, duration=1000
     let (creator, token_id, client, token_admin_client) =
         setup_contract_with_vesting(&env, 1_000, 1_000, 2_000, 1_000);
@@ -1195,7 +1199,7 @@ fn withdraw_after_cliff_transfers_vested_amount() {
 
 #[test]
 fn no_vesting_schedule_returns_full_payout_as_vested() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000, 500, 0);
 
@@ -1210,7 +1214,7 @@ fn no_vesting_schedule_returns_full_payout_as_vested() {
 
 #[test]
 fn enable_insurance_stores_config() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 10_000, 100_000, 0);
 
     let provider = Address::generate(&env);
@@ -1223,7 +1227,7 @@ fn enable_insurance_stores_config() {
 
 #[test]
 fn enable_insurance_invalid_fee_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 10_000, 100_000, 0);
 
     let provider = Address::generate(&env);
@@ -1233,7 +1237,7 @@ fn enable_insurance_invalid_fee_is_rejected() {
 
 #[test]
 fn contribute_with_insurance_splits_fee_into_pool() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1254,7 +1258,7 @@ fn contribute_with_insurance_splits_fee_into_pool() {
 
 #[test]
 fn claim_insurance_payout_on_failed_campaign() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000, 100_000, 0);
 
@@ -1279,7 +1283,7 @@ fn claim_insurance_payout_on_failed_campaign() {
 
 #[test]
 fn claim_insurance_payout_on_active_campaign_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1296,7 +1300,7 @@ fn claim_insurance_payout_on_active_campaign_is_rejected() {
 
 #[test]
 fn claim_insurance_payout_on_successful_campaign_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000, 500, 0);
 
@@ -1318,7 +1322,7 @@ fn claim_insurance_payout_on_successful_campaign_is_rejected() {
 
 #[test]
 fn propose_extension_stores_proposal() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     env.ledger().set_timestamp(100);
@@ -1333,7 +1337,7 @@ fn propose_extension_stores_proposal() {
 
 #[test]
 fn propose_extension_with_earlier_deadline_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 10_000, 0);
 
     let result = client.try_propose_extension(&500);
@@ -1342,7 +1346,7 @@ fn propose_extension_with_earlier_deadline_is_rejected() {
 
 #[test]
 fn vote_on_extension_records_vote_weight() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1362,7 +1366,7 @@ fn vote_on_extension_records_vote_weight() {
 
 #[test]
 fn vote_on_extension_against_records_correctly() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1381,7 +1385,7 @@ fn vote_on_extension_against_records_correctly() {
 
 #[test]
 fn double_vote_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1399,7 +1403,7 @@ fn double_vote_is_rejected() {
 
 #[test]
 fn vote_after_voting_period_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000_000, 100_000, 0);
 
@@ -1419,7 +1423,7 @@ fn vote_after_voting_period_is_rejected() {
 
 #[test]
 fn execute_extension_updates_deadline_when_majority_approves() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000_000, 100_000, 0);
 
@@ -1445,7 +1449,7 @@ fn execute_extension_updates_deadline_when_majority_approves() {
 
 #[test]
 fn execute_extension_does_not_update_deadline_when_majority_rejects() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000_000, 100_000, 0);
 
@@ -1473,7 +1477,7 @@ fn execute_extension_does_not_update_deadline_when_majority_rejects() {
 
 #[test]
 fn refund_partial_within_limit_succeeds() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1491,7 +1495,7 @@ fn refund_partial_within_limit_succeeds() {
 
 #[test]
 fn refund_partial_exceeding_50_percent_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1505,7 +1509,7 @@ fn refund_partial_exceeding_50_percent_is_rejected() {
 
 #[test]
 fn refund_partial_updates_total_raised() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1522,7 +1526,7 @@ fn refund_partial_updates_total_raised() {
 
 #[test]
 fn archive_successful_campaign() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (creator, token_id, client, token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1544,7 +1548,7 @@ fn archive_successful_campaign() {
 
 #[test]
 fn archive_cancelled_campaign() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (_creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1560,7 +1564,7 @@ fn archive_cancelled_campaign() {
 #[test]
 #[should_panic]
 fn archive_active_campaign_fails() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (_creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1572,7 +1576,7 @@ fn archive_active_campaign_fails() {
 #[test]
 #[should_panic]
 fn archive_already_archived_fails() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (_creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1585,7 +1589,7 @@ fn archive_already_archived_fails() {
 
 #[test]
 fn is_archived_returns_false_before_archiving() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (_creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1598,7 +1602,7 @@ fn is_archived_returns_false_before_archiving() {
 
 #[test]
 fn transfer_ownership_updates_creator_and_admin() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1612,7 +1616,7 @@ fn transfer_ownership_updates_creator_and_admin() {
 #[test]
 #[should_panic]
 fn transfer_ownership_to_self_fails() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1623,7 +1627,7 @@ fn transfer_ownership_to_self_fails() {
 
 #[test]
 fn new_owner_can_perform_creator_actions() {
-    let env = Env::default();
+    let env = setup_env();
     env.ledger().set_timestamp(1000);
     let (_creator, _token_id, client, _token_admin_client) =
         setup_contract(&env, 2000, 100, 0);
@@ -1640,7 +1644,7 @@ fn new_owner_can_perform_creator_actions() {
 
 #[test]
 fn contributor_list_returns_all_contributors_in_order() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1665,7 +1669,7 @@ fn contributor_list_returns_all_contributors_in_order() {
 
 #[test]
 fn contributor_list_paginates_correctly() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 1_000_000, 0);
 
@@ -1692,7 +1696,7 @@ fn contributor_list_paginates_correctly() {
 
 #[test]
 fn contributor_list_offset_beyond_count_returns_empty() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1706,7 +1710,7 @@ fn contributor_list_offset_beyond_count_returns_empty() {
 
 #[test]
 fn contributor_list_caps_limit_at_50() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 10_000_000, 0);
 
@@ -1723,7 +1727,7 @@ fn contributor_list_caps_limit_at_50() {
 
 #[test]
 fn repeat_contributor_does_not_inflate_count_or_list() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1749,7 +1753,7 @@ fn below_minimum_returned_before_blacklist_check() {
     // Amount is below minimum AND contributor is blacklisted.
     // The optimised path checks amount first, so BelowMinimum should be
     // returned without ever consulting the blacklist storage.
-    let env = Env::default();
+    let env = setup_env();
     let (creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 500); // min = 500
 
@@ -1767,7 +1771,7 @@ fn below_minimum_returned_before_blacklist_check() {
 
 #[test]
 fn refund_single_rejects_before_deadline_when_not_cancelled() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1782,7 +1786,7 @@ fn refund_single_rejects_before_deadline_when_not_cancelled() {
 
 #[test]
 fn refund_single_rejects_when_goal_reached() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000, 500, 0); // goal = 500
 
@@ -1798,7 +1802,7 @@ fn refund_single_rejects_when_goal_reached() {
 
 #[test]
 fn refund_batch_rejects_before_deadline_when_not_cancelled() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 0);
 
@@ -1815,7 +1819,7 @@ fn refund_batch_rejects_before_deadline_when_not_cancelled() {
 
 #[test]
 fn refund_batch_rejects_when_goal_reached() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 1_000, 500, 0); // goal = 500
 
@@ -1836,7 +1840,7 @@ fn refund_batch_rejects_when_goal_reached() {
 
 #[test]
 fn get_stats_returns_accurate_metrics_after_multiple_contributions() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 10_000, 0);
 
@@ -1874,7 +1878,6 @@ fn setup_with_matching(
     CrowdfundContractClient<'_>,
     token::StellarAssetClient<'_>,
 ) {
-    env.mock_all_auths();
 
     let creator = Address::generate(env);
     let sponsor = Address::generate(env);
@@ -1911,7 +1914,7 @@ fn setup_with_matching(
 
 #[test]
 fn matching_escrows_sponsor_funds_on_setup() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 10_000u64;
     let goal = 1_000i128;
     let max_match = 500i128;
@@ -1932,7 +1935,7 @@ fn matching_escrows_sponsor_funds_on_setup() {
 
 #[test]
 fn matching_applies_ratio_on_contribution() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 10_000u64;
 
     // 1:1 match (10_000 bps), cap 1000
@@ -1951,7 +1954,7 @@ fn matching_applies_ratio_on_contribution() {
 
 #[test]
 fn matching_capped_at_max_match() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 10_000u64;
 
     // 1:1 match but cap only 50
@@ -1970,7 +1973,7 @@ fn matching_capped_at_max_match() {
 
 #[test]
 fn matching_partial_ratio() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 10_000u64;
 
     // 50% match (5_000 bps), cap 1000
@@ -1988,7 +1991,7 @@ fn matching_partial_ratio() {
 
 #[test]
 fn matching_cap_exhausted_stops_matching() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 10_000u64;
 
     // 1:1 match, cap 100
@@ -2011,7 +2014,7 @@ fn matching_cap_exhausted_stops_matching() {
 
 #[test]
 fn matching_refunds_unused_to_sponsor_on_withdraw() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
     let goal = 200i128;
 
@@ -2038,7 +2041,7 @@ fn matching_refunds_unused_to_sponsor_on_withdraw() {
 
 #[test]
 fn matching_refund_sponsor_manual_after_cancellation() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 10_000u64;
 
     let (creator, sponsor, token_id, client, _token_admin_client) =
@@ -2063,7 +2066,7 @@ fn matching_refund_sponsor_manual_after_cancellation() {
 
 #[test]
 fn execute_recurring_after_cancel_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000_000, 1_000_000, 100);
 
     let contributor = Address::generate(&env);
@@ -2078,7 +2081,7 @@ fn execute_recurring_after_cancel_is_rejected() {
 
 #[test]
 fn execute_recurring_no_plan_is_rejected() {
-    let env = Env::default();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000_000, 1_000_000, 100);
 
     let contributor = Address::generate(&env);
@@ -2103,7 +2106,6 @@ fn setup_contract_with_cap(
     CrowdfundContractClient<'_>,
     token::StellarAssetClient<'_>,
 ) {
-    env.mock_all_auths();
     let creator = Address::generate(env);
     let token_admin = Address::generate(env);
     let token_id = env.register_stellar_asset_contract(token_admin.clone());
@@ -2131,7 +2133,7 @@ fn setup_contract_with_cap(
 
 #[test]
 fn contributor_cap_rejects_over_cap() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_cap(&env, deadline, 10_000, 100, 500);
@@ -2149,7 +2151,7 @@ fn contributor_cap_rejects_over_cap() {
 
 #[test]
 fn contributor_cap_allows_exactly_at_boundary() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
     let (_creator, token_id, client, token_admin_client) =
         setup_contract_with_cap(&env, deadline, 10_000, 100, 500);
@@ -2164,7 +2166,7 @@ fn contributor_cap_allows_exactly_at_boundary() {
 
 #[test]
 fn no_cap_behaves_as_before() {
-    let env = Env::default();
+    let env = setup_env();
     let deadline = 1_000u64;
     // max_contribution = 0 means disabled
     let (_creator, token_id, client, token_admin_client) =
@@ -2182,8 +2184,7 @@ fn no_cap_behaves_as_before() {
 
 #[test]
 fn stream_claim_proportional_midway() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
     let deadline = 1_000u64;
     let goal = 1_000i128;
 
@@ -2212,8 +2213,7 @@ fn stream_claim_proportional_midway() {
 
 #[test]
 fn stream_claim_full_after_end() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
     let deadline = 1_000u64;
     let goal = 1_000i128;
 
@@ -2239,8 +2239,7 @@ fn stream_claim_full_after_end() {
 
 #[test]
 fn stream_claim_before_start_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
     let deadline = 1_000u64;
     let goal = 1_000i128;
 
@@ -2262,8 +2261,7 @@ fn stream_claim_before_start_is_rejected() {
 
 #[test]
 fn claim_stream_without_config_is_rejected() {
-    let env = Env::default();
-    env.mock_all_auths();
+    let env = setup_env();
     let (_creator, _token_id, client, _) = setup_contract(&env, 1_000, 1_000, 100);
 
     env.ledger().set_timestamp(2_000u64);

@@ -18,6 +18,7 @@
   "dependencies": {
     "@fund-my-cause/types": "file:../../packages/types",
     "@fund-my-cause/sdk": "file:../../sdks/js",
+    "@fund-my-cause/shared-utils": "file:../../packages/shared-utils",
     "@apollo/server": "^4.10.0",
     "@graphql-tools/schema": "^9.0.19",
     "@graphql-tools/utils": "^10.0.0",
@@ -33,7 +34,9 @@
     "@stellar/stellar-sdk": "14.6.1",
     "dotenv": "^16.0.0",
     "rate-limiter-flexible": "^2.4.1",
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^9.0.2",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1"
   },
   "devDependencies": {
     "artillery": "^2.0.0",

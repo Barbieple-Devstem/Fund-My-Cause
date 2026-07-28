@@ -1,47 +1,88 @@
 "use client";
 
-import React, { InputHTMLAttributes, forwardRef } from "react";
-import { cn } from "@/lib/utils";
+import React, { InputHTMLAttributes, ReactNode, forwardRef } from "react";
+import { cn } from "./lib/utils";
+import { FormField } from "./FormField";
+import { controlClassName } from "./lib/formStyles";
 
-export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
+export interface InputProps
+  extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
+  /** Visible label text rendered above the control. */
+  label?: ReactNode;
+  /** Validation message. Marks the input invalid and hides `helperText`. */
+  error?: string | null;
+  /** Supporting text shown below the control while there is no error. */
   helperText?: string;
+  /** Stretches the field and control to the width of the container. */
   fullWidth?: boolean;
+  /** Explicit control id. Generated when omitted. */
+  id?: string;
+  /**
+   * Drops the library's default control styling so `className` fully owns the
+   * look. Use when adopting the primitive inside an app that already has its
+   * own input styles and needs pixel-identical output.
+   */
+  unstyled?: boolean;
+  /** Extra classes for the wrapper element (not the control). */
+  fieldClassName?: string;
+  labelClassName?: string;
+  errorClassName?: string;
+  helperTextClassName?: string;
 }
 
 /**
- * Input component with label, error, and helper text support
+ * Text input composed onto `FormField` — label, error, helper text and
+ * required indicator all come from the shared wrapper.
+ *
+ * Works controlled (`value` + `onChange`) or uncontrolled (`defaultValue`).
+ *
  * @example
- * <Input label="Email" type="email" error="Invalid email" />
+ * <Input label="Email" type="email" error="Invalid email" required />
  */
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, fullWidth = false, className, ...props }, ref) => {
-    return (
-      <div className={cn("flex flex-col gap-1", fullWidth && "w-full")}>
-        {label && (
-          <label className="text-sm font-medium text-gray-700">
-            {label}
-            {props.required && <span className="text-red-500 ml-1">*</span>}
-          </label>
-        )}
+  (
+    {
+      label,
+      error,
+      helperText,
+      fullWidth = false,
+      id,
+      unstyled = false,
+      fieldClassName,
+      labelClassName,
+      errorClassName,
+      helperTextClassName,
+      className,
+      required,
+      ...props
+    },
+    ref,
+  ) => (
+    <FormField
+      label={label}
+      error={error}
+      helperText={helperText}
+      required={required}
+      id={id}
+      fullWidth={fullWidth}
+      className={fieldClassName}
+      labelClassName={labelClassName}
+      errorClassName={errorClassName}
+      helperTextClassName={helperTextClassName}
+    >
+      {(control) => (
         <input
           ref={ref}
+          {...control}
           className={cn(
-            "px-3 py-2 border rounded-lg text-base transition-colors",
-            "focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent",
-            "disabled:bg-gray-100 disabled:cursor-not-allowed",
-            error ? "border-red-500 focus:ring-red-500" : "border-gray-300",
-            fullWidth && "w-full",
-            className
+            controlClassName({ unstyled, hasError: Boolean(error), fullWidth }),
+            className,
           )}
           {...props}
         />
-        {error && <span className="text-sm text-red-500">{error}</span>}
-        {helperText && !error && <span className="text-sm text-gray-500">{helperText}</span>}
-      </div>
-    );
-  }
+      )}
+    </FormField>
+  ),
 );
 
 Input.displayName = "Input";

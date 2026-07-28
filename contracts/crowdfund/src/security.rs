@@ -152,11 +152,8 @@ impl RateLimiter {
         let current_ledger = env.ledger().sequence();
         let key = storage::make_rate_limit_key(addr);
 
-        let (last_ledger, count): (u32, u32) = env
-            .storage()
-            .persistent()
-            .get(&key)
-            .unwrap_or((0, 0));
+        let (last_ledger, count): (u32, u32) =
+            env.storage().persistent().get(&key).unwrap_or((0, 0));
 
         // Reset count if we're in a new ledger
         let (new_ledger, new_count) = if last_ledger < current_ledger {

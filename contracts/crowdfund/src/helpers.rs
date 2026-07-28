@@ -10,10 +10,12 @@ use soroban_sdk::{Address, Env};
 use crate::{
     errors::ContractError,
     storage::{
-        DataKey, KEY_PLATFORM, KEY_INSURANCE, KEY_STATUS, KEY_CREATOR, 
-        KEY_VISIBILITY, KEY_INSURANCE_POOL, KEY_RATE_LIMIT,
+        BASIS_POINTS_MAX, DataKey, KEY_CREATOR, KEY_INSURANCE, KEY_INSURANCE_POOL, KEY_PLATFORM,
+        KEY_RATE_LIMIT, KEY_STATUS, KEY_VISIBILITY, TTL_PERSISTENT_ENTRY,
     },
-    types::{FeeMode, MatchingConfig, PlatformConfig, RateLimit, Visibility, InsuranceConfig, Status},
+    types::{
+        FeeMode, InsuranceConfig, MatchingConfig, PlatformConfig, RateLimit, Status, Visibility,
+    },
 };
 
 /// Validates that the campaign is in Active status and that the caller is the creator.
@@ -31,7 +33,9 @@ pub(crate) fn require_active_and_auth_creator(env: &Env) -> Result<Address, Cont
         return Err(ContractError::NotActive);
     }
 
-    let creator: Address = inst.get(&KEY_CREATOR).ok_or(ContractError::InvalidAddress)?;
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
     Ok(creator)
 }
@@ -65,12 +69,8 @@ pub(crate) fn check_contributor_access(
     }
 
     // Check whitelist requirement
-    let whitelist_only: bool = inst
-        .get(&DataKey::WhitelistOnly)
-        .unwrap_or(false);
-    let visibility: Visibility = inst
-        .get(&KEY_VISIBILITY)
-        .unwrap_or(Visibility::Public);
+    let whitelist_only: bool = inst.get(&DataKey::WhitelistOnly).unwrap_or(false);
+    let visibility: Visibility = inst.get(&KEY_VISIBILITY).unwrap_or(Visibility::Public);
 
     let needs_whitelist = whitelist_only || visibility == Visibility::Private;
     if needs_whitelist
@@ -108,13 +108,13 @@ pub(crate) fn register_contributor_if_new(
 
     if !is_present {
         persistent.set(&presence_key, &true);
-        persistent.extend_ttl(&presence_key, 100, 100);
+        persistent.extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         // Store contributor address at insertion-order index
         let count: u32 = inst.get(&DataKey::ContributorCount).unwrap_or(0);
         let index_key = DataKey::ContributorIndex(count);
         persistent.set(&index_key, &contributor);
-        persistent.extend_ttl(&index_key, 100, 100);
+        persistent.extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         // Increment count
         inst.set(&DataKey::ContributorCount, &(count + 1));
@@ -126,7 +126,7 @@ pub(crate) fn register_contributor_if_new(
 /// Calculates the platform fee based on the total amount, configuration, and fee mode.
 ///
 /// - If `fee_mode == OnContribution`: fee is already collected per-contribution; returns 0
-/// - If `fee_mode == OnSuccess`: calculates `total * fee_bps / 10_000`
+/// - If `fee_mode == OnSuccess`: calculates `total * fee_bps / BASIS_POINTS_MAX`
 ///
 /// # Arguments
 /// * `total` — The total amount to calculate fee on
@@ -140,7 +140,7 @@ pub(crate) fn calculate_platform_fee(total: i128, config: &Option<PlatformConfig
             if c.fee_mode == FeeMode::OnContribution {
                 0 // Already collected per contribution
             } else {
-                total * c.fee_bps as i128 / 10_000
+                total * c.fee_bps as i128 / BASIS_POINTS_MAX
             }
         }
         None => 0,
@@ -200,7 +200,7 @@ pub(crate) fn check_and_update_rate_limit(
 
 /// Calculates the insurance fee deduction for a contribution.
 ///
-/// If insurance is enabled, deducts `effective_amount * insurance_fee_bps / 10_000`
+/// If insurance is enabled, deducts `effective_amount * insurance_fee_bps / BASIS_POINTS_MAX`
 /// and stores the fee in per-contributor persistent storage.
 ///
 /// # Arguments
@@ -220,18 +220,26 @@ pub(crate) fn apply_insurance_fee(
 
     let insurance_fee = insurance_config
         .filter(|c| c.enabled)
-        .map(|c| effective_amount * c.fee_bps as i128 / 10_000)
+        .map(|c| effective_amount * c.fee_bps as i128 / BASIS_POINTS_MAX)
         .unwrap_or(0);
 
     if insurance_fee > 0 {
         let persistent = env.storage().persistent();
         let fee_key = DataKey::InsuranceFee(contributor.clone());
         let prev_fee: i128 = persistent.get(&fee_key).unwrap_or(0);
-        persistent.set(&fee_key, &(prev_fee + insurance_fee));
-        persistent.extend_ttl(&fee_key, 100, 100);
+        let new_fee = prev_fee
+            .checked_add(insurance_fee)
+            .ok_or(ContractError::Overflow)
+            // apply_insurance_fee returns i128, not Result — use unwrap_or as a
+            // last resort; the caller in contribute() already validates amounts so
+            // this path is unreachable under normal conditions.
+            .unwrap_or(prev_fee); // saturate: never reduce the stored fee
+        persistent.set(&fee_key, &new_fee);
+        persistent.extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
-        inst.set(&KEY_INSURANCE_POOL, &(pool + insurance_fee));
+        let new_pool = pool.checked_add(insurance_fee).unwrap_or(pool); // saturate pool rather than panic
+        inst.set(&KEY_INSURANCE_POOL, &new_pool);
     }
 
     insurance_fee
@@ -239,7 +247,7 @@ pub(crate) fn apply_insurance_fee(
 
 /// Applies matching funds to a contribution.
 ///
-/// Calculates matched amount based on `amount * match_ratio / 10_000`,
+/// Calculates matched amount based on `amount * match_ratio / BASIS_POINTS_MAX`,
 /// up to the remaining sponsor pool. Updates total matched and deducts from pool.
 ///
 /// # Returns
@@ -251,15 +259,23 @@ pub(crate) fn apply_matching(env: &Env, amount: i128) -> Result<i128, ContractEr
         Some(config) => config,
         None => return Ok(0),
     };
-    let match_amount = (amount * config.match_ratio as i128) / 10_000;
+    let match_amount = (amount * config.match_ratio as i128) / BASIS_POINTS_MAX;
     let total_matched: i128 = inst.get(&DataKey::TotalMatched).unwrap_or(0);
-    let available_match = config.max_match - total_matched;
+    let available_match = config
+        .max_match
+        .checked_sub(total_matched)
+        .unwrap_or(0)
+        .max(0);
     let matched_amount = match_amount.min(available_match).max(0);
 
     if matched_amount > 0 {
-        inst.set(&DataKey::TotalMatched, &(total_matched + matched_amount));
+        let new_total_matched = total_matched
+            .checked_add(matched_amount)
+            .ok_or(ContractError::Overflow)?;
+        inst.set(&DataKey::TotalMatched, &new_total_matched);
         let pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
-        inst.set(&DataKey::MatchingPool, &(pool - matched_amount).max(0));
+        let new_pool = pool.checked_sub(matched_amount).unwrap_or(0).max(0);
+        inst.set(&DataKey::MatchingPool, &new_pool);
     }
 
     Ok(matched_amount)

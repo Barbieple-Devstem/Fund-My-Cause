@@ -23,15 +23,15 @@ fn set_index(env: &Env, leaderboard_type: LeaderboardType, index: &Vec<Address>)
 }
 
 /// Re-insert `user` into the sorted (descending-score) index for `leaderboard_type`,
-/// based on whatever score is currently stored for them.
-fn reindex_user(env: &Env, user: &Address, leaderboard_type: LeaderboardType) {
+/// using the caller-supplied `score` (already just read/written by the caller,
+/// so this doesn't re-fetch `DataKey::LeaderboardScore` for `user`).
+fn reindex_user(env: &Env, user: &Address, leaderboard_type: LeaderboardType, score: u32) {
     let mut index = get_index(env, leaderboard_type);
 
     if let Some(pos) = index.first_index_of(user) {
         let _ = index.remove(pos);
     }
 
-    let score = get_score(env, user, leaderboard_type);
     let mut insert_at = index.len();
     for i in 0..index.len() {
         let existing = index.get(i).unwrap();
@@ -59,7 +59,7 @@ pub fn add_leaderboard_entry(
     let current: u32 = env.storage().instance().get(&key).unwrap_or(0);
     let new_score = current.saturating_add(score_delta);
     env.storage().instance().set(&key, &new_score);
-    reindex_user(env, user, leaderboard_type);
+    reindex_user(env, user, leaderboard_type, new_score);
     Ok(())
 }
 
@@ -122,100 +122,125 @@ mod tests {
     use super::*;
     use soroban_sdk::testutils::Address as _;
 
+    // All unit tests must call storage through `env.as_contract(&id, || ...)`
+    // because `instance()` storage is only accessible from within a contract
+    // execution context.  We register a minimal stub contract just to get a
+    // valid contract ID to pass to `as_contract`.
+    fn make_env() -> (Env, soroban_sdk::Address) {
+        let env = Env::default();
+        // Register an empty contract so we have a real contract ID.
+        let id = env.register(crate::AchievementsContract, ());
+        (env, id)
+    }
+
     #[test]
     fn empty_leaderboard_returns_no_entries() {
-        let env = Env::default();
-        let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
-        assert_eq!(entries.len(), 0);
+        let (env, id) = make_env();
+        env.as_contract(&id, || {
+            let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
+            assert_eq!(entries.len(), 0);
+        });
     }
 
     #[test]
     fn rank_for_unknown_user_is_not_found() {
-        let env = Env::default();
+        let (env, id) = make_env();
         let user = Address::generate(&env);
-        assert_eq!(
-            get_user_rank(&env, &user, LeaderboardType::Points),
-            Err(ContractError::UserNotFound)
-        );
+        env.as_contract(&id, || {
+            assert_eq!(
+                get_user_rank(&env, &user, LeaderboardType::Points),
+                Err(ContractError::UserNotFound)
+            );
+        });
     }
 
     #[test]
     fn single_entry_is_ranked_first() {
-        let env = Env::default();
+        let (env, id) = make_env();
         let user = Address::generate(&env);
-        add_leaderboard_entry(&env, &user, 100, LeaderboardType::Points).unwrap();
+        env.as_contract(&id, || {
+            add_leaderboard_entry(&env, &user, 100, LeaderboardType::Points).unwrap();
 
-        assert_eq!(get_user_rank(&env, &user, LeaderboardType::Points), Ok(1));
-        let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
-        assert_eq!(entries.len(), 1);
-        assert_eq!(entries.get(0).unwrap().score, 100);
+            assert_eq!(get_user_rank(&env, &user, LeaderboardType::Points), Ok(1));
+            let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
+            assert_eq!(entries.len(), 1);
+            assert_eq!(entries.get(0).unwrap().score, 100);
+        });
     }
 
     #[test]
     fn entries_are_sorted_descending_by_score() {
-        let env = Env::default();
+        let (env, id) = make_env();
         let a = Address::generate(&env);
         let b = Address::generate(&env);
         let c = Address::generate(&env);
 
-        add_leaderboard_entry(&env, &a, 50, LeaderboardType::Points).unwrap();
-        add_leaderboard_entry(&env, &b, 200, LeaderboardType::Points).unwrap();
-        add_leaderboard_entry(&env, &c, 100, LeaderboardType::Points).unwrap();
+        env.as_contract(&id, || {
+            add_leaderboard_entry(&env, &a, 50, LeaderboardType::Points).unwrap();
+            add_leaderboard_entry(&env, &b, 200, LeaderboardType::Points).unwrap();
+            add_leaderboard_entry(&env, &c, 100, LeaderboardType::Points).unwrap();
 
-        let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
-        assert_eq!(entries.len(), 3);
-        assert_eq!(entries.get(0).unwrap().user, b);
-        assert_eq!(entries.get(1).unwrap().user, c);
-        assert_eq!(entries.get(2).unwrap().user, a);
+            let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
+            assert_eq!(entries.len(), 3);
+            assert_eq!(entries.get(0).unwrap().user, b);
+            assert_eq!(entries.get(1).unwrap().user, c);
+            assert_eq!(entries.get(2).unwrap().user, a);
 
-        assert_eq!(get_user_rank(&env, &b, LeaderboardType::Points), Ok(1));
-        assert_eq!(get_user_rank(&env, &c, LeaderboardType::Points), Ok(2));
-        assert_eq!(get_user_rank(&env, &a, LeaderboardType::Points), Ok(3));
+            assert_eq!(get_user_rank(&env, &b, LeaderboardType::Points), Ok(1));
+            assert_eq!(get_user_rank(&env, &c, LeaderboardType::Points), Ok(2));
+            assert_eq!(get_user_rank(&env, &a, LeaderboardType::Points), Ok(3));
+        });
     }
 
     #[test]
     fn limit_truncates_results() {
-        let env = Env::default();
-        for score in [10u32, 20, 30, 40] {
-            let user = Address::generate(&env);
-            add_leaderboard_entry(&env, &user, score, LeaderboardType::Points).unwrap();
-        }
+        let (env, id) = make_env();
+        env.as_contract(&id, || {
+            for score in [10u32, 20, 30, 40] {
+                let user = Address::generate(&env);
+                add_leaderboard_entry(&env, &user, score, LeaderboardType::Points).unwrap();
+            }
 
-        let entries = get_leaderboard(&env, LeaderboardType::Points, 2).unwrap();
-        assert_eq!(entries.len(), 2);
-        assert_eq!(entries.get(0).unwrap().score, 40);
-        assert_eq!(entries.get(1).unwrap().score, 30);
+            let entries = get_leaderboard(&env, LeaderboardType::Points, 2).unwrap();
+            assert_eq!(entries.len(), 2);
+            assert_eq!(entries.get(0).unwrap().score, 40);
+            assert_eq!(entries.get(1).unwrap().score, 30);
+        });
     }
 
     #[test]
     fn additional_score_accumulates_and_reorders_index() {
-        let env = Env::default();
+        let (env, id) = make_env();
         let a = Address::generate(&env);
         let b = Address::generate(&env);
 
-        add_leaderboard_entry(&env, &a, 10, LeaderboardType::Points).unwrap();
-        add_leaderboard_entry(&env, &b, 20, LeaderboardType::Points).unwrap();
-        assert_eq!(get_user_rank(&env, &b, LeaderboardType::Points), Ok(1));
+        env.as_contract(&id, || {
+            add_leaderboard_entry(&env, &a, 10, LeaderboardType::Points).unwrap();
+            add_leaderboard_entry(&env, &b, 20, LeaderboardType::Points).unwrap();
+            assert_eq!(get_user_rank(&env, &b, LeaderboardType::Points), Ok(1));
 
-        // `a` earns 25 more (cumulative 35) and overtakes `b`.
-        add_leaderboard_entry(&env, &a, 25, LeaderboardType::Points).unwrap();
-        assert_eq!(get_user_rank(&env, &a, LeaderboardType::Points), Ok(1));
-        assert_eq!(get_user_rank(&env, &b, LeaderboardType::Points), Ok(2));
+            // `a` earns 25 more (cumulative 35) and overtakes `b`.
+            add_leaderboard_entry(&env, &a, 25, LeaderboardType::Points).unwrap();
+            assert_eq!(get_user_rank(&env, &a, LeaderboardType::Points), Ok(1));
+            assert_eq!(get_user_rank(&env, &b, LeaderboardType::Points), Ok(2));
 
-        let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
-        assert_eq!(entries.get(0).unwrap().user, a);
-        assert_eq!(entries.get(0).unwrap().score, 35);
+            let entries = get_leaderboard(&env, LeaderboardType::Points, 10).unwrap();
+            assert_eq!(entries.get(0).unwrap().user, a);
+            assert_eq!(entries.get(0).unwrap().score, 35);
+        });
     }
 
     #[test]
     fn leaderboard_types_are_independent() {
-        let env = Env::default();
+        let (env, id) = make_env();
         let user = Address::generate(&env);
 
-        add_leaderboard_entry(&env, &user, 100, LeaderboardType::Points).unwrap();
-        assert_eq!(
-            get_user_rank(&env, &user, LeaderboardType::Contributions),
-            Err(ContractError::UserNotFound)
-        );
+        env.as_contract(&id, || {
+            add_leaderboard_entry(&env, &user, 100, LeaderboardType::Points).unwrap();
+            assert_eq!(
+                get_user_rank(&env, &user, LeaderboardType::Contributions),
+                Err(ContractError::UserNotFound)
+            );
+        });
     }
 }

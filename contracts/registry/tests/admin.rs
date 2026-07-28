@@ -18,6 +18,7 @@
 
 use soroban_sdk::{testutils::Address as _, Address, Env};
 
+use common::test_utils::setup_env;
 use registry::{CampaignStatus, ContractError, RegistryContract, RegistryContractClient};
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -33,7 +34,6 @@ fn deploy(env: &Env) -> RegistryContractClient {
 fn deploy_and_init(env: &Env) -> (RegistryContractClient, Address) {
     let client = deploy(env);
     let admin = Address::generate(env);
-    env.mock_all_auths();
     client.initialize(&admin);
     (client, admin)
 }
@@ -44,20 +44,18 @@ fn deploy_and_init(env: &Env) -> (RegistryContractClient, Address) {
 
 #[test]
 fn test_initialize_succeeds() {
-    let env = Env::default();
+    let env = setup_env();
     let client = deploy(&env);
     let admin = Address::generate(&env);
-    env.mock_all_auths();
     // Should not panic
     client.initialize(&admin);
 }
 
 #[test]
 fn test_initialize_twice_returns_already_initialized() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
     let result = client.try_initialize(&admin);
     assert_eq!(
         result,
@@ -72,11 +70,10 @@ fn test_initialize_twice_returns_already_initialized() {
 
 #[test]
 fn test_register_without_init_returns_not_initialized() {
-    let env = Env::default();
+    let env = setup_env();
     let client = deploy(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     let result = client.try_register(&campaign);
     assert_eq!(
         result,
@@ -88,11 +85,10 @@ fn test_register_without_init_returns_not_initialized() {
 #[test]
 fn test_register_requires_campaign_auth() {
     // Verify campaign_id.require_auth() is recorded in the auth context.
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     client.register(&campaign);
 
     // The campaign address must appear as an authorizing signer.
@@ -107,11 +103,9 @@ fn test_register_requires_campaign_auth() {
 
 #[test]
 fn test_register_authorized_and_deduplicates() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
-
-    env.mock_all_auths();
 
     client.register(&campaign);
     client.register(&campaign); // duplicate — must be ignored
@@ -123,10 +117,8 @@ fn test_register_authorized_and_deduplicates() {
 
 #[test]
 fn test_register_multiple_campaigns() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
-
-    env.mock_all_auths();
 
     let c1 = Address::generate(&env);
     let c2 = Address::generate(&env);
@@ -144,11 +136,10 @@ fn test_register_multiple_campaigns() {
 
 #[test]
 fn test_register_with_category_without_init_returns_not_initialized() {
-    let env = Env::default();
+    let env = setup_env();
     let client = deploy(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     let result = client.try_register_with_category(&campaign, &0);
     assert_eq!(
         result,
@@ -159,11 +150,10 @@ fn test_register_with_category_without_init_returns_not_initialized() {
 
 #[test]
 fn test_register_with_category_requires_campaign_auth() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     client.register_with_category(&campaign, &1);
 
     let auths = env.auths();
@@ -177,10 +167,9 @@ fn test_register_with_category_requires_campaign_auth() {
 
 #[test]
 fn test_register_with_category_filters_correctly() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
 
     let charity1 = Address::generate(&env);
     let charity2 = Address::generate(&env);
@@ -198,10 +187,9 @@ fn test_register_with_category_filters_correctly() {
 
 #[test]
 fn test_register_with_category_deduplicates() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
 
     let campaign = Address::generate(&env);
     client.register_with_category(&campaign, &0);
@@ -217,11 +205,10 @@ fn test_register_with_category_deduplicates() {
 
 #[test]
 fn test_register_with_status_without_init_returns_not_initialized() {
-    let env = Env::default();
+    let env = setup_env();
     let client = deploy(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     let result = client.try_register_with_status(&campaign, &CampaignStatus::Active);
     assert_eq!(
         result,
@@ -232,11 +219,10 @@ fn test_register_with_status_without_init_returns_not_initialized() {
 
 #[test]
 fn test_register_with_status_requires_campaign_auth() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     client.register_with_status(&campaign, &CampaignStatus::Active);
 
     let auths = env.auths();
@@ -250,10 +236,9 @@ fn test_register_with_status_requires_campaign_auth() {
 
 #[test]
 fn test_register_with_status_filters_correctly() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
 
     let active1 = Address::generate(&env);
     let active2 = Address::generate(&env);
@@ -271,10 +256,9 @@ fn test_register_with_status_filters_correctly() {
 
 #[test]
 fn test_register_with_status_deduplicates() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
 
     let campaign = Address::generate(&env);
     client.register_with_status(&campaign, &CampaignStatus::Active);
@@ -290,11 +274,10 @@ fn test_register_with_status_deduplicates() {
 
 #[test]
 fn test_update_status_without_init_returns_not_initialized() {
-    let env = Env::default();
+    let env = setup_env();
     let client = deploy(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     let result = client.try_update_status(
         &campaign,
         &CampaignStatus::Active,
@@ -309,11 +292,10 @@ fn test_update_status_without_init_returns_not_initialized() {
 
 #[test]
 fn test_update_status_campaign_not_found_returns_error() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
     let unregistered = Address::generate(&env);
 
-    env.mock_all_auths();
     let result = client.try_update_status(
         &unregistered,
         &CampaignStatus::Active,
@@ -329,11 +311,10 @@ fn test_update_status_campaign_not_found_returns_error() {
 #[test]
 fn test_update_status_requires_admin_auth() {
     // Verify admin.require_auth() is recorded — not the campaign's address.
-    let env = Env::default();
+    let env = setup_env();
     let (client, admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
     client.register_with_status(&campaign, &CampaignStatus::Active);
 
     // Clear auth history then call update_status.
@@ -357,11 +338,10 @@ fn test_update_status_requires_admin_auth() {
 
 #[test]
 fn test_update_status_moves_campaign_between_buckets() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-    env.mock_all_auths();
 
     client.register_with_status(&campaign, &CampaignStatus::Active);
     assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
@@ -381,10 +361,9 @@ fn test_update_status_moves_campaign_between_buckets() {
 
 #[test]
 fn test_list_pagination() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
     for _ in 0..5 {
         client.register(&Address::generate(&env));
     }
@@ -397,10 +376,9 @@ fn test_list_pagination() {
 
 #[test]
 fn test_list_by_status_pagination() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
     for _ in 0..5 {
         client.register_with_status(&Address::generate(&env), &CampaignStatus::Active);
     }
@@ -413,10 +391,9 @@ fn test_list_by_status_pagination() {
 
 #[test]
 fn test_get_campaigns_by_category_pagination() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
     for _ in 0..4 {
         client.register_with_category(&Address::generate(&env), &2);
     }
@@ -433,10 +410,9 @@ fn test_get_campaigns_by_category_pagination() {
 
 #[test]
 fn test_full_lifecycle_register_update_and_list() {
-    let env = Env::default();
+    let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-    env.mock_all_auths();
 
     let c1 = Address::generate(&env);
     let c2 = Address::generate(&env);
