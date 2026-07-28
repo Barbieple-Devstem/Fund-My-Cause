@@ -267,6 +267,7 @@ async function startServer() {
               redis,
               traceId,
               log,
+              rateLimiter,
             } as Context;
           } catch (error: any) {
             log.error(

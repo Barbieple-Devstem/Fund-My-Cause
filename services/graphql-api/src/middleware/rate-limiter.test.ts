@@ -57,7 +57,8 @@ describe("GraphQL Mutation Rate Limiting Middleware Unit Tests", () => {
     expect(result).toEqual({ success: true, id: "test-123" });
 
     // Exhaust user rate limit
-    await (rateLimiter as any).userLimiter.consume("GUSERADDRESS99999999999999999999", 10000);
+    // Note: the first middleware call above already consumed 1 point, so only 9999 remain.
+    await (rateLimiter as any).userLimiter.consume("GUSERADDRESS99999999999999999999", 9999);
 
     await expect(middleware(mockResolver, {}, {}, mockContext, mockInfo)).rejects.toThrow("Rate limit exceeded");
   });
@@ -79,8 +80,9 @@ describe("GraphQL Mutation Rate Limiting Middleware Unit Tests", () => {
     expect(result).toEqual({ success: true, id: "test-123" });
 
     // Exhaust operation key
+    // Note: the first middleware call above already consumed 1 point, so only 99 remain.
     const opKey = "custom_op:createCampaign:10.0.0.1";
-    await (rateLimiter as any).limiter.consume(opKey, 100);
+    await (rateLimiter as any).limiter.consume(opKey, 99);
 
     await expect(middleware(mockResolver, {}, {}, mockContext, mockInfo)).rejects.toThrow("Rate limit exceeded");
   });

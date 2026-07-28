@@ -6,6 +6,7 @@ import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
 import { PubSubService } from "./services/pubsub.js";
 import { notifyContribution } from "./services/fraud-client.js";
+import type { MutationName } from "./services/rate-limiter.js";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -18,6 +19,46 @@ import { notifyContribution } from "./services/fraud-client.js";
 export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> = Object.fromEntries(
   CAMPAIGN_STATUS_VALUES.map((value) => [value.toUpperCase(), value])
 );
+
+// ---------------------------------------------------------------------------
+// Mutation rate-limit helper (#899)
+// ---------------------------------------------------------------------------
+
+/**
+ * Enforce per-mutation rate limiting.
+ *
+ * Uses the authenticated wallet address as the key (one independent bucket per
+ * user) with the IP address as a fallback for unauthenticated callers.  Throws
+ * a structured GraphQLError with:
+ *  - extensions.code   = "TOO_MANY_REQUESTS"
+ *  - extensions.retryAfter (seconds until the bucket resets)
+ *  - extensions.mutation   (which mutation was limited)
+ */
+async function enforceMutationRateLimit(
+  mutation: MutationName,
+  context: Context
+): Promise<void> {
+  const rateLimiter = (context as any).rateLimiter;
+  if (!rateLimiter) return; // not present in test stubs — skip
+
+  const key = context.user?.address ?? (context as any).ip ?? "anonymous";
+  try {
+    await rateLimiter.checkMutationLimit(mutation, key);
+  } catch (error: any) {
+    const retryAfter: number = error.retryAfter ?? 60;
+    throw new GraphQLError(
+      error.message ?? `Rate limit exceeded for mutation '${mutation}'. Retry after ${retryAfter}s.`,
+      {
+        extensions: {
+          code: "TOO_MANY_REQUESTS",
+          http: { status: 429 },
+          retryAfter,
+          mutation,
+        },
+      }
+    );
+  }
+}
 
 export const resolvers: IResolvers<any, Context> = {
   CampaignStatus: CAMPAIGN_STATUS_ENUM_MAP,
@@ -327,6 +368,9 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      // Rate-limit: 5 campaign creations per wallet per hour (#899)
+      await enforceMutationRateLimit("createCampaign", context);
+
       const campaign = await context.contractService.createCampaign(
         context.user,
         input
@@ -364,6 +408,9 @@ export const resolvers: IResolvers<any, Context> = {
       if (!context.user) {
         throw new GraphQLError("Authentication required");
       }
+
+      // Rate-limit: 20 contributions per wallet per 10 minutes (#899)
+      await enforceMutationRateLimit("recordContribution", context);
 
       const { traceId, log } = context;
 

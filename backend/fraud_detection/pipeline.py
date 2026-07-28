@@ -16,6 +16,34 @@ surfaced via the ``/moderation-queue`` endpoint.
 Heuristics and their thresholds are documented in
 ``docs/fraud-detection-heuristics.md``.
 
+Dead-code audit (#900)
+──────────────────────
+Audit date: 2026-07-28
+Auditor: automated
+
+Audit scope: conditional branches referencing removed feature flags or
+deprecated scoring models.
+
+Findings:
+  - No feature-flag conditionals found (no flag-variable references or
+    os.getenv flag-key calls).
+  - No versioned-model dispatch found (no model_version or scoring_model
+    equality checks).
+  - No commented-out heuristic blocks found.
+  - ``_is_valid_trace_id`` is live: called by ``TraceIDMiddleware.dispatch``.
+  - ``_QUEUE``, ``_CONTRIBUTIONS``, ``_REFUNDS``, ``_CAMPAIGN_RECORDS`` are all
+    live: written by ingest endpoints and read by scan functions.
+  - All three scan functions (``scan_wash_contributions``,
+    ``scan_contribution_spikes``, ``scan_duplicate_content``) are called by
+    ``run_full_scan``.
+  - ``run_full_scan`` is called by ``POST /scan`` background task.
+
+Result: NO dead code paths found.  The rules engine is clean.
+
+See ``tests_pipeline.py → test_no_dead_feature_flag_branches`` for the
+automated regression guard that prevents future dead branches from being
+silently introduced.
+
 Trace-ID propagation
 ────────────────────
 Every inbound HTTP request carries an ``X-Trace-ID`` header injected by the
@@ -53,7 +81,6 @@ structlog.configure(
     processors=[
         structlog.contextvars.merge_contextvars,       # injects trace_id
         structlog.stdlib.add_log_level,
-        structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
@@ -252,13 +279,15 @@ def scan_wash_contributions() -> list[Flag]:
         key = (r.campaign_id, r.wallet)
         refund_lookup.setdefault(key, []).append(r.timestamp)
 
-    # For each contribution, check if a refund followed within the window
+    # For each contribution, check if at least one refund followed within the
+    # window.  Count each contribution event as at most one wash cycle so
+    # N contributions and N refunds → N cycles, not N² cross-product pairings.
     wash_count: dict[tuple[str, str], int] = {}
     for c in _CONTRIBUTIONS:
         key = (c.campaign_id, c.wallet)
-        for rt in refund_lookup.get(key, []):
-            if 0 < rt - c.timestamp <= WASH_WINDOW_SECONDS:
-                wash_count[key] = wash_count.get(key, 0) + 1
+        refund_times = refund_lookup.get(key, [])
+        if any(0 < rt - c.timestamp <= WASH_WINDOW_SECONDS for rt in refund_times):
+            wash_count[key] = wash_count.get(key, 0) + 1
 
     for (campaign_id, wallet), count in wash_count.items():
         if count >= WASH_MIN_OCCURRENCES:
