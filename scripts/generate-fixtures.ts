@@ -324,9 +324,28 @@ if (!fs.existsSync(fixturesDir)) {
 // Write fixtures to file
 fs.writeFileSync(outputPath, JSON.stringify(fixtures, null, 2), 'utf-8');
 
+// Ensure multi-currency donation scenario fixtures exist alongside standard fixtures
+const multiCurrencyPath = path.join(fixturesDir, 'multi-currency-donations.json');
+if (!fs.existsSync(multiCurrencyPath)) {
+  const multiCurrencyData = {
+    description: "Multi-currency donation test scenarios",
+    supportedCurrencies: [
+      { code: "XLM", symbol: "𐤀", decimals: 7, isNative: true, usdExchangeRate: 0.12 },
+      { code: "USDC", symbol: "$", decimals: 7, isNative: false, usdExchangeRate: 1.0 },
+      { code: "EURC", symbol: "€", decimals: 7, isNative: false, usdExchangeRate: 1.08 },
+      { code: "BTC", symbol: "₿", decimals: 8, isNative: false, usdExchangeRate: 65000.0 },
+      { code: "ETH", symbol: "Ξ", decimals: 18, isNative: false, usdExchangeRate: 3400.0 }
+    ],
+    scenarios: []
+  };
+  fs.writeFileSync(multiCurrencyPath, JSON.stringify(multiCurrencyData, null, 2), 'utf-8');
+}
+
 console.log('✓ Test fixtures generated successfully!');
 console.log(`  Output: ${outputPath}`);
+console.log(`  Multi-currency Output: ${multiCurrencyPath}`);
 console.log(`  Campaigns: ${fixtures.metadata.totalCampaigns}`);
 console.log(`  Contributors: ${fixtures.metadata.totalContributors}`);
 console.log(`  Contributions: ${fixtures.metadata.totalContributions}`);
 console.log(`  Total Raised: ${(fixtures.metadata.totalRaised / 10_000_000).toFixed(2)} XLM`);
+
