@@ -232,6 +232,7 @@ describe("httpFetch", () => {
         "https://example.com",
         {},
         { maxRetries: 3, initialBackoffMs: 500, backoffMultiplier: 2, maxBackoffMs: 30_000 },
+        undefined, // traceId
         sleep,
       ),
     ).rejects.toThrow();
@@ -389,6 +390,7 @@ describe("httpFetch", () => {
         "https://example.com",
         {},
         { maxRetries: 1, initialBackoffMs: 1_000, backoffMultiplier: 2, maxBackoffMs: 30_000 },
+        undefined, // traceId
         sleep,
       ),
     ).rejects.toThrow();
