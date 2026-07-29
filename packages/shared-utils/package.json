@@ -17,6 +17,10 @@
     "./campaign": {
       "import": "./src/campaign.ts",
       "types": "./src/campaign.ts"
+    },
+    "./timestamps": {
+      "import": "./src/timestamps.ts",
+      "types": "./src/timestamps.ts"
     }
   },
   "scripts": {
