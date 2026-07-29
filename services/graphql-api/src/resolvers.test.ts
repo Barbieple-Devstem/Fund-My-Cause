@@ -3,6 +3,16 @@ import { GraphQLError } from "graphql";
 import { resolvers } from "./resolvers.js";
 import type { Context } from "./types.js";
 
+const mockLog = {
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+  fatal: vi.fn(),
+  trace: vi.fn(),
+  child: vi.fn().mockReturnThis(),
+} as any;
+
 function createMockContext(overrides: Partial<Context> = {}): Context {
   const dataLoader = {
     campaigns: { load: vi.fn() },
@@ -46,6 +56,8 @@ function createMockContext(overrides: Partial<Context> = {}): Context {
     } as any,
     user: undefined,
     redis: {} as any,
+    traceId: "fmc-00000000-0000000000000000",
+    log: mockLog,
     ...overrides,
   } as Context;
 }

@@ -4,6 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from service import (
+    Campaign,
     IndexedActivity,
     _ACTIVITY,
     _CAMPAIGNS,
@@ -12,6 +13,48 @@ from service import (
 )
 
 client = TestClient(app)
+
+
+# ── Schema audit regression guard (#897) ─────────────────────────────────────
+# If a field is added to the Campaign or IndexedActivity dataclass but is never
+# actually referenced in the module, this test will fail, signalling that the
+# new column is dead weight.
+
+def test_all_campaign_fields_used():
+    """
+    Every field declared on Campaign must appear at least once in the
+    recommendation logic (score functions or API response).
+    """
+    import dataclasses, service as svc
+
+    field_names = {f.name for f in dataclasses.fields(Campaign)}
+
+    # Collect field references from the source of the service module
+    import inspect
+    source = inspect.getsource(svc)
+
+    missing = [name for name in field_names if f".{name}" not in source]
+    assert not missing, (
+        f"Campaign fields not referenced anywhere in service.py "
+        f"(potential dead columns): {missing}"
+    )
+
+
+def test_all_indexed_activity_fields_used():
+    """
+    Every field declared on IndexedActivity must be referenced in the
+    recommendation logic.
+    """
+    import dataclasses, service as svc, inspect
+
+    field_names = {f.name for f in dataclasses.fields(IndexedActivity)}
+    source = inspect.getsource(svc)
+
+    missing = [name for name in field_names if f".{name}" not in source]
+    assert not missing, (
+        f"IndexedActivity fields not referenced anywhere in service.py "
+        f"(potential dead columns): {missing}"
+    )
 
 
 def test_health():

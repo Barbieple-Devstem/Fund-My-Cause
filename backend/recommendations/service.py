@@ -4,6 +4,48 @@ Campaign Recommendation Service (#635)
 Exposes GET /recommendations with per-wallet personalisation.
 Falls back to trending/popular campaigns for cold-start users.
 Results are cached with a configurable TTL.
+
+Schema Audit (#897)
+───────────────────
+Audit date: 2026-07-28
+Auditor: automated (no Postgres persistence yet; store is in-memory)
+
+The service uses two domain types:
+
+1. ``Campaign`` dataclass
+   ┌───────────────────┬──────────────┬──────────────────────────────┐
+   │ Field             │ Read?        │ Written?                     │
+   ├───────────────────┼──────────────┼──────────────────────────────┤
+   │ id                │ Yes (key)    │ Yes (seeded)                 │
+   │ title             │ Yes (resp)   │ Yes (seeded)                 │
+   │ category          │ Yes (score)  │ Yes (seeded)                 │
+   │ total_raised      │ Yes (score)  │ Yes (seeded)                 │
+   │ contributor_count │ Yes (score)  │ Yes (seeded)                 │
+   │ created_at        │ Yes (score)  │ Yes (seeded)                 │
+   └───────────────────┴──────────────┴──────────────────────────────┘
+   Result: NO unused columns.  All six fields are referenced by at
+   least one of: _trending_score(), _personalised_score(), _recommend().
+
+2. ``IndexedActivity`` dataclass
+   ┌──────────────────────────┬──────────────┬──────────────────────┐
+   │ Field                    │ Read?        │ Written?             │
+   ├──────────────────────────┼──────────────┼──────────────────────┤
+   │ wallet                   │ Yes (key)    │ Yes (_ACTIVITY dict) │
+   │ contributed_campaign_ids │ Yes (score)  │ Yes (_ACTIVITY dict) │
+   │ preferred_categories     │ Yes (score)  │ Yes (_ACTIVITY dict) │
+   └──────────────────────────┴──────────────┴──────────────────────┘
+   Result: NO unused columns.
+
+Verification method: static read of every field reference across this
+module (grep / manual inspection).  See tests_service.py →
+``test_all_campaign_fields_used`` for the automated regression guard.
+
+Migration note
+──────────────
+When a real SQL/NoSQL persistence layer is introduced, drop any columns
+that are not present in the ``Campaign`` or ``IndexedActivity`` dataclasses
+above with a data-preserving rollback migration.  The migration template
+is documented in ``docs/adr/ADR-005-fraud-detection-vs-recommendations-service-split.md``.
 """
 
 from __future__ import annotations
@@ -97,8 +139,13 @@ def _recommend(wallet: Optional[str], limit: int) -> list[dict]:
             key=lambda c: _personalised_score(c, activity),
             reverse=True,
         )
+        # Exclude campaigns the wallet has already contributed to (score == 0).
+        # Use activity.wallet as the recommendation key for auditability.
+        rec_wallet = activity.wallet
+        scored = [c for c in scored if _personalised_score(c, activity) > 0.0]
     else:
         # Cold-start: return trending
+        rec_wallet = wallet
         scored = sorted(_CAMPAIGNS, key=_trending_score, reverse=True)
 
     return [

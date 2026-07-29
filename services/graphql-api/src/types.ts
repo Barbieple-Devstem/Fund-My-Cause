@@ -204,6 +204,8 @@ export interface Context {
   traceId: string;
   /** Request-scoped pino logger with trace_id pre-bound. */
   log: pino.Logger;
+  /** Rate limiter service — used by mutation resolvers for per-mutation limits. */
+  rateLimiter?: any;
 }
 
 // API Response types
