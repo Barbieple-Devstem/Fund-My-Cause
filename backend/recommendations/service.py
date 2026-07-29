@@ -58,6 +58,8 @@ from typing import Optional
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 
+from scoring_config import SCORING_CONFIG
+
 # ---------------------------------------------------------------------------
 # In-process cache (TTL-based)
 # ---------------------------------------------------------------------------
@@ -117,14 +119,14 @@ _ACTIVITY: dict[str, IndexedActivity] = {}
 # ---------------------------------------------------------------------------
 def _trending_score(c: Campaign) -> float:
     """Recency-weighted activity: more weight to recent, active campaigns."""
-    age_hours = max((time.time() - c.created_at) / 3600, 1)
+    age_hours = max((time.time() - c.created_at) / 3600, SCORING_CONFIG.age_divisor_min)
     return (c.contributor_count * math.log1p(c.total_raised)) / age_hours
 
 
 def _personalised_score(c: Campaign, activity: IndexedActivity) -> float:
     base = _trending_score(c)
     # Boost campaigns in categories the user has previously contributed to
-    category_boost = 2.0 if c.category in activity.preferred_categories else 1.0
+    category_boost = SCORING_CONFIG.category_boost if c.category in activity.preferred_categories else 1.0
     # Exclude campaigns the user already contributed to
     already_contributed = c.id in activity.contributed_campaign_ids
     return 0.0 if already_contributed else base * category_boost

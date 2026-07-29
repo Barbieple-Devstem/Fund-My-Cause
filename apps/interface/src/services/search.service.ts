@@ -7,6 +7,10 @@
  */
 
 import type { Campaign } from "@/types/campaign";
+import {
+  type ScoringWeights,
+  SCORING_WEIGHTS,
+} from "@/services/search-weights.config";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,10 +68,41 @@ export interface UserPreferences {
 const PREFS_KEY = "fmc:user-prefs";
 
 const STOP_WORDS = new Set([
-  "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-  "of", "with", "by", "from", "is", "are", "was", "be", "been", "have",
-  "has", "do", "does", "will", "can", "this", "that", "it", "we", "they",
-  "our", "their", "your", "its",
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "but",
+  "in",
+  "on",
+  "at",
+  "to",
+  "for",
+  "of",
+  "with",
+  "by",
+  "from",
+  "is",
+  "are",
+  "was",
+  "be",
+  "been",
+  "have",
+  "has",
+  "do",
+  "does",
+  "will",
+  "can",
+  "this",
+  "that",
+  "it",
+  "we",
+  "they",
+  "our",
+  "their",
+  "your",
+  "its",
 ]);
 
 // Curated semantic expansion map — maps common search terms to related concepts
@@ -91,21 +126,49 @@ const SEMANTIC_MAP: Record<string, string[]> = {
   intelligence: ["ai", "artificial", "machine", "learning", "tech"],
   blockchain: ["decentralized", "crypto", "stellar", "distributed", "records"],
   decentralized: ["blockchain", "distributed", "stellar", "crypto", "records"],
-  internet: ["connectivity", "network", "digital", "online", "broadband", "mesh"],
-  connectivity: ["internet", "network", "digital", "broadband", "mesh", "rural"],
+  internet: [
+    "connectivity",
+    "network",
+    "digital",
+    "online",
+    "broadband",
+    "mesh",
+  ],
+  connectivity: [
+    "internet",
+    "network",
+    "digital",
+    "broadband",
+    "mesh",
+    "rural",
+  ],
   mesh: ["connectivity", "network", "internet", "rural"],
   education: ["learn", "teach", "school", "course", "training", "knowledge"],
   learn: ["education", "teach", "course", "training", "study", "open"],
   open: ["free", "accessible", "public", "source", "learn"],
   health: ["medical", "hospital", "wellness", "care", "medicine", "patient"],
-  medical: ["health", "healthcare", "hospital", "doctor", "medicine", "records"],
+  medical: [
+    "health",
+    "healthcare",
+    "hospital",
+    "doctor",
+    "medicine",
+    "records",
+  ],
   records: ["medical", "data", "decentralized", "blockchain", "secure"],
   community: ["local", "social", "people", "rural", "village", "neighborhood"],
   rural: ["community", "remote", "countryside", "connectivity", "village"],
   drone: ["autonomous", "robot", "ocean", "plastic", "cleanup", "fleet"],
   fund: ["raise", "support", "donate", "contribute", "invest", "campaign"],
   clean: ["purification", "water", "eco", "solar", "renewable"],
-  energy: ["solar", "power", "renewable", "electric", "sustainable", "microgrid"],
+  energy: [
+    "solar",
+    "power",
+    "renewable",
+    "electric",
+    "sustainable",
+    "microgrid",
+  ],
   microgrid: ["solar", "energy", "community", "power", "renewable"],
 };
 
@@ -142,9 +205,7 @@ function editDistance(a: string, b: string): number {
     for (let j = 1; j <= n; j++) {
       const temp = row[j];
       row[j] =
-        a[i - 1] === b[j - 1]
-          ? prev
-          : 1 + Math.min(row[j], row[j - 1], prev);
+        a[i - 1] === b[j - 1] ? prev : 1 + Math.min(row[j], row[j - 1], prev);
       prev = temp;
     }
   }
@@ -189,6 +250,7 @@ function scoreCampaign(
   expandedTokens: string[],
   rawQuery: string,
   preferences: UserPreferences,
+  weights: ScoringWeights = SCORING_WEIGHTS,
 ): Pick<ScoredCampaign, "score" | "matchedFields" | "highlights"> {
   if (!rawQuery.trim()) return { score: 1, matchedFields: [], highlights: {} };
 
@@ -204,43 +266,49 @@ function scoreCampaign(
 
   // Exact phrase match (highest weight)
   if (titleLow.includes(rawLow)) {
-    score += 10;
+    score += weights.titleExactPhrase;
     if (!matchedFields.includes("title")) matchedFields.push("title");
     highlights.title = highlight(campaign.title, rawQuery);
   }
   if (descLow.includes(rawLow)) {
-    score += 4;
-    if (!matchedFields.includes("description")) matchedFields.push("description");
-    if (!highlights.description) highlights.description = highlight(campaign.description, rawQuery);
+    score += weights.descriptionExactPhrase;
+    if (!matchedFields.includes("description"))
+      matchedFields.push("description");
+    if (!highlights.description)
+      highlights.description = highlight(campaign.description, rawQuery);
   }
 
   // Per-token scoring
   for (const token of queryTokens) {
     if (titleLow.includes(token)) {
-      score += 5;
+      score += weights.titleToken;
       if (!matchedFields.includes("title")) matchedFields.push("title");
-      if (!highlights.title) highlights.title = highlight(campaign.title, token);
+      if (!highlights.title)
+        highlights.title = highlight(campaign.title, token);
     } else if (fuzzyMatch(token, campaign.title)) {
-      score += 2.5;
+      score += weights.titleFuzzy;
       if (!matchedFields.includes("title")) matchedFields.push("title");
     }
 
     if (descLow.includes(token)) {
-      score += 2;
-      if (!matchedFields.includes("description")) matchedFields.push("description");
-      if (!highlights.description) highlights.description = highlight(campaign.description, token);
+      score += weights.descriptionToken;
+      if (!matchedFields.includes("description"))
+        matchedFields.push("description");
+      if (!highlights.description)
+        highlights.description = highlight(campaign.description, token);
     } else if (fuzzyMatch(token, campaign.description)) {
-      score += 1;
-      if (!matchedFields.includes("description")) matchedFields.push("description");
+      score += weights.descriptionFuzzy;
+      if (!matchedFields.includes("description"))
+        matchedFields.push("description");
     }
 
     if (catLow === token || catLow.includes(token)) {
-      score += 4;
+      score += weights.categoryToken;
       if (!matchedFields.includes("category")) matchedFields.push("category");
     }
 
     if (creatorLow.includes(token)) {
-      score += 1;
+      score += weights.creatorToken;
       if (!matchedFields.includes("creator")) matchedFields.push("creator");
     }
   }
@@ -248,15 +316,18 @@ function scoreCampaign(
   // Semantic expansion scoring (lower weight than direct token matches)
   const semanticOnly = expandedTokens.filter((t) => !queryTokens.includes(t));
   for (const token of semanticOnly) {
-    if (titleLow.includes(token)) score += 2;
-    else if (descLow.includes(token)) score += 0.5;
-    if (catLow.includes(token)) score += 1.5;
+    if (titleLow.includes(token)) score += weights.semanticTitle;
+    else if (descLow.includes(token)) score += weights.semanticDescription;
+    if (catLow.includes(token)) score += weights.categorySemantic;
   }
 
   // Personalization: boost campaigns whose category the user has viewed more
   if (campaign.category) {
     const views = preferences.categoryViews[campaign.category] ?? 0;
-    const boost = Math.min(1.5, 1 + views * 0.1);
+    const boost = Math.min(
+      weights.categoryBoostMax,
+      1 + views * weights.categoryBoostRate,
+    );
     score *= boost;
   }
 
@@ -325,7 +396,8 @@ export function advancedSearch(
   for (const campaign of campaigns) {
     // Apply deterministic filters first (fast path)
     if (category && campaign.category !== category) continue;
-    if (status !== "all" && getCampaignStatusValue(campaign) !== status) continue;
+    if (status !== "all" && getCampaignStatusValue(campaign) !== status)
+      continue;
     if (goalMin !== undefined && campaign.goal < goalMin) continue;
     if (goalMax !== undefined && campaign.goal > goalMax) continue;
     if (dateFrom && new Date(campaign.deadline) < new Date(dateFrom)) continue;
@@ -348,7 +420,8 @@ export function advancedSearch(
   // Sort results
   // Treat "recent" as "newest" for backward URL compatibility
   const normSort = sort === "recent" ? "newest" : sort;
-  const effectiveSort = hasQuery && normSort === "newest" ? "relevance" : normSort;
+  const effectiveSort =
+    hasQuery && normSort === "newest" ? "relevance" : normSort;
   if (effectiveSort === "relevance") {
     scored.sort((a, b) => b.score - a.score);
   } else if (effectiveSort === "most-funded") {
@@ -422,9 +495,7 @@ export function getSearchSuggestions(
       const titleLow = c.title.toLowerCase();
       const descLow = c.description.toLowerCase();
       if (titleLow.includes(lower) || descLow.includes(lower)) return true;
-      return tokens.some(
-        (t) => titleLow.includes(t) || fuzzyMatch(t, c.title),
-      );
+      return tokens.some((t) => titleLow.includes(t) || fuzzyMatch(t, c.title));
     })
     .slice(0, limit)
     .map((c) => ({ id: c.id, title: c.title, category: c.category }));
@@ -443,7 +514,9 @@ export function getRecommendations(
 
   if (Object.keys(preferences.categoryViews).length > 0) {
     const byPreference = available
-      .filter((c) => c.category && (preferences.categoryViews[c.category] ?? 0) > 0)
+      .filter(
+        (c) => c.category && (preferences.categoryViews[c.category] ?? 0) > 0,
+      )
       .sort(
         (a, b) =>
           (preferences.categoryViews[b.category ?? ""] ?? 0) -
@@ -459,17 +532,17 @@ export function getRecommendations(
   // Fallback: most-contributors among active campaigns
   const trending = available
     .filter((c) => getCampaignStatusValue(c) === "active")
-    .sort(
-      (a, b) =>
-        (b.contributorCount ?? 0) - (a.contributorCount ?? 0),
-    )
+    .sort((a, b) => (b.contributorCount ?? 0) - (a.contributorCount ?? 0))
     .slice(0, limit);
   return { campaigns: trending, reason: "Trending campaigns" };
 }
 
 // ── User preferences persistence ──────────────────────────────────────────────
 
-const DEFAULT_PREFS: UserPreferences = { categoryViews: {}, recentSearches: [] };
+const DEFAULT_PREFS: UserPreferences = {
+  categoryViews: {},
+  recentSearches: [],
+};
 
 export function loadPreferences(): UserPreferences {
   if (typeof window === "undefined") return DEFAULT_PREFS;
