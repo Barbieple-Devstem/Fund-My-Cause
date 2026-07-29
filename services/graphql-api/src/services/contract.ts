@@ -21,6 +21,10 @@ import type {
   RawCampaignInfo,
   RawCampaignStats,
 } from "../types.js";
+// Shared mapper extracted as part of #903 (consolidate duplicate DTO mappers).
+// STATUS_MAP and mapStatus were previously defined inline here; they now live
+// in @fund-my-cause/shared-utils so any future service can reuse them.
+import { mapCampaignStatus } from "@fund-my-cause/shared-utils";
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -29,21 +33,6 @@ export interface ContractServiceConfig {
   networkPassphrase: string;
   /** Optional registry contract address for listing/searching campaigns. */
   registryContractId?: string;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-const STATUS_MAP: Record<string, CampaignStatus> = {
-  Active: "Active",
-  Successful: "Successful",
-  Refunded: "Refunded",
-  Cancelled: "Cancelled",
-  Paused: "Paused",
-  Archived: "Archived",
-};
-
-function mapStatus(s: string): CampaignStatus {
-  return STATUS_MAP[s] ?? "Active";
 }
 
 function stroopsToIsoString(stroops: bigint): string {
@@ -119,7 +108,7 @@ export class ContractService {
         goal: stats.goal,
         raised: stats.total_raised,
         deadline: stroopsToIsoString(info.deadline),
-        status: mapStatus(info.status),
+        status: mapCampaignStatus(info.status),
         category: info.category,
         minContribution: info.min_contribution,
         maxContribution: info.max_contribution,

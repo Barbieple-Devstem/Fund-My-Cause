@@ -33,6 +33,10 @@
     "./graphql": {
       "import": "./src/graphql.ts",
       "types": "./src/graphql.ts"
+    },
+    "./validation": {
+      "import": "./src/validation.ts",
+      "types": "./src/validation.ts"
     }
   },
   "scripts": {
