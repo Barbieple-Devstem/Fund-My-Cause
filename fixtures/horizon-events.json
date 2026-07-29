@@ -1,0 +1,96 @@
+{
+  "campaign": [
+    {
+      "id": "campaign-001",
+      "timestamp": 1700000001,
+      "type": "campaign",
+      "contractId": "CCAMPAIGN111111111111111111111111111111111111111111111",
+      "data": {
+        "creator": "GCREATOR111111111111111111111111111111111111111111111",
+        "title": "Clean Water Initiative",
+        "goal": "10000000000",
+        "deadline": "1800000000",
+        "token": "CTOKEN11111111111111111111111111111111111111111111111",
+        "min_contribution": "1000000"
+      }
+    },
+    {
+      "id": "campaign-002",
+      "timestamp": 1700000050,
+      "type": "campaign",
+      "contractId": "CCAMPAIGN222222222222222222222222222222222222222222222",
+      "data": {
+        "creator": "GCREATOR222222222222222222222222222222222222222222222",
+        "title": "Solar Panel Grid",
+        "goal": "50000000000",
+        "deadline": "1900000000",
+        "token": "CTOKEN22222222222222222222222222222222222222222222222",
+        "min_contribution": "5000000"
+      }
+    }
+  ],
+  "donation": [
+    {
+      "id": "donation-001",
+      "timestamp": 1700000100,
+      "type": "donation",
+      "contractId": "CCAMPAIGN111111111111111111111111111111111111111111111",
+      "data": {
+        "contributor": "GCONTRIB1111111111111111111111111111111111111111111111",
+        "amount": "500000000",
+        "message": "Great cause!",
+        "total_raised": "500000000"
+      }
+    },
+    {
+      "id": "donation-002",
+      "timestamp": 1700000200,
+      "type": "donation",
+      "contractId": "CCAMPAIGN111111111111111111111111111111111111111111111",
+      "data": {
+        "contributor": "GCONTRIB2222222222222222222222222222222222222222222222",
+        "amount": "1000000000",
+        "message": "",
+        "total_raised": "1500000000"
+      }
+    },
+    {
+      "id": "donation-003",
+      "timestamp": 1700000300,
+      "type": "donation",
+      "contractId": "CCAMPAIGN222222222222222222222222222222222222222222222",
+      "data": {
+        "contributor": "GCONTRIB1111111111111111111111111111111111111111111111",
+        "amount": "2000000000",
+        "message": "Happy to help",
+        "total_raised": "2000000000"
+      }
+    }
+  ],
+  "achievement": [
+    {
+      "id": "achievement-001",
+      "timestamp": 1700000400,
+      "type": "achievement",
+      "contractId": "CCAMPAIGN111111111111111111111111111111111111111111111",
+      "data": {
+        "contributor": "GCONTRIB1111111111111111111111111111111111111111111111",
+        "achievement_type": "first_contribution",
+        "badge": "pioneer",
+        "points": 100
+      }
+    },
+    {
+      "id": "achievement-002",
+      "timestamp": 1700000500,
+      "type": "achievement",
+      "contractId": "CCAMPAIGN222222222222222222222222222222222222222222222",
+      "data": {
+        "contributor": "GCONTRIB1111111111111111111111111111111111111111111111",
+        "achievement_type": "top_contributor",
+        "badge": "champion",
+        "points": 500
+      }
+    }
+  ]
+}

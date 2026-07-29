@@ -141,7 +141,7 @@ describe("httpFetch", () => {
   it("returns data on first success (1 attempt)", async () => {
     mockFetch(makeResponse(200, { ok: true }));
 
-    const result = await httpFetch("https://example.com", {}, {}, noopSleep);
+    const result = await httpFetch("https://example.com", {}, {}, undefined, noopSleep);
 
     expect(result.ok).toBe(true);
     expect(result.status).toBe(200);
@@ -151,7 +151,7 @@ describe("httpFetch", () => {
 
   it("calls fetch exactly once on success", async () => {
     const mock = mockFetch(makeResponse(200, {}));
-    await httpFetch("https://example.com", {}, {}, noopSleep);
+    await httpFetch("https://example.com", {}, {}, undefined, noopSleep);
     expect(mock).toHaveBeenCalledTimes(1);
   });
 
@@ -169,6 +169,7 @@ describe("httpFetch", () => {
       "https://example.com",
       {},
       { maxRetries: 3 },
+      undefined,
       noopSleep,
     );
 
@@ -186,7 +187,7 @@ describe("httpFetch", () => {
     );
 
     await expect(
-      httpFetch("https://example.com", {}, { maxRetries: 3 }, noopSleep),
+      httpFetch("https://example.com", {}, { maxRetries: 3 }, undefined, noopSleep),
     ).rejects.toThrow();
   });
 
@@ -199,7 +200,7 @@ describe("httpFetch", () => {
     );
 
     await expect(
-      httpFetch("https://example.com", {}, { maxRetries: 3 }, noopSleep),
+      httpFetch("https://example.com", {}, { maxRetries: 3 }, undefined, noopSleep),
     ).rejects.toThrow();
 
     // 1 initial + 3 retries = 4 total
@@ -210,7 +211,7 @@ describe("httpFetch", () => {
     const mock = mockFetch(makeResponse(500));
 
     await expect(
-      httpFetch("https://example.com", {}, { maxRetries: 0 }, noopSleep),
+      httpFetch("https://example.com", {}, { maxRetries: 0 }, undefined, noopSleep),
     ).rejects.toThrow();
 
     expect(mock).toHaveBeenCalledTimes(1);
@@ -232,7 +233,7 @@ describe("httpFetch", () => {
         "https://example.com",
         {},
         { maxRetries: 3, initialBackoffMs: 500, backoffMultiplier: 2, maxBackoffMs: 30_000 },
-        undefined, // traceId
+        undefined,
         sleep,
       ),
     ).rejects.toThrow();
@@ -250,7 +251,7 @@ describe("httpFetch", () => {
     mockFetch(makeResponse(500));
 
     await expect(
-      httpFetch("https://example.com", {}, { maxRetries: 0 }, sleep),
+      httpFetch("https://example.com", {}, { maxRetries: 0 }, undefined, sleep),
     ).rejects.toThrow();
 
     expect(sleep).toHaveBeenCalledTimes(0);
@@ -265,6 +266,7 @@ describe("httpFetch", () => {
       "https://example.com",
       {},
       { maxRetries: 1 },
+      undefined,
       noopSleep,
     );
 
@@ -281,6 +283,7 @@ describe("httpFetch", () => {
         "https://example.com",
         {},
         { maxRetries: 1 },
+        undefined,
         noopSleep,
       );
 
@@ -296,6 +299,7 @@ describe("httpFetch", () => {
       "https://example.com",
       {},
       { maxRetries: 3 },
+      undefined,
       noopSleep,
     );
 
@@ -308,13 +312,13 @@ describe("httpFetch", () => {
 
   it("does NOT retry on 401 Unauthorized", async () => {
     const mock = mockFetch(makeResponse(401));
-    await httpFetch("https://example.com", {}, { maxRetries: 3 }, noopSleep);
+    await httpFetch("https://example.com", {}, { maxRetries: 3 }, undefined, noopSleep);
     expect(mock).toHaveBeenCalledTimes(1);
   });
 
   it("does NOT retry on 404 Not Found", async () => {
     const mock = mockFetch(makeResponse(404));
-    await httpFetch("https://example.com", {}, { maxRetries: 3 }, noopSleep);
+    await httpFetch("https://example.com", {}, { maxRetries: 3 }, undefined, noopSleep);
     expect(mock).toHaveBeenCalledTimes(1);
   });
 
@@ -331,6 +335,7 @@ describe("httpFetch", () => {
       "https://example.com",
       {},
       { maxRetries: 1 },
+      undefined,
       noopSleep,
     );
 
@@ -342,7 +347,7 @@ describe("httpFetch", () => {
     mockFetchNetworkError("DNS resolution failed");
 
     await expect(
-      httpFetch("https://example.com", {}, { maxRetries: 2 }, noopSleep),
+      httpFetch("https://example.com", {}, { maxRetries: 2 }, undefined, noopSleep),
     ).rejects.toThrow("DNS resolution failed");
 
     expect(vi.mocked(global.fetch)).toHaveBeenCalledTimes(3); // 1 + 2 retries
@@ -353,7 +358,7 @@ describe("httpFetch", () => {
     vi.stubGlobal("fetch", mock);
 
     await expect(
-      httpFetch("https://example.com", {}, { maxRetries: 3 }, noopSleep),
+      httpFetch("https://example.com", {}, { maxRetries: 3 }, undefined, noopSleep),
     ).rejects.toThrow("Unexpected token");
 
     // SyntaxError is not a TypeError, so no retries.
@@ -373,6 +378,7 @@ describe("httpFetch", () => {
       "https://example.com",
       {},
       { maxRetries: 5 }, // override default of 3
+      undefined,
       noopSleep,
     );
 
@@ -390,7 +396,7 @@ describe("httpFetch", () => {
         "https://example.com",
         {},
         { maxRetries: 1, initialBackoffMs: 1_000, backoffMultiplier: 2, maxBackoffMs: 30_000 },
-        undefined, // traceId
+        undefined,
         sleep,
       ),
     ).rejects.toThrow();

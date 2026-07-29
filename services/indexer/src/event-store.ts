@@ -1,6 +1,9 @@
 import pino from "pino";
 import type { IndexerEvent } from "./rpc-client.js";
 
+// Re-export so tests can import IndexerEvent from "./event-store" consistently
+export type { IndexerEvent };
+
 /**
  * In-memory event store (for MVP - replace with database)
  */

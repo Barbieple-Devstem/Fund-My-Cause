@@ -4,6 +4,8 @@ import pino from "pino";
 import { SorobanRPCClient } from "./rpc-client.js";
 import { HealthChecker } from "./health-checker.js";
 import { EventStore } from "./event-store.js";
+import { EventStoreRepository } from "./repository-impl.js";
+import type { EventRepository } from "./repository.js";
 
 // Environment variables
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
@@ -23,7 +25,12 @@ const rpcClient = new SorobanRPCClient(
   logger
 );
 const healthChecker = new HealthChecker(logger);
+
+// Build the repository once at startup.  All handlers interact with
+// `eventRepository` (the interface) rather than `eventStore` directly,
+// so the storage layer can be replaced without touching handler code.
 const eventStore = new EventStore(logger);
+const eventRepository: EventRepository = new EventStoreRepository(eventStore, logger);
 
 let isRunning = false;
 
@@ -47,8 +54,8 @@ async function startIndexer(): Promise<void> {
   logger.info("Streaming events from Soroban RPC");
   for await (const events of rpcClient.streamEvents()) {
     try {
-      // Store events
-      eventStore.addEvents(events);
+      // Store events via repository (no direct EventStore access here)
+      eventRepository.addEvents(events);
 
       // Update health
       for (const event of events) {
@@ -86,28 +93,28 @@ app.get("/ready", (req, res) => {
   }
 });
 
-// Events query endpoint
+// Events query endpoint — uses EventRepository interface
 app.get("/events", (req, res) => {
   const { contractId, type, limit = "100" } = req.query;
   const limitNum = Math.min(parseInt(limit as string, 10) || 100, 1000);
 
   let events = [];
   if (contractId) {
-    events = eventStore.queryByContract(contractId as string, limitNum);
+    events = eventRepository.queryByContract(contractId as string, limitNum);
   } else if (type) {
-    events = eventStore.queryByType(type as string, limitNum);
+    events = eventRepository.queryByType(type as string, limitNum);
   } else {
-    events = eventStore.getAllEvents(limitNum);
+    events = eventRepository.getAllEvents(limitNum);
   }
 
   res.json({ count: events.length, events });
 });
 
-// Stats endpoint
+// Stats endpoint — uses EventRepository interface
 app.get("/stats", (req, res) => {
   const health = healthChecker.getStatus();
   res.json({
-    eventCount: eventStore.getCount(),
+    eventCount: eventRepository.getCount(),
     health: health.status,
     uptime: health.uptime,
     lastLedger: health.lastLedger,
