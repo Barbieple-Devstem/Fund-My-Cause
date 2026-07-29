@@ -57,11 +57,11 @@ interface EscalateResponse {
 export class PagerDutyIntegration {
   private client: AxiosInstance;
   private readonly API_BASE_URL = 'https://api.pagerduty.com';
-  private readonly api_key: string;
+  private readonly _api_key: string;
   private readonly integration_key: string;
 
   constructor(api_key: string, integration_key?: string) {
-    this.api_key = api_key;
+    this._api_key = api_key;
     this.integration_key = integration_key || process.env.PAGERDUTY_INTEGRATION_KEY || '';
 
     this.client = axios.create({
@@ -163,7 +163,7 @@ export class PagerDutyIntegration {
   /**
    * Resolve incident
    */
-  async resolveIncident(incident_id: string, user_id?: string): Promise<ResolveResponse> {
+  async resolveIncident(incident_id: string, _user_id?: string): Promise<ResolveResponse> {
     const startTime = Date.now();
     try {
       const response = await this.client.put(`/incidents/${incident_id}`, {

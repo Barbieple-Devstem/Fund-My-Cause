@@ -307,7 +307,7 @@ export class IncidentResponseEngine {
   analyzeMetric(
     metric: string,
     threshold: number,
-    window: number,
+    _window: number,
   ): AnalysisResult {
     // Simulated analysis
     const current_value = Math.random() * 100;

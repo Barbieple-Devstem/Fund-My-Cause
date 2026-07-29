@@ -235,3 +235,39 @@ class TestDefaultScoringConfig:
         """ScoringWeightsConfig is a frozen dataclass — mutation must fail."""
         with pytest.raises((AttributeError, TypeError)):
             DEFAULT_SCORING_CONFIG.category_boost = 99.0  # type: ignore[misc]
+
+
+# ---------------------------------------------------------------------------
+# #912 regression guard: default config == historical hardcoded values
+# ---------------------------------------------------------------------------
+
+class TestDefaultConfigMatchesHardcodedValues:
+    """
+    Guard that the built-in defaults in ScoringWeightsConfig exactly match
+    the constants that were previously hardcoded inline in service.py before
+    issue #912 extracted them into this config module.
+
+    If either default value changes the scoring output will differ from the
+    pre-#912 behaviour, which would be a breaking change.  Any intentional
+    change to the defaults must also update this test.
+    """
+
+    # Historical hardcoded values from service.py (pre-#912):
+    _LEGACY_CATEGORY_BOOST: float = 2.0
+    _LEGACY_AGE_DIVISOR_MIN: float = 1.0
+
+    def test_category_boost_matches_legacy_hardcoded_value(self):
+        assert DEFAULT_SCORING_CONFIG.category_boost == pytest.approx(
+            self._LEGACY_CATEGORY_BOOST
+        )
+
+    def test_age_divisor_min_matches_legacy_hardcoded_value(self):
+        assert DEFAULT_SCORING_CONFIG.age_divisor_min == pytest.approx(
+            self._LEGACY_AGE_DIVISOR_MIN
+        )
+
+    def test_load_with_empty_env_matches_legacy_values(self):
+        """Loading from an empty environment must reproduce the legacy constants."""
+        cfg = load_scoring_config({})
+        assert cfg.category_boost == pytest.approx(self._LEGACY_CATEGORY_BOOST)
+        assert cfg.age_divisor_min == pytest.approx(self._LEGACY_AGE_DIVISOR_MIN)

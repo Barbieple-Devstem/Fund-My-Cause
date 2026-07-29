@@ -1,95 +1,73 @@
 /**
- * Shared validation schemas for campaign and donation inputs.
- *
- * Reconciliation note: Both frontend and backend now use identical rules.
- * Pre-existing discrepancy resolved: frontend had minContribution >= 1 (XLM),
- * graphql-api had no validation - now both enforce >= 1 XLM minimum.
+ * Input validation and sanitization utilities for campaign creation.
  */
 
-export const CAMPAIGN_TITLE_MAX_LENGTH = 100;
-export const CAMPAIGN_DESCRIPTION_MAX_LENGTH = 1000;
-export const CAMPAIGN_DEADLINE_MIN_HOURS = 1;
-export const CAMPAIGN_DEADLINE_MAX_YEARS = 1;
-export const DONATION_MIN_XLM = 1; // minimum 1 XLM
-export const XLM_TO_STROOPS = 10_000_000n;
-
-/** Maximum goal in stroops: i128::MAX / 10 */
-const MAX_GOAL_STROOPS = BigInt("9223372036854775807") / 10n;
-
-// ---------------------------------------------------------------------------
-// Input types
-// ---------------------------------------------------------------------------
-
-export interface CampaignValidationInput {
-  title: string;
-  description: string;
-  goal: string;
-  deadline: string;
-  minContribution: string;
-  maxContribution?: string;
-  feeBps?: string;
-}
-
-export interface DonationValidationInput {
-  amount: string;
-  campaignId: string;
-}
-
-export interface DonationValidationOptions {
-  minContributionStroops?: bigint;
-  maxContributionStroops?: bigint;
-}
-
-// ---------------------------------------------------------------------------
-// Internal helper
-// ---------------------------------------------------------------------------
+const MAX_TITLE_LENGTH = 100;
+const MAX_DESCRIPTION_LENGTH = 1000;
+const MAX_GOAL = BigInt(9223372036854775807) / BigInt(10); // i128::MAX / 10
+const MIN_DEADLINE_HOURS = 1;
+const MAX_DEADLINE_YEARS = 1;
 
 /**
- * Strip HTML tags from a string before applying length rules.
+ * Validate that a string is a valid Stellar contract ID.
+ * Contract IDs start with 'C', are 56 characters long, and use valid base32 characters.
+ * @returns Error message if invalid, null if valid
  */
-function stripHtml(text: string): string {
+export function isValidContractId(id: string): boolean {
+  if (!id || typeof id !== "string") {
+    return false;
+  }
+  // Must start with 'C' and be exactly 56 characters
+  if (!id.startsWith("C") || id.length !== 56) {
+    return false;
+  }
+  // Must contain only valid base32 characters (A-Z, 2-7)
+  const base32Regex = /^C[A-Z2-7]{55}$/;
+  return base32Regex.test(id);
+}
+
+/**
+ * Strip HTML tags from a string.
+ */
+export function stripHtmlTags(text: string): string {
   return text.replace(/<[^>]*>/g, "");
 }
 
-// ---------------------------------------------------------------------------
-// Individual field validators — return error string or null
-// ---------------------------------------------------------------------------
-
 /**
- * Validate campaign title.
- * Required, HTML stripped, max 100 characters.
+ * Validate and sanitize campaign title.
+ * @returns Error message if invalid, null if valid
  */
-export function validateCampaignTitle(title: string): string | null {
+export function validateTitle(title: string): string | null {
   if (!title || !title.trim()) {
     return "Title is required.";
   }
-  const sanitized = stripHtml(title);
-  if (sanitized.length > CAMPAIGN_TITLE_MAX_LENGTH) {
-    return `Title must be ${CAMPAIGN_TITLE_MAX_LENGTH} characters or less.`;
+  const sanitized = stripHtmlTags(title);
+  if (sanitized.length > MAX_TITLE_LENGTH) {
+    return `Title must be ${MAX_TITLE_LENGTH} characters or less.`;
   }
   return null;
 }
 
 /**
- * Validate campaign description.
- * Required, HTML stripped, max 1000 characters.
+ * Validate and sanitize campaign description.
+ * @returns Error message if invalid, null if valid
  */
-export function validateCampaignDescription(description: string): string | null {
+export function validateDescription(description: string): string | null {
   if (!description || !description.trim()) {
     return "Description is required.";
   }
-  const sanitized = stripHtml(description);
-  if (sanitized.length > CAMPAIGN_DESCRIPTION_MAX_LENGTH) {
-    return `Description must be ${CAMPAIGN_DESCRIPTION_MAX_LENGTH} characters or less.`;
+  const sanitized = stripHtmlTags(description);
+  if (sanitized.length > MAX_DESCRIPTION_LENGTH) {
+    return `Description must be ${MAX_DESCRIPTION_LENGTH} characters or less.`;
   }
   return null;
 }
 
 /**
  * Validate funding goal.
- * Required, positive number, bigint conversion to stroops must not exceed i128::MAX / 10.
+ * @returns Error message if invalid, null if valid
  */
-export function validateCampaignGoal(goal: string): string | null {
+export function validateGoal(goal: string): string | null {
   if (!goal || goal.trim() === "") {
     return "Goal is required.";
   }
@@ -97,18 +75,46 @@ export function validateCampaignGoal(goal: string): string | null {
   if (isNaN(num) || num <= 0) {
     return "Goal must be a positive number.";
   }
-  const bigGoal = BigInt(Math.floor(num * Number(XLM_TO_STROOPS)));
-  if (bigGoal > MAX_GOAL_STROOPS) {
+  const bigGoal = BigInt(Math.floor(num * 10_000_000)); // Convert to stroops
+  if (bigGoal > MAX_GOAL) {
     return "Goal exceeds maximum allowed value.";
   }
   return null;
 }
 
+export function validateContractId(id: string): string | null {
+  if (!id || !id.trim()) {
+    return "Contract ID is required.";
+  }
+  if (!isValidContractId(id.trim())) {
+    return "Contract ID is invalid.";
+  }
+  return null;
+}
+
+export function validateVideoUrl(videoUrl: string): string | null {
+  if (!videoUrl || !videoUrl.trim()) {
+    return null;
+  }
+
+  const trimmed = videoUrl.trim();
+  if (!/^https:\/\//i.test(trimmed)) {
+    return "Enter a valid URL starting with https://";
+  }
+
+  try {
+    new URL(trimmed);
+    return null;
+  } catch {
+    return "Enter a valid URL.";
+  }
+}
+
 /**
- * Validate campaign deadline.
- * Required, must be at least 1 hour in the future, at most 1 year in the future.
+ * Validate deadline.
+ * @returns Error message if invalid, null if valid
  */
-export function validateCampaignDeadline(deadline: string): string | null {
+export function validateDeadline(deadline: string): string | null {
   if (!deadline) {
     return "Deadline is required.";
   }
@@ -118,52 +124,48 @@ export function validateCampaignDeadline(deadline: string): string | null {
   const diffHours = diffMs / (1000 * 60 * 60);
   const diffYears = diffHours / (24 * 365);
 
-  if (diffHours < CAMPAIGN_DEADLINE_MIN_HOURS) {
-    return `Deadline must be at least ${CAMPAIGN_DEADLINE_MIN_HOURS} hour in the future.`;
+  if (diffHours < MIN_DEADLINE_HOURS) {
+    return `Deadline must be at least ${MIN_DEADLINE_HOURS} hour in the future.`;
   }
-  if (diffYears > CAMPAIGN_DEADLINE_MAX_YEARS) {
-    return `Deadline cannot be more than ${CAMPAIGN_DEADLINE_MAX_YEARS} year in the future.`;
+  if (diffYears > MAX_DEADLINE_YEARS) {
+    return `Deadline cannot be more than ${MAX_DEADLINE_YEARS} year in the future.`;
   }
   return null;
 }
 
 /**
  * Validate minimum contribution.
- * Required, must be >= 1 XLM. If goal provided, must not exceed goal.
+ * @returns Error message if invalid, null if valid
  */
 export function validateMinContribution(
   minContribution: string,
-  goal?: string,
+  goal: string,
 ): string | null {
   if (!minContribution || minContribution.trim() === "") {
     return "Minimum contribution is required.";
   }
   const num = Number(minContribution);
-  if (isNaN(num) || num < DONATION_MIN_XLM) {
+  if (isNaN(num) || num < 1) {
     return "Minimum contribution must be at least 1.";
   }
-  if (goal !== undefined && goal !== "") {
-    const goalNum = Number(goal);
-    if (!isNaN(goalNum) && num > goalNum) {
-      return "Minimum contribution cannot exceed goal.";
-    }
+  const goalNum = Number(goal);
+  if (num > goalNum) {
+    return "Minimum contribution cannot exceed goal.";
   }
   return null;
 }
 
 /**
  * Validate maximum contribution per contributor.
- * Optional — 0 means no limit. If set, must be >= minContribution.
+ * A value of 0 means no limit. If set, must be >= minContribution.
+ * Use case: prevents whale dominance by capping any single contributor's total pledge.
+ * @returns Error message if invalid, null if valid
  */
 export function validateMaxContribution(
   maxContribution: string,
   minContribution: string,
 ): string | null {
-  if (
-    !maxContribution ||
-    maxContribution.trim() === "" ||
-    maxContribution === "0"
-  ) {
+  if (!maxContribution || maxContribution.trim() === "" || maxContribution === "0") {
     return null; // 0 = no limit, optional field
   }
   const num = Number(maxContribution);
@@ -179,7 +181,7 @@ export function validateMaxContribution(
 
 /**
  * Validate platform fee in basis points.
- * Optional — if provided must be 0–10000.
+ * @returns Error message if invalid, null if valid
  */
 export function validateFeeBps(feeBps: string): string | null {
   if (!feeBps || feeBps.trim() === "") {
@@ -193,107 +195,15 @@ export function validateFeeBps(feeBps: string): string | null {
 }
 
 /**
- * Validate a donation amount (expressed in XLM, not stroops).
- * Required, must be > 0.
- * If minContributionStroops provided: amount_in_stroops >= minContributionStroops.
- * If maxContributionStroops provided and > 0: amount_in_stroops <= maxContributionStroops.
+ * Sanitize title by stripping HTML tags and trimming.
  */
-export function validateDonationAmount(
-  amount: string,
-  options?: DonationValidationOptions,
-): string | null {
-  if (!amount || amount.trim() === "") {
-    return "Amount is required.";
-  }
-  const num = Number(amount);
-  if (isNaN(num) || num <= 0) {
-    return "Amount must be a positive number.";
-  }
-
-  const amountInStroops = BigInt(Math.floor(num * Number(XLM_TO_STROOPS)));
-
-  if (options?.minContributionStroops !== undefined) {
-    if (amountInStroops < options.minContributionStroops) {
-      const minXlm = Number(options.minContributionStroops) / Number(XLM_TO_STROOPS);
-      return `Amount must be at least ${minXlm} XLM.`;
-    }
-  }
-
-  if (
-    options?.maxContributionStroops !== undefined &&
-    options.maxContributionStroops > 0n
-  ) {
-    if (amountInStroops > options.maxContributionStroops) {
-      const maxXlm = Number(options.maxContributionStroops) / Number(XLM_TO_STROOPS);
-      return `Amount must not exceed ${maxXlm} XLM.`;
-    }
-  }
-
-  return null;
-}
-
-// ---------------------------------------------------------------------------
-// Aggregate validators
-// ---------------------------------------------------------------------------
-
-/**
- * Validate all campaign creation fields at once.
- * Returns a record of field name → error message for each invalid field.
- * An empty object means all fields are valid.
- */
-export function validateCampaignInput(
-  input: CampaignValidationInput,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
-
-  const titleError = validateCampaignTitle(input.title);
-  if (titleError) errors["title"] = titleError;
-
-  const descError = validateCampaignDescription(input.description);
-  if (descError) errors["description"] = descError;
-
-  const goalError = validateCampaignGoal(input.goal);
-  if (goalError) errors["goal"] = goalError;
-
-  const deadlineError = validateCampaignDeadline(input.deadline);
-  if (deadlineError) errors["deadline"] = deadlineError;
-
-  const minContribError = validateMinContribution(input.minContribution, input.goal);
-  if (minContribError) errors["minContribution"] = minContribError;
-
-  if (input.maxContribution !== undefined) {
-    const maxContribError = validateMaxContribution(
-      input.maxContribution,
-      input.minContribution,
-    );
-    if (maxContribError) errors["maxContribution"] = maxContribError;
-  }
-
-  if (input.feeBps !== undefined) {
-    const feeBpsError = validateFeeBps(input.feeBps);
-    if (feeBpsError) errors["feeBps"] = feeBpsError;
-  }
-
-  return errors;
+export function sanitizeTitle(title: string): string {
+  return stripHtmlTags(title).trim();
 }
 
 /**
- * Validate a donation input.
- * Returns a record of field name → error message for each invalid field.
- * An empty object means all fields are valid.
+ * Sanitize description by stripping HTML tags and trimming.
  */
-export function validateDonationInput(
-  input: DonationValidationInput,
-  options?: DonationValidationOptions,
-): Record<string, string> {
-  const errors: Record<string, string> = {};
-
-  const amountError = validateDonationAmount(input.amount, options);
-  if (amountError) errors["amount"] = amountError;
-
-  if (!input.campaignId || !input.campaignId.trim()) {
-    errors["campaignId"] = "Campaign ID is required.";
-  }
-
-  return errors;
+export function sanitizeDescription(description: string): string {
+  return stripHtmlTags(description).trim();
 }

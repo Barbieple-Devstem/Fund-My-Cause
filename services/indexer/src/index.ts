@@ -124,6 +124,8 @@ app.get("/stats", (req, res) => {
     uptime: health.uptime,
     lastLedger: health.lastLedger,
     eventsProcessed: health.eventsProcessed,
+    // Circuit breaker metrics — expose for observability (Issue #906)
+    circuitBreaker: rpcClient.getCircuitBreakerMetrics(),
   });
 });
 

@@ -1,430 +1,241 @@
 import { describe, it, expect } from "vitest";
 import {
-  validateCampaignTitle,
-  validateCampaignDescription,
-  validateCampaignGoal,
-  validateCampaignDeadline,
+  isValidContractId,
+  stripHtmlTags,
+  validateTitle,
+  validateDescription,
+  validateGoal,
+  validateContractId,
+  validateVideoUrl,
+  validateDeadline,
   validateMinContribution,
   validateMaxContribution,
   validateFeeBps,
-  validateDonationAmount,
-  validateCampaignInput,
-  validateDonationInput,
-  XLM_TO_STROOPS,
+  sanitizeTitle,
+  sanitizeDescription,
 } from "../validation";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Returns a ISO string that is `hours` hours from now. */
-function hoursFromNow(hours: number): string {
-  return new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
-}
-
-/** Returns a ISO string that is `days` days from now. */
-function daysFromNow(days: number): string {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
-}
-
-// ---------------------------------------------------------------------------
-// validateCampaignTitle
-// ---------------------------------------------------------------------------
-
-describe("validateCampaignTitle", () => {
-  it("accepts a valid title", () => {
-    expect(validateCampaignTitle("Save the rainforest")).toBeNull();
-  });
-
-  it("rejects an empty string", () => {
-    expect(validateCampaignTitle("")).not.toBeNull();
-  });
-
-  it("rejects a whitespace-only string", () => {
-    expect(validateCampaignTitle("   ")).not.toBeNull();
-  });
-
-  it("rejects a title longer than 100 characters", () => {
-    const longTitle = "a".repeat(101);
-    expect(validateCampaignTitle(longTitle)).not.toBeNull();
-  });
-
-  it("accepts a title exactly 100 characters long", () => {
-    const maxTitle = "a".repeat(100);
-    expect(validateCampaignTitle(maxTitle)).toBeNull();
-  });
-
-  it("strips HTML tags before checking length — a title with HTML that is <=100 chars after stripping is valid", () => {
-    // <b>abc</b> → "abc" (3 chars after stripping) — valid
-    expect(validateCampaignTitle("<b>abc</b>")).toBeNull();
-  });
-
-  it("strips HTML before checking length — tags are not counted toward the limit", () => {
-    // 100 'a' chars inside tags: stripped length = 100 → valid
-    const withHtml = `<b>${"a".repeat(100)}</b>`;
-    expect(validateCampaignTitle(withHtml)).toBeNull();
-  });
-
-  it("rejects a title whose stripped text exceeds 100 characters", () => {
-    const withHtml = `<b>${"a".repeat(101)}</b>`;
-    expect(validateCampaignTitle(withHtml)).not.toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateCampaignDescription
-// ---------------------------------------------------------------------------
-
-describe("validateCampaignDescription", () => {
-  it("accepts a valid description", () => {
-    expect(validateCampaignDescription("A meaningful campaign for a great cause.")).toBeNull();
-  });
-
-  it("rejects an empty string", () => {
-    expect(validateCampaignDescription("")).not.toBeNull();
-  });
-
-  it("rejects a whitespace-only string", () => {
-    expect(validateCampaignDescription("   ")).not.toBeNull();
-  });
-
-  it("rejects a description longer than 1000 characters", () => {
-    expect(validateCampaignDescription("a".repeat(1001))).not.toBeNull();
-  });
-
-  it("accepts a description exactly 1000 characters long", () => {
-    expect(validateCampaignDescription("a".repeat(1000))).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateCampaignGoal
-// ---------------------------------------------------------------------------
-
-describe("validateCampaignGoal", () => {
-  it("accepts a positive goal", () => {
-    expect(validateCampaignGoal("1000")).toBeNull();
-  });
-
-  it("accepts a fractional positive goal", () => {
-    expect(validateCampaignGoal("0.5")).toBeNull();
-  });
-
-  it("rejects 0", () => {
-    expect(validateCampaignGoal("0")).not.toBeNull();
-  });
-
-  it("rejects a negative number", () => {
-    expect(validateCampaignGoal("-1")).not.toBeNull();
-  });
-
-  it("rejects NaN input", () => {
-    expect(validateCampaignGoal("abc")).not.toBeNull();
-  });
-
-  it("rejects an empty string", () => {
-    expect(validateCampaignGoal("")).not.toBeNull();
-  });
-
-  it("rejects a goal that exceeds i128::MAX / 10 in stroops", () => {
-    // i128::MAX = 9223372036854775807; /10 = 922337203685477580
-    // 922337203685477580 stroops = 92233720368.547758 XLM — use a value well above
-    const hugGoal = "100000000000"; // 100 billion XLM → stroops overflows
-    expect(validateCampaignGoal(hugGoal)).not.toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateCampaignDeadline
-// ---------------------------------------------------------------------------
-
-describe("validateCampaignDeadline", () => {
-  it("accepts a deadline 2 hours from now", () => {
-    expect(validateCampaignDeadline(hoursFromNow(2))).toBeNull();
-  });
-
-  it("accepts a deadline 30 days from now", () => {
-    expect(validateCampaignDeadline(daysFromNow(30))).toBeNull();
-  });
-
-  it("rejects a past deadline", () => {
-    expect(validateCampaignDeadline(hoursFromNow(-1))).not.toBeNull();
-  });
-
-  it("rejects a deadline less than 1 hour in the future", () => {
-    expect(validateCampaignDeadline(hoursFromNow(0.5))).not.toBeNull();
-  });
-
-  it("rejects a deadline more than 1 year in the future", () => {
-    expect(validateCampaignDeadline(daysFromNow(366))).not.toBeNull();
-  });
-
-  it("rejects an empty string", () => {
-    expect(validateCampaignDeadline("")).not.toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateMinContribution
-// ---------------------------------------------------------------------------
-
-describe("validateMinContribution", () => {
-  it("accepts 1 XLM", () => {
-    expect(validateMinContribution("1")).toBeNull();
-  });
-
-  it("accepts 10 XLM", () => {
-    expect(validateMinContribution("10")).toBeNull();
-  });
-
-  it("rejects 0", () => {
-    expect(validateMinContribution("0")).not.toBeNull();
-  });
-
-  it("rejects 0.5 (below 1 XLM minimum)", () => {
-    expect(validateMinContribution("0.5")).not.toBeNull();
-  });
-
-  it("rejects an empty string", () => {
-    expect(validateMinContribution("")).not.toBeNull();
-  });
-
-  it("rejects a value greater than the goal", () => {
-    expect(validateMinContribution("500", "100")).not.toBeNull();
-  });
-
-  it("accepts a value equal to the goal", () => {
-    expect(validateMinContribution("100", "100")).toBeNull();
-  });
-
-  it("accepts a value less than the goal", () => {
-    expect(validateMinContribution("10", "100")).toBeNull();
-  });
-
-  it("does not apply goal check when goal is not provided", () => {
-    expect(validateMinContribution("9999")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateMaxContribution
-// ---------------------------------------------------------------------------
-
-describe("validateMaxContribution", () => {
-  it("accepts 0 (no limit)", () => {
-    expect(validateMaxContribution("0", "10")).toBeNull();
-  });
-
-  it("accepts an empty string (optional field)", () => {
-    expect(validateMaxContribution("", "10")).toBeNull();
-  });
-
-  it("accepts a valid max >= min", () => {
-    expect(validateMaxContribution("50", "10")).toBeNull();
-  });
-
-  it("accepts max equal to min", () => {
-    expect(validateMaxContribution("10", "10")).toBeNull();
-  });
-
-  it("rejects a value less than minContribution", () => {
-    expect(validateMaxContribution("5", "10")).not.toBeNull();
-  });
-
-  it("rejects a negative number", () => {
-    expect(validateMaxContribution("-1", "10")).not.toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateFeeBps
-// ---------------------------------------------------------------------------
-
-describe("validateFeeBps", () => {
-  it("accepts 0", () => {
-    expect(validateFeeBps("0")).toBeNull();
-  });
-
-  it("accepts 10000", () => {
-    expect(validateFeeBps("10000")).toBeNull();
-  });
-
-  it("accepts a mid-range value like 250 (2.5%)", () => {
-    expect(validateFeeBps("250")).toBeNull();
-  });
-
-  it("rejects -1", () => {
-    expect(validateFeeBps("-1")).not.toBeNull();
-  });
-
-  it("rejects 10001", () => {
-    expect(validateFeeBps("10001")).not.toBeNull();
-  });
-
-  it("accepts an empty string (optional field)", () => {
-    expect(validateFeeBps("")).toBeNull();
-  });
-
-  it("accepts undefined-like whitespace (optional field)", () => {
-    expect(validateFeeBps("  ")).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateDonationAmount
-// ---------------------------------------------------------------------------
-
-describe("validateDonationAmount", () => {
-  it("accepts a valid positive amount", () => {
-    expect(validateDonationAmount("5")).toBeNull();
-  });
-
-  it("rejects 0", () => {
-    expect(validateDonationAmount("0")).not.toBeNull();
-  });
-
-  it("rejects a negative amount", () => {
-    expect(validateDonationAmount("-1")).not.toBeNull();
-  });
-
-  it("rejects an empty string", () => {
-    expect(validateDonationAmount("")).not.toBeNull();
-  });
-
-  it("rejects NaN", () => {
-    expect(validateDonationAmount("abc")).not.toBeNull();
-  });
-
-  it("rejects an amount below minContributionStroops", () => {
-    const minStroops = 10n * XLM_TO_STROOPS; // 10 XLM
-    expect(
-      validateDonationAmount("5", { minContributionStroops: minStroops }),
-    ).not.toBeNull();
-  });
-
-  it("accepts an amount equal to minContributionStroops", () => {
-    const minStroops = 10n * XLM_TO_STROOPS; // 10 XLM
-    expect(
-      validateDonationAmount("10", { minContributionStroops: minStroops }),
-    ).toBeNull();
-  });
-
-  it("accepts an amount above minContributionStroops", () => {
-    const minStroops = 10n * XLM_TO_STROOPS;
-    expect(
-      validateDonationAmount("20", { minContributionStroops: minStroops }),
-    ).toBeNull();
-  });
-
-  it("rejects an amount above maxContributionStroops", () => {
-    const maxStroops = 100n * XLM_TO_STROOPS; // 100 XLM
-    expect(
-      validateDonationAmount("200", { maxContributionStroops: maxStroops }),
-    ).not.toBeNull();
-  });
-
-  it("accepts an amount equal to maxContributionStroops", () => {
-    const maxStroops = 100n * XLM_TO_STROOPS;
-    expect(
-      validateDonationAmount("100", { maxContributionStroops: maxStroops }),
-    ).toBeNull();
-  });
-
-  it("treats maxContributionStroops of 0 as no limit", () => {
-    expect(
-      validateDonationAmount("9999", { maxContributionStroops: 0n }),
-    ).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateCampaignInput
-// ---------------------------------------------------------------------------
-
-describe("validateCampaignInput", () => {
-  const validInput = {
-    title: "Save the Rainforest",
-    description: "Help us protect biodiversity.",
-    goal: "1000",
-    deadline: hoursFromNow(48),
-    minContribution: "1",
-  };
-
-  it("returns an empty object for a fully valid input", () => {
-    expect(validateCampaignInput(validInput)).toEqual({});
-  });
-
-  it("returns errors for every invalid field", () => {
-    const errors = validateCampaignInput({
-      title: "",
-      description: "",
-      goal: "0",
-      deadline: hoursFromNow(-1),
-      minContribution: "0",
+describe("Validation Schemas & Utilities", () => {
+  describe("isValidContractId & validateContractId", () => {
+    it("should accept valid Stellar contract IDs", () => {
+      const validId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2";
+      expect(isValidContractId(validId)).toBe(true);
+      expect(validateContractId(validId)).toBeNull();
     });
-    expect(Object.keys(errors)).toContain("title");
-    expect(Object.keys(errors)).toContain("description");
-    expect(Object.keys(errors)).toContain("goal");
-    expect(Object.keys(errors)).toContain("deadline");
-    expect(Object.keys(errors)).toContain("minContribution");
-  });
 
-  it("includes feeBps error when feeBps is invalid", () => {
-    const errors = validateCampaignInput({ ...validInput, feeBps: "99999" });
-    expect(errors["feeBps"]).toBeDefined();
-  });
-
-  it("includes maxContribution error when maxContribution is less than min", () => {
-    const errors = validateCampaignInput({
-      ...validInput,
-      minContribution: "10",
-      maxContribution: "5",
+    it("should reject contract IDs with incorrect length", () => {
+      const shortId = "CAAAAAAAA";
+      const longId = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA22";
+      expect(isValidContractId(shortId)).toBe(false);
+      expect(isValidContractId(longId)).toBe(false);
+      expect(validateContractId(shortId)).toBe("Contract ID is invalid.");
     });
-    expect(errors["maxContribution"]).toBeDefined();
-  });
 
-  it("does not include feeBps key when feeBps is not provided", () => {
-    const errors = validateCampaignInput(validInput);
-    expect(errors["feeBps"]).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// validateDonationInput
-// ---------------------------------------------------------------------------
-
-describe("validateDonationInput", () => {
-  it("returns an empty object for a valid donation", () => {
-    expect(
-      validateDonationInput({ amount: "5", campaignId: "CABC123" }),
-    ).toEqual({});
-  });
-
-  it("returns an amount error for an invalid amount", () => {
-    const errors = validateDonationInput({
-      amount: "0",
-      campaignId: "CABC123",
+    it("should reject contract IDs that do not start with C", () => {
+      const wrongStart = "GAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA2";
+      expect(isValidContractId(wrongStart)).toBe(false);
+      expect(validateContractId(wrongStart)).toBe("Contract ID is invalid.");
     });
-    expect(errors["amount"]).toBeDefined();
+
+    it("should reject invalid base32 characters", () => {
+      const invalidChars = "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA1"; // '1' is not base32
+      expect(isValidContractId(invalidChars)).toBe(false);
+      expect(validateContractId(invalidChars)).toBe("Contract ID is invalid.");
+    });
+
+    it("should reject empty/whitespace input for contract ID", () => {
+      expect(validateContractId("")).toBe("Contract ID is required.");
+      expect(validateContractId("   ")).toBe("Contract ID is required.");
+    });
   });
 
-  it("returns a campaignId error when campaignId is empty", () => {
-    const errors = validateDonationInput({ amount: "5", campaignId: "" });
-    expect(errors["campaignId"]).toBeDefined();
+  describe("stripHtmlTags", () => {
+    it("should strip HTML tags correctly", () => {
+      expect(stripHtmlTags("<p>Hello <strong>World</strong></p>")).toBe("Hello World");
+      expect(stripHtmlTags("Plain Text")).toBe("Plain Text");
+    });
   });
 
-  it("returns errors for both fields when both are invalid", () => {
-    const errors = validateDonationInput({ amount: "-1", campaignId: "" });
-    expect(errors["amount"]).toBeDefined();
-    expect(errors["campaignId"]).toBeDefined();
+  describe("validateTitle & sanitizeTitle", () => {
+    it("should accept valid titles", () => {
+      expect(validateTitle("Valid Title")).toBeNull();
+    });
+
+    it("should reject empty titles", () => {
+      expect(validateTitle("")).toBe("Title is required.");
+      expect(validateTitle("   ")).toBe("Title is required.");
+    });
+
+    it("should reject titles exceeding 100 characters", () => {
+      const longTitle = "a".repeat(101);
+      expect(validateTitle(longTitle)).toBe("Title must be 100 characters or less.");
+    });
+
+    it("should enforce boundaries correctly", () => {
+      const boundaryTitle = "a".repeat(100);
+      expect(validateTitle(boundaryTitle)).toBeNull();
+    });
+
+    it("should sanitize titles by stripping HTML tags", () => {
+      expect(sanitizeTitle("<h1>Title</h1> ")).toBe("Title");
+    });
   });
 
-  it("respects min contribution options", () => {
-    const minStroops = 10n * XLM_TO_STROOPS;
-    const errors = validateDonationInput(
-      { amount: "1", campaignId: "CABC123" },
-      { minContributionStroops: minStroops },
-    );
-    expect(errors["amount"]).toBeDefined();
+  describe("validateDescription & sanitizeDescription", () => {
+    it("should accept valid descriptions", () => {
+      expect(validateDescription("This is a valid campaign description.")).toBeNull();
+    });
+
+    it("should reject empty descriptions", () => {
+      expect(validateDescription("")).toBe("Description is required.");
+      expect(validateDescription("   ")).toBe("Description is required.");
+    });
+
+    it("should reject descriptions exceeding 1000 characters", () => {
+      const longDesc = "a".repeat(1001);
+      expect(validateDescription(longDesc)).toBe("Description must be 1000 characters or less.");
+    });
+
+    it("should enforce boundaries correctly", () => {
+      const boundaryDesc = "a".repeat(1000);
+      expect(validateDescription(boundaryDesc)).toBeNull();
+    });
+
+    it("should sanitize descriptions by stripping HTML tags", () => {
+      expect(sanitizeDescription("<p>Desc</p>")).toBe("Desc");
+    });
+  });
+
+  describe("validateGoal", () => {
+    it("should accept valid positive numbers", () => {
+      expect(validateGoal("1000")).toBeNull();
+      expect(validateGoal("10.5")).toBeNull();
+    });
+
+    it("should reject empty or missing goals", () => {
+      expect(validateGoal("")).toBe("Goal is required.");
+      expect(validateGoal("   ")).toBe("Goal is required.");
+    });
+
+    it("should reject negative or zero goals", () => {
+      expect(validateGoal("-50")).toBe("Goal must be a positive number.");
+      expect(validateGoal("0")).toBe("Goal must be a positive number.");
+      expect(validateGoal("abc")).toBe("Goal must be a positive number.");
+    });
+
+    it("should reject goals exceeding maximum allowed value", () => {
+      // i128::MAX / 10 is 17014118346046923173168730371588410572
+      // Goal input is multiplied by 10,000,000 (stroops)
+      // Maximum goal in XLM is MAX_GOAL / 10,000,000
+      const hugeGoal = "9223372036854775807";
+      expect(validateGoal(hugeGoal)).toBe("Goal exceeds maximum allowed value.");
+    });
+  });
+
+  describe("validateVideoUrl", () => {
+    it("should return null for empty/optional video URL", () => {
+      expect(validateVideoUrl("")).toBeNull();
+      expect(validateVideoUrl("  ")).toBeNull();
+    });
+
+    it("should accept valid https URLs", () => {
+      expect(validateVideoUrl("https://youtube.com/watch?v=123")).toBeNull();
+      expect(validateVideoUrl("https://example.com/video.mp4")).toBeNull();
+    });
+
+    it("should reject non-https URLs", () => {
+      expect(validateVideoUrl("http://example.com/video.mp4")).toBe("Enter a valid URL starting with https://");
+    });
+
+    it("should reject malformed URLs", () => {
+      expect(validateVideoUrl("https://")).toBe("Enter a valid URL.");
+    });
+  });
+
+  describe("validateDeadline", () => {
+    it("should reject missing deadline", () => {
+      expect(validateDeadline("")).toBe("Deadline is required.");
+    });
+
+    it("should accept deadlines within the allowed window (1 hour to 1 year)", () => {
+      const tomorrow = new Date();
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      expect(validateDeadline(tomorrow.toISOString())).toBeNull();
+    });
+
+    it("should reject deadlines in the past or too close in the future", () => {
+      const past = new Date();
+      past.setDate(past.getDate() - 1);
+      expect(validateDeadline(past.toISOString())).toBe("Deadline must be at least 1 hour in the future.");
+
+      const justNow = new Date();
+      expect(validateDeadline(justNow.toISOString())).toBe("Deadline must be at least 1 hour in the future.");
+    });
+
+    it("should reject deadlines more than 1 year in the future", () => {
+      const farFuture = new Date();
+      farFuture.setFullYear(farFuture.getFullYear() + 2);
+      expect(validateDeadline(farFuture.toISOString())).toBe("Deadline cannot be more than 1 year in the future.");
+    });
+  });
+
+  describe("validateMinContribution", () => {
+    it("should accept valid minimum contributions", () => {
+      expect(validateMinContribution("10", "1000")).toBeNull();
+      expect(validateMinContribution("1", "1")).toBeNull();
+    });
+
+    it("should reject empty minimum contributions", () => {
+      expect(validateMinContribution("", "100")).toBe("Minimum contribution is required.");
+    });
+
+    it("should reject minimum contributions less than 1", () => {
+      expect(validateMinContribution("0.5", "100")).toBe("Minimum contribution must be at least 1.");
+      expect(validateMinContribution("0", "100")).toBe("Minimum contribution must be at least 1.");
+      expect(validateMinContribution("-5", "100")).toBe("Minimum contribution must be at least 1.");
+      expect(validateMinContribution("abc", "100")).toBe("Minimum contribution must be at least 1.");
+    });
+
+    it("should reject minimum contributions exceeding the goal", () => {
+      expect(validateMinContribution("150", "100")).toBe("Minimum contribution cannot exceed goal.");
+    });
+  });
+
+  describe("validateMaxContribution", () => {
+    it("should accept 0 or empty as no limit", () => {
+      expect(validateMaxContribution("", "10")).toBeNull();
+      expect(validateMaxContribution("0", "10")).toBeNull();
+    });
+
+    it("should accept valid maximum contributions", () => {
+      expect(validateMaxContribution("50", "10")).toBeNull();
+    });
+
+    it("should reject negative maximum contributions", () => {
+      expect(validateMaxContribution("-5", "10")).toBe("Maximum contribution must be a non-negative number.");
+      expect(validateMaxContribution("abc", "10")).toBe("Maximum contribution must be a non-negative number.");
+    });
+
+    it("should reject maximum contributions less than minimum contribution", () => {
+      expect(validateMaxContribution("5", "10")).toBe("Maximum contribution cannot be less than minimum contribution.");
+    });
+  });
+
+  describe("validateFeeBps", () => {
+    it("should accept empty platform fees as optional", () => {
+      expect(validateFeeBps("")).toBeNull();
+    });
+
+    it("should accept valid basis points (0 to 10000)", () => {
+      expect(validateFeeBps("250")).toBeNull();
+      expect(validateFeeBps("0")).toBeNull();
+      expect(validateFeeBps("10000")).toBeNull();
+    });
+
+    it("should reject out-of-range basis points", () => {
+      expect(validateFeeBps("-1")).toBe("Fee must be between 0 and 10000 basis points.");
+      expect(validateFeeBps("10001")).toBe("Fee must be between 0 and 10000 basis points.");
+      expect(validateFeeBps("abc")).toBe("Fee must be between 0 and 10000 basis points.");
+    });
   });
 });

@@ -18,9 +18,9 @@
       "import": "./src/campaign.ts",
       "types": "./src/campaign.ts"
     },
-    "./mappers": {
-      "import": "./src/mappers.ts",
-      "types": "./src/mappers.ts"
+    "./timestamps": {
+      "import": "./src/timestamps.ts",
+      "types": "./src/timestamps.ts"
     }
   },
   "scripts": {

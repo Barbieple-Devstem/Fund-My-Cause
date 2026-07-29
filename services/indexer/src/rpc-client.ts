@@ -1,14 +1,34 @@
 import { SorobanRpc } from "@stellar/stellar-sdk";
 import pino from "pino";
 import { createHttpClient, type HttpClientOptions } from "./http-client.js";
+import {
+  CircuitBreaker,
+  CircuitOpenError,
+  type CircuitBreakerOptions,
+  type CircuitBreakerMetrics,
+} from "./circuit-breaker.js";
 
 export interface SorobanRPCConfig {
   url: string;
   contractId: string;
+  /** Optional circuit breaker tuning. Defaults: failureThreshold=5, cooldownMs=30_000 */
+  circuitBreaker?: CircuitBreakerOptions;
 }
 
+/**
+ * A normalised contract event emitted by the indexer.
+ *
+ * ## Timestamp convention (#911)
+ *
+ * `timestamp` is always **UTC milliseconds since the Unix epoch**
+ * (`Date.now()` style).  Soroban RPC returns ledger close times as Unix
+ * seconds; `parseEvent` converts them to milliseconds before storing.  Any
+ * code that reads `IndexerEvent.timestamp` can safely pass it directly to
+ * `new Date(event.timestamp)` or compare it with `Date.now()`.
+ */
 export interface IndexerEvent {
   id: string;
+  /** UTC milliseconds since the Unix epoch. Never in seconds or local time. */
   timestamp: number;
   type: string;
   contractId: string;
@@ -44,6 +64,7 @@ export class SorobanRPCClient {
   private logger: pino.Logger;
   private config: SorobanRPCConfig;
   private lastLedger: number = 0;
+  private readonly circuitBreaker: CircuitBreaker;
 
   /**
    * Injectable sleep used by unit tests to skip real delays.
@@ -62,6 +83,7 @@ export class SorobanRPCClient {
     this.server = new SorobanRpc.Server(config.url, {
       allowHttp: config.url.startsWith("http://"),
     });
+    this.circuitBreaker = new CircuitBreaker(config.circuitBreaker ?? {});
   }
 
   /**
@@ -128,6 +150,11 @@ export class SorobanRPCClient {
   /**
    * Fetch contract events for a specific ledger sequence.
    *
+   * The outbound HTTP call is wrapped in the circuit breaker.  If the breaker
+   * is OPEN (i.e. Horizon/RPC has been repeatedly failing) the call is
+   * short-circuited and an empty array is returned immediately so the stream
+   * loop can continue without blocking.
+   *
    * Uses the shared HTTP client factory — timeout, retry count, and backoff
    * all follow the documented defaults in http-client.ts unless overridden
    * through RPC_HTTP_OPTIONS above.
@@ -143,22 +170,24 @@ export class SorobanRPCClient {
     const client = createHttpClient(RPC_HTTP_OPTIONS);
 
     try {
-      const result = await client.fetch<{
-        result?: { events: unknown[] };
-        error?: { message: string };
-      }>(this.config.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getEvents",
-          params: {
-            startLedger: ledgerSequence,
-            filters: [{ type: "contract", contractIds: [this.config.contractId] }],
-          },
+      const result = await this.circuitBreaker.call(() =>
+        client.fetch<{
+          result?: { events: unknown[] };
+          error?: { message: string };
+        }>(this.config.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getEvents",
+            params: {
+              startLedger: ledgerSequence,
+              filters: [{ type: "contract", contractIds: [this.config.contractId] }],
+            },
+          }),
         }),
-      });
+      );
 
       if (!result.ok) {
         // Non-retryable HTTP error (4xx other than 429 already exhausted retries).
@@ -176,6 +205,18 @@ export class SorobanRPCClient {
       const events = result.data?.result?.events ?? [];
       return events.map((e: unknown) => this.parseEvent(e));
     } catch (error) {
+      if (error instanceof CircuitOpenError) {
+        // Circuit is open — RPC is known-down; skip gracefully without noise.
+        this.logger.warn(
+          {
+            ledger: ledgerSequence,
+            circuitState: this.circuitBreaker.currentState,
+          },
+          "Circuit breaker OPEN — skipping RPC call for ledger",
+        );
+        return [];
+      }
+
       this.logger.warn(
         {
           ledger: ledgerSequence,
@@ -188,13 +229,39 @@ export class SorobanRPCClient {
   }
 
   /**
+   * Return the current circuit breaker metrics.
+   * Useful for exposing via the /health or /stats endpoints.
+   */
+  getCircuitBreakerMetrics(): CircuitBreakerMetrics {
+    return this.circuitBreaker.getMetrics();
+  }
+
+  /**
    * Parse a raw RPC event object into a typed IndexerEvent.
+   *
+   * ## Timestamp normalisation (#911)
+   *
+   * Soroban RPC returns `close_time` / `timestamp` values as **Unix seconds**
+   * (uint32).  We multiply by 1 000 to convert to UTC milliseconds so that
+   * `IndexerEvent.timestamp` is always ms-since-epoch, consistent with
+   * `Date.now()` and the rest of the Fund-My-Cause codebase.
+   *
+   * When the field is absent we fall back to `Date.now()` (ms) so the
+   * convention is preserved regardless.
    */
   private parseEvent(rawEvent: unknown): IndexerEvent {
     const event = rawEvent as Record<string, unknown>;
+
+    // Soroban timestamps are Unix seconds; convert to milliseconds.
+    const rawTimestamp = event.timestamp as number | undefined;
+    const timestampMs =
+      rawTimestamp != null
+        ? rawTimestamp * 1000          // seconds → milliseconds
+        : Date.now();                  // fallback: current UTC ms
+
     return {
       id: `${event.id}`,
-      timestamp: (event.timestamp as number) ?? Date.now(),
+      timestamp: timestampMs,
       type: `${event.type}`,
       contractId: `${event.contractId}`,
       data: (event.data as Record<string, unknown>) ?? {},
