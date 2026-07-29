@@ -116,7 +116,7 @@ describe('PagerDutyIntegration', () => {
     });
 
     it('should handle list services request', () => {
-      const services = [];
+      const services: any[] = [];
 
       expect(services).toEqual([]);
     });
