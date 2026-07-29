@@ -1,10 +1,18 @@
 import { SorobanRpc } from "@stellar/stellar-sdk";
 import pino from "pino";
 import { createHttpClient, type HttpClientOptions } from "./http-client.js";
+import {
+  CircuitBreaker,
+  CircuitOpenError,
+  type CircuitBreakerOptions,
+  type CircuitBreakerMetrics,
+} from "./circuit-breaker.js";
 
 export interface SorobanRPCConfig {
   url: string;
   contractId: string;
+  /** Optional circuit breaker tuning. Defaults: failureThreshold=5, cooldownMs=30_000 */
+  circuitBreaker?: CircuitBreakerOptions;
 }
 
 export interface IndexerEvent {
@@ -44,6 +52,7 @@ export class SorobanRPCClient {
   private logger: pino.Logger;
   private config: SorobanRPCConfig;
   private lastLedger: number = 0;
+  private readonly circuitBreaker: CircuitBreaker;
 
   /**
    * Injectable sleep used by unit tests to skip real delays.
@@ -62,6 +71,7 @@ export class SorobanRPCClient {
     this.server = new SorobanRpc.Server(config.url, {
       allowHttp: config.url.startsWith("http://"),
     });
+    this.circuitBreaker = new CircuitBreaker(config.circuitBreaker ?? {});
   }
 
   /**
@@ -128,6 +138,11 @@ export class SorobanRPCClient {
   /**
    * Fetch contract events for a specific ledger sequence.
    *
+   * The outbound HTTP call is wrapped in the circuit breaker.  If the breaker
+   * is OPEN (i.e. Horizon/RPC has been repeatedly failing) the call is
+   * short-circuited and an empty array is returned immediately so the stream
+   * loop can continue without blocking.
+   *
    * Uses the shared HTTP client factory — timeout, retry count, and backoff
    * all follow the documented defaults in http-client.ts unless overridden
    * through RPC_HTTP_OPTIONS above.
@@ -143,22 +158,24 @@ export class SorobanRPCClient {
     const client = createHttpClient(RPC_HTTP_OPTIONS);
 
     try {
-      const result = await client.fetch<{
-        result?: { events: unknown[] };
-        error?: { message: string };
-      }>(this.config.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getEvents",
-          params: {
-            startLedger: ledgerSequence,
-            filters: [{ type: "contract", contractIds: [this.config.contractId] }],
-          },
+      const result = await this.circuitBreaker.call(() =>
+        client.fetch<{
+          result?: { events: unknown[] };
+          error?: { message: string };
+        }>(this.config.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getEvents",
+            params: {
+              startLedger: ledgerSequence,
+              filters: [{ type: "contract", contractIds: [this.config.contractId] }],
+            },
+          }),
         }),
-      });
+      );
 
       if (!result.ok) {
         // Non-retryable HTTP error (4xx other than 429 already exhausted retries).
@@ -176,6 +193,18 @@ export class SorobanRPCClient {
       const events = result.data?.result?.events ?? [];
       return events.map((e: unknown) => this.parseEvent(e));
     } catch (error) {
+      if (error instanceof CircuitOpenError) {
+        // Circuit is open — RPC is known-down; skip gracefully without noise.
+        this.logger.warn(
+          {
+            ledger: ledgerSequence,
+            circuitState: this.circuitBreaker.currentState,
+          },
+          "Circuit breaker OPEN — skipping RPC call for ledger",
+        );
+        return [];
+      }
+
       this.logger.warn(
         {
           ledger: ledgerSequence,
@@ -185,6 +214,14 @@ export class SorobanRPCClient {
       );
       return [];
     }
+  }
+
+  /**
+   * Return the current circuit breaker metrics.
+   * Useful for exposing via the /health or /stats endpoints.
+   */
+  getCircuitBreakerMetrics(): CircuitBreakerMetrics {
+    return this.circuitBreaker.getMetrics();
   }
 
   /**
