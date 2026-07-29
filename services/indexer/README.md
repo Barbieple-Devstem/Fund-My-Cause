@@ -105,6 +105,46 @@ Get overall service statistics.
 - **Health Checker**: Tracks service health and metrics
 - **Express Server**: REST API (`/events`, `/stats`, `/health`, `/ready`) for querying indexed data
 
+## Connection Pool Configuration
+
+The indexer uses in-memory storage (via `EventStore`) rather than a SQL or NoSQL database, so there is no traditional connection pool to configure. Instead, `src/store-config.ts` exposes the analogous resource-capacity levers that bound memory and outbound RPC concurrency.
+
+### Settings
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `STORE_MAX_EVENT_CAPACITY` | `100000` | Maximum events held in memory. Acts as the pool-size equivalent — bounds total RAM usage. Oldest events are evicted when the limit is reached. |
+| `STORE_EVENT_BATCH_SIZE` | `500` | Maximum events processed per ingestion batch. Analogous to a pool acquire timeout: limits per-cycle work. |
+| `STORE_STALE_LEDGER_THRESHOLD_MS` | `60000` | Milliseconds since the last ingested event before health is reported as degraded. |
+| `RPC_REQUEST_TIMEOUT_MS` | `30000` | Timeout in ms for each Soroban RPC request. Matches the recommended Soroban RPC timeout. |
+| `RPC_MAX_CONCURRENT_REQUESTS` | `5` | Maximum concurrent outbound RPC requests. Stellar testnet recommends ≤ 10 concurrent connections; 5 leaves headroom for other clients. |
+| `RPC_RETRY_ATTEMPTS` | `3` | Retry attempts on transient RPC failure before the request is considered failed. |
+
+### Design rationale
+
+These defaults are derived from observed testnet behaviour:
+
+- **Peak ingestion rate**: ~500 events/min on testnet → `STORE_MAX_EVENT_CAPACITY=100,000` keeps ~200 min of history in memory before eviction begins.
+- **`RPC_MAX_CONCURRENT_REQUESTS=5`**: prevents saturating the Stellar testnet RPC endpoint (recommended ceiling: 10 concurrent connections).
+- **`RPC_REQUEST_TIMEOUT_MS=30,000`**: aligns with the Soroban JSON-RPC documented timeout.
+
+All values are configurable via environment variables (see `.env.example`). The defaults are intentionally conservative; raise `STORE_MAX_EVENT_CAPACITY` if you need longer in-memory history and have sufficient RAM.
+
+### Future migration
+
+When a durable store (e.g. PostgreSQL, SQLite) is introduced, replace `src/store-config.ts` with real connection-pool settings such as:
+
+```typescript
+// Example future pg pool config
+{
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+}
+```
+
+The `StoreConfig` interface is designed to make this migration visible: a grep for `StoreConfig` will find every place the capacity and concurrency settings are consumed.
+
 ### Data-access decision (#837)
 
 This service previously carried two disconnected data-access implementations: this

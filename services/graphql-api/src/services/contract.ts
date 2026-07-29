@@ -32,21 +32,6 @@ export interface ContractServiceConfig {
   registryContractId?: string;
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-const STATUS_MAP: Record<string, CampaignStatus> = {
-  Active: "Active",
-  Successful: "Successful",
-  Refunded: "Refunded",
-  Cancelled: "Cancelled",
-  Paused: "Paused",
-  Archived: "Archived",
-};
-
-function mapStatus(s: string): CampaignStatus {
-  return STATUS_MAP[s] ?? "Active";
-}
-
 function stroopsToIsoString(stroops: bigint): string {
   return new Date(Number(stroops) * 1000).toISOString();
 }
@@ -120,7 +105,7 @@ export class ContractService {
         goal: stats.goal,
         raised: stats.total_raised,
         deadline: stroopsToIsoString(info.deadline),
-        status: mapStatus(info.status),
+        status: mapCampaignStatus(info.status),
         category: info.category,
         minContribution: info.min_contribution,
         maxContribution: info.max_contribution,

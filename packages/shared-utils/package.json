@@ -28,6 +28,9 @@
     "dev": "tsc --watch",
     "test": "vitest"
   },
+  "dependencies": {
+    "@fund-my-cause/types": "file:../types"
+  },
   "devDependencies": {
     "@types/node": "20.19.37",
     "typescript": "5.9.3",

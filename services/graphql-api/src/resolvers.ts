@@ -1,6 +1,6 @@
 import { GraphQLError } from "graphql";
 import type { IResolvers } from "@graphql-tools/utils";
-import { CAMPAIGN_STATUS_VALUES, type CampaignStatus } from "@fund-my-cause/types";
+import { CAMPAIGN_STATUS_VALUES, type CampaignStatus, validateCampaignInput, validateDonationAmount, XLM_TO_STROOPS } from "@fund-my-cause/types";
 import type { Context, Campaign } from "./types.js";
 import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
@@ -410,6 +410,19 @@ export const resolvers: IResolvers<any, Context> = {
       // Rate-limit: 5 campaign creations per wallet per hour (#899)
       await enforceMutationRateLimit("createCampaign", context);
 
+      const validationErrors = validateCampaignInput({
+        title: input.title,
+        description: input.description,
+        goal: input.goal?.toString() ?? "",
+        deadline: input.deadline,
+        minContribution: input.minContribution?.toString() ?? "",
+      });
+      if (Object.keys(validationErrors).length > 0) {
+        throw new GraphQLError("Invalid campaign input", {
+          extensions: { code: "BAD_USER_INPUT", validationErrors },
+        });
+      }
+
       const campaign = await context.contractService.createCampaign(
         context.user,
         input
@@ -450,6 +463,16 @@ export const resolvers: IResolvers<any, Context> = {
 
       // Rate-limit: 20 contributions per wallet per 10 minutes (#899)
       await enforceMutationRateLimit("recordContribution", context);
+
+      const amountXlm = input.amount
+        ? (Number(input.amount) / Number(XLM_TO_STROOPS)).toString()
+        : "0";
+      const amountError = validateDonationAmount(amountXlm);
+      if (amountError) {
+        throw new GraphQLError(amountError, {
+          extensions: { code: "BAD_USER_INPUT" },
+        });
+      }
 
       const { traceId, log } = context;
 

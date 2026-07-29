@@ -11,14 +11,27 @@ export class EventStore {
   private events: Map<string, IndexerEvent> = new Map();
   private logger: pino.Logger;
   private maxSize: number;
+  private readonly maxCapacity: number | undefined;
 
-  constructor(logger: pino.Logger, maxSize: number = 10000) {
+  /**
+   * @param logger  - pino logger instance
+   * @param maxSize - legacy hard cap (default 10,000); used when maxCapacity is not set
+   * @param maxCapacity - optional capacity bound from StoreConfig (#902).
+   *   When provided, this takes precedence over maxSize and acts as the
+   *   pool-size equivalent: bounds total RAM usage by evicting oldest events
+   *   once the store exceeds this limit.
+   */
+  constructor(logger: pino.Logger, maxSize: number = 10000, maxCapacity?: number) {
     this.logger = logger;
-    this.maxSize = maxSize;
+    // maxCapacity (from StoreConfig) takes precedence when explicitly supplied.
+    this.maxCapacity = maxCapacity;
+    this.maxSize = maxCapacity ?? maxSize;
   }
 
   /**
-   * Add events to the store
+   * Add events to the store.
+   * When the store exceeds maxCapacity (or maxSize), the oldest event by
+   * timestamp is evicted to keep memory bounded.
    */
   addEvents(events: IndexerEvent[]): void {
     for (const event of events) {
@@ -72,6 +85,23 @@ export class EventStore {
    */
   getCount(): number {
     return this.events.size;
+  }
+
+  /**
+   * Get the effective capacity limit (maxSize in use).
+   * Useful for exposing in /stats or health endpoints.
+   */
+  getCapacity(): number {
+    return this.maxSize;
+  }
+
+  /**
+   * Get configuration snapshot for this store instance.
+   * Exposes maxCapacity so callers can distinguish between a capacity set
+   * explicitly via StoreConfig and the legacy maxSize default.
+   */
+  getConfig(): { maxCapacity: number | undefined } {
+    return { maxCapacity: this.maxCapacity };
   }
 
   /**

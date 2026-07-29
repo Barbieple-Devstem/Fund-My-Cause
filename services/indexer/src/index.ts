@@ -6,12 +6,16 @@ import { HealthChecker } from "./health-checker.js";
 import { EventStore } from "./event-store.js";
 import { EventStoreRepository } from "./repository-impl.js";
 import type { EventRepository } from "./repository.js";
+import { loadStoreConfig } from "./store-config.js";
 
 // Environment variables
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const RPC_URL = process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
 const CONTRACT_ID = process.env.CROWDFUND_CONTRACT_ID ?? "";
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
+
+// Resolve store / RPC capacity configuration from environment (#902)
+const storeConfig = loadStoreConfig();
 
 // Logger
 const logger = pino({ level: LOG_LEVEL });
@@ -29,7 +33,7 @@ const healthChecker = new HealthChecker(logger);
 // Build the repository once at startup.  All handlers interact with
 // `eventRepository` (the interface) rather than `eventStore` directly,
 // so the storage layer can be replaced without touching handler code.
-const eventStore = new EventStore(logger);
+const eventStore = new EventStore(logger, 10000, storeConfig.maxEventCapacity);
 const eventRepository: EventRepository = new EventStoreRepository(eventStore, logger);
 
 let isRunning = false;
@@ -39,6 +43,7 @@ let isRunning = false;
  */
 async function startIndexer(): Promise<void> {
   logger.info({ rpc: RPC_URL, contract: CONTRACT_ID }, "Starting indexer service");
+  logger.info({ storeConfig }, "Effective store configuration");
 
   // Connect to RPC
   const connected = await rpcClient.connect();
