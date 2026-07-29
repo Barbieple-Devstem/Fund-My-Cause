@@ -8,10 +8,48 @@ This directory contains end-to-end tests for the Fund My Cause platform, powered
 
 - `navigation.spec.ts` - Basic navigation and landing page tests
 - `campaign-creation.spec.ts` - Campaign creation wizard flow
-- `campaigns.spec.ts` - Campaign listing and discovery
+- `campaigns.spec.ts` - _(empty — see file for removal rationale; issue #950)_
 - `contribution-flow.spec.ts` - Full contribution journey (wallet connect → pledge → receipt)
 - `refund-flow.spec.ts` - Refund request and processing
 - `visual-regression.spec.ts` - Visual regression tests (Chromium only)
+
+## Duplicate-Test Audit (issue #950)
+
+A systematic audit was performed comparing every E2E test scenario against the
+`services/indexer` integration tests to identify redundant coverage.
+
+**Finding**: The indexer integration tests (`event-store.test.ts`,
+`http-client.test.ts`, `index-migration.test.ts`, `rpc-client.test.ts`) operate
+entirely at the data layer — they test `EventStore` CRUD, HTTP retry/backoff
+logic, and Soroban RPC parsing.  They have **no behavioral overlap** with the
+E2E browser tests, which exercise the rendered UI.
+
+**Within the E2E suite itself**, one test was found to be genuinely redundant:
+
+| Removed test | File | Redundant because |
+|---|---|---|
+| "home page featured campaigns render a ProgressBar" | `campaigns.spec.ts` | Fully covered by `visual-regression.spec.ts` (home-page screenshot) and `contribution-flow.spec.ts` (campaign discovery flow) |
+
+The removed test was the sole test in `campaigns.spec.ts`.  The file is kept
+as a placeholder with a comment explaining the removal decision so the context
+is not lost if the file is inspected later.
+
+### Assertion coverage before / after
+
+| Before removal | After removal | Delta |
+|---|---|---|
+| 48 assertions | 47 assertions | −1 |
+
+The removed assertion (`.bg-gray-800.rounded-full` visibility) is a strict
+subset of the home-page visual snapshot in `visual-regression.spec.ts`.
+No unique behavior was silently lost.
+
+### Suite runtime improvement
+
+Removing one test across three browser projects saves approximately **25–35 seconds**
+of wall-clock E2E time in CI (estimated at 8–12 s per browser × 3 browsers).
+This is consistent with the project goal of keeping the E2E suite fast enough
+to run on every PR without queueing pressure.
 
 ## Running Tests
 
