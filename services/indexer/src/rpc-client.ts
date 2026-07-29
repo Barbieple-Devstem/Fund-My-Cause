@@ -7,8 +7,20 @@ export interface SorobanRPCConfig {
   contractId: string;
 }
 
+/**
+ * A normalised contract event emitted by the indexer.
+ *
+ * ## Timestamp convention (#911)
+ *
+ * `timestamp` is always **UTC milliseconds since the Unix epoch**
+ * (`Date.now()` style).  Soroban RPC returns ledger close times as Unix
+ * seconds; `parseEvent` converts them to milliseconds before storing.  Any
+ * code that reads `IndexerEvent.timestamp` can safely pass it directly to
+ * `new Date(event.timestamp)` or compare it with `Date.now()`.
+ */
 export interface IndexerEvent {
   id: string;
+  /** UTC milliseconds since the Unix epoch. Never in seconds or local time. */
   timestamp: number;
   type: string;
   contractId: string;
@@ -189,12 +201,30 @@ export class SorobanRPCClient {
 
   /**
    * Parse a raw RPC event object into a typed IndexerEvent.
+   *
+   * ## Timestamp normalisation (#911)
+   *
+   * Soroban RPC returns `close_time` / `timestamp` values as **Unix seconds**
+   * (uint32).  We multiply by 1 000 to convert to UTC milliseconds so that
+   * `IndexerEvent.timestamp` is always ms-since-epoch, consistent with
+   * `Date.now()` and the rest of the Fund-My-Cause codebase.
+   *
+   * When the field is absent we fall back to `Date.now()` (ms) so the
+   * convention is preserved regardless.
    */
   private parseEvent(rawEvent: unknown): IndexerEvent {
     const event = rawEvent as Record<string, unknown>;
+
+    // Soroban timestamps are Unix seconds; convert to milliseconds.
+    const rawTimestamp = event.timestamp as number | undefined;
+    const timestampMs =
+      rawTimestamp != null
+        ? rawTimestamp * 1000          // seconds → milliseconds
+        : Date.now();                  // fallback: current UTC ms
+
     return {
       id: `${event.id}`,
-      timestamp: (event.timestamp as number) ?? Date.now(),
+      timestamp: timestampMs,
       type: `${event.type}`,
       contractId: `${event.contractId}`,
       data: (event.data as Record<string, unknown>) ?? {},

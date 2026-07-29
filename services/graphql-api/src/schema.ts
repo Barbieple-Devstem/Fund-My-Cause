@@ -147,8 +147,23 @@ export const typeDefs = gql`
   type Query {
     # Campaign queries
     campaign(id: ID!): Campaign
+    # List campaigns with cursor-based pagination.
+    #
+    # Cursor pagination arguments:
+    #   first  - maximum number of items to return (default 20, max 100).
+    #   after  - opaque cursor from a previous response's pageInfo.endCursor;
+    #            when supplied, results start *after* that item.
+    #
+    # Legacy offset arguments (kept for backwards compatibility):
+    #   pagination.limit / pagination.offset
+    # When both cursor and offset arguments are present, cursor arguments take precedence.
     campaigns(
       filter: CampaignFilter
+      # Cursor-based: return at most this many items (max 100).
+      first: Int
+      # Cursor-based: start after this opaque cursor.
+      after: String
+      # Legacy offset pagination - superseded by first/after.
       pagination: PaginationInput
       sort: CampaignSort
     ): CampaignConnection!

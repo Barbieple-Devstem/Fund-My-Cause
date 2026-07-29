@@ -21,6 +21,7 @@ import type {
   RawCampaignInfo,
   RawCampaignStats,
 } from "../types.js";
+import { nowUtcIso } from "@fund-my-cause/shared-utils";
 
 // ── Configuration ──────────────────────────────────────────────────────────────
 
@@ -127,8 +128,8 @@ export class ContractService {
         token: info.token,
         platformFeeBps: info.has_platform_config ? info.platform_fee_bps : undefined,
         hasRBACEnabled: info.has_platform_config,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt: nowUtcIso(),
+        updatedAt: nowUtcIso(),
       };
     } catch (error) {
       console.error(`Error fetching campaign ${id}:`, error);
@@ -313,7 +314,7 @@ export class ContractService {
         contributionCount,
         campaigns: [],
         contributions: [],
-        joinedAt: new Date().toISOString(),
+        joinedAt: nowUtcIso(),
       };
     } catch (error) {
       console.error(`Error fetching user ${address}:`, error);
@@ -468,7 +469,7 @@ export class ContractService {
         campaignId: input.campaignId,
         contributor: input.contributor,
         amount: contribAmount,
-        timestamp: new Date().toISOString(),
+        timestamp: nowUtcIso(),
         transactionHash: input.transactionHash,
       };
     } catch (error) {
