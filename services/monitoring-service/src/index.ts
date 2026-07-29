@@ -2,6 +2,7 @@ import express, { Express, Request, Response } from 'express';
 import { IncidentResponseEngine } from './incident-response';
 import { PagerDutyIntegration } from './pagerduty-integration';
 import { register, Counter, Histogram, Gauge } from 'prom-client';
+import { emailTransport, slackTransport } from './notifier';
 
 const app: Express = express();
 const port = process.env.PORT || 9091;
@@ -126,6 +127,32 @@ app.post('/incidents', async (req: Request, res: Response) => {
       } catch (error) {
         console.error('Failed to create PagerDuty incident:', error);
       }
+    }
+
+    // Deliver alert to Email transport
+    try {
+      await emailTransport.send({
+        title: alert_name,
+        description,
+        severity,
+        channel: 'email',
+        timestamp: incident.created_at,
+      });
+    } catch (error) {
+      console.error('Failed to deliver email alert:', error);
+    }
+
+    // Deliver alert to Slack transport
+    try {
+      await slackTransport.send({
+        title: alert_name,
+        description,
+        severity,
+        channel: 'slack',
+        timestamp: incident.created_at,
+      });
+    } catch (error) {
+      console.error('Failed to deliver slack alert:', error);
     }
 
     responseTimeHistogram.labels('/incidents', 'POST').observe((Date.now() - startTime) / 1000);
