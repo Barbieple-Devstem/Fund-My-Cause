@@ -1,0 +1,11 @@
+{
+  "contractId": "INVALID_CONTRACT_ID",
+  "token": "   ",
+  "title": "E2E Campaign Test with an extremely long title that exceeds the maximum limit of one hundred characters to trigger validation error",
+  "description": "",
+  "goal": "-100",
+  "minContribution": "200",
+  "deadline": "2020-01-01",
+  "videoUrl": "http://not-secure.com",
+  "feeBps": "15000"
+}
