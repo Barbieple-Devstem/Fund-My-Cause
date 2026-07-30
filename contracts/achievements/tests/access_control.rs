@@ -16,9 +16,9 @@ mod common;
 
 use soroban_sdk::{testutils::Address as _, Address, Env, String};
 
+use ::common::test_utils::setup_env;
 use achievements::ContractError;
 use common::deploy_and_init;
-use ::common::test_utils::setup_env;
 
 // ── initialize() ──────────────────────────────────────────────────────────
 

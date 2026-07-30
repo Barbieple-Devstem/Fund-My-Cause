@@ -117,8 +117,6 @@ pub use storage::{
     KEY_MILESTONE_STATUS,
     KEY_MIN,
     KEY_NEXT_RELEASE,
-    MAX_BATCH_REFUND_SIZE,
-    MAX_MESSAGE_LENGTH,
     // #696 Pause timelock
     KEY_PAUSE_TIMELOCK,
     KEY_PERF_STATS,
@@ -149,6 +147,8 @@ pub use storage::{
     // DeFi yield
     KEY_YIELD_CONFIG,
     KEY_YIELD_TOTAL,
+    MAX_BATCH_REFUND_SIZE,
+    MAX_MESSAGE_LENGTH,
     MIN_SUPPORTED_VERSION,
     TTL_INSTANCE_EXTEND_MAX,
     TTL_INSTANCE_EXTEND_MIN,
@@ -690,9 +690,11 @@ impl CrowdfundContract {
             .checked_add(effective_amount)
             .ok_or(ContractError::Overflow)?;
         env.storage().persistent().set(&contrib_key, &new_contrib);
-        env.storage()
-            .persistent()
-            .extend_ttl(&contrib_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &contrib_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         if let Some(msg) = message {
             let msg_key = DataKey::ContributionMessage(contributor.clone());
@@ -741,9 +743,11 @@ impl CrowdfundContract {
             .unwrap_or(false);
         if !is_present {
             env.storage().persistent().set(&presence_key, &true);
-            env.storage()
-                .persistent()
-                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &presence_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
 
             // O(1) indexed write: store address at its insertion-order index.
             // Previously used an O(n) Vec append into KEY_CONTRIBS; with many
@@ -3041,7 +3045,6 @@ impl CrowdfundContract {
         env.storage().persistent().set(&key, &new_amount);
         env.storage().persistent().extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
-        env.storage().persistent().set(&delegated_key, &new_delegated);
         env.storage()
             .persistent()
             .extend_ttl(&delegated_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
@@ -3058,9 +3061,11 @@ impl CrowdfundContract {
             .unwrap_or(false);
         if !is_present {
             env.storage().persistent().set(&presence_key, &true);
-            env.storage()
-                .persistent()
-                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &presence_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
             let count: u32 = env
                 .storage()
                 .instance()

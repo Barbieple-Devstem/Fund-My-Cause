@@ -170,7 +170,6 @@ fn test_register_with_category_filters_correctly() {
     let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-
     let charity1 = Address::generate(&env);
     let charity2 = Address::generate(&env);
     let tech1 = Address::generate(&env);
@@ -189,7 +188,6 @@ fn test_register_with_category_filters_correctly() {
 fn test_register_with_category_deduplicates() {
     let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
-
 
     let campaign = Address::generate(&env);
     client.register_with_category(&campaign, &0);
@@ -239,7 +237,6 @@ fn test_register_with_status_filters_correctly() {
     let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-
     let active1 = Address::generate(&env);
     let active2 = Address::generate(&env);
     let success1 = Address::generate(&env);
@@ -249,9 +246,24 @@ fn test_register_with_status_filters_correctly() {
     client.register_with_status(&success1, &CampaignStatus::Successful);
 
     assert_eq!(client.list(&0, &10).len(), 3);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 2);
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Cancelled, &0, &10).len(), 0);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        2
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Cancelled, &0, &10)
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -259,13 +271,17 @@ fn test_register_with_status_deduplicates() {
     let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-
     let campaign = Address::generate(&env);
     client.register_with_status(&campaign, &CampaignStatus::Active);
     client.register_with_status(&campaign, &CampaignStatus::Active); // duplicate
 
     assert_eq!(client.list(&0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        1
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -342,15 +358,38 @@ fn test_update_status_moves_campaign_between_buckets() {
     let (client, _admin) = deploy_and_init(&env);
     let campaign = Address::generate(&env);
 
-
     client.register_with_status(&campaign, &CampaignStatus::Active);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 0);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        0
+    );
 
-    client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful);
+    client.update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
 
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 0);
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 1);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        0
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        1
+    );
     // Global list is unchanged
     assert_eq!(client.list(&0, &10).len(), 1);
 }
@@ -383,10 +422,22 @@ fn test_list_by_status_pagination() {
         client.register_with_status(&Address::generate(&env), &CampaignStatus::Active);
     }
 
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &3).len(), 3);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &3, &3).len(), 2);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &5, &3).len(), 0);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &0).len(), 0);
+    assert_eq!(
+        client.list_by_status(&CampaignStatus::Active, &0, &3).len(),
+        3
+    );
+    assert_eq!(
+        client.list_by_status(&CampaignStatus::Active, &3, &3).len(),
+        2
+    );
+    assert_eq!(
+        client.list_by_status(&CampaignStatus::Active, &5, &3).len(),
+        0
+    );
+    assert_eq!(
+        client.list_by_status(&CampaignStatus::Active, &0, &0).len(),
+        0
+    );
 }
 
 #[test]
@@ -413,7 +464,6 @@ fn test_full_lifecycle_register_update_and_list() {
     let env = setup_env();
     let (client, _admin) = deploy_and_init(&env);
 
-
     let c1 = Address::generate(&env);
     let c2 = Address::generate(&env);
     let c3 = Address::generate(&env);
@@ -423,14 +473,34 @@ fn test_full_lifecycle_register_update_and_list() {
     client.register_with_status(&c3, &CampaignStatus::Failed);
 
     assert_eq!(client.list(&0, &10).len(), 3);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 2);
-    assert_eq!(client.list_by_status(&CampaignStatus::Failed, &0, &10).len(), 1);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        2
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Failed, &0, &10)
+            .len(),
+        1
+    );
 
     // Admin transitions c1 to Successful
     client.update_status(&c1, &CampaignStatus::Active, &CampaignStatus::Successful);
 
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 1);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        1
+    );
     // Global count unchanged
     assert_eq!(client.list(&0, &10).len(), 3);
 }
