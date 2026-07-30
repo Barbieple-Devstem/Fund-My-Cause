@@ -1,5 +1,5 @@
 import React from "react";
-import Image from "next/image";
+// next/image used in JSX below (kept for future use)
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
