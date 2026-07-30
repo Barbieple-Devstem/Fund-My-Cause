@@ -10,7 +10,8 @@ import { loadStoreConfig } from "./store-config.js";
 
 // Environment variables
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
-const RPC_URL = process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
+const RPC_URL =
+  process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
 const CONTRACT_ID = process.env.CROWDFUND_CONTRACT_ID ?? "";
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
 
@@ -26,7 +27,7 @@ const app: Express = express();
 // Global state
 const rpcClient = new SorobanRPCClient(
   { url: RPC_URL, contractId: CONTRACT_ID },
-  logger
+  logger,
 );
 const healthChecker = new HealthChecker(logger);
 
@@ -34,7 +35,10 @@ const healthChecker = new HealthChecker(logger);
 // `eventRepository` (the interface) rather than `eventStore` directly,
 // so the storage layer can be replaced without touching handler code.
 const eventStore = new EventStore(logger, 10000, storeConfig.maxEventCapacity);
-const eventRepository: EventRepository = new EventStoreRepository(eventStore, logger);
+const eventRepository: EventRepository = new EventStoreRepository(
+  eventStore,
+  logger,
+);
 
 let isRunning = false;
 
@@ -42,7 +46,10 @@ let isRunning = false;
  * Start the indexer service
  */
 async function startIndexer(): Promise<void> {
-  logger.info({ rpc: RPC_URL, contract: CONTRACT_ID }, "Starting indexer service");
+  logger.info(
+    { rpc: RPC_URL, contract: CONTRACT_ID },
+    "Starting indexer service",
+  );
   logger.info({ storeConfig }, "Effective store configuration");
 
   // Connect to RPC
@@ -72,7 +79,7 @@ async function startIndexer(): Promise<void> {
     } catch (error) {
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
-        "Error processing events"
+        "Error processing events",
       );
     }
   }
@@ -82,14 +89,48 @@ async function startIndexer(): Promise<void> {
  * Routes
  */
 
-// Health endpoint
+// Health endpoint (liveness)
 app.get("/health", (req, res) => {
   const status = healthChecker.getStatus();
-  const statusCode = status.status === "healthy" ? 200 : status.status === "degraded" ? 202 : 503;
+  const statusCode =
+    status.status === "healthy"
+      ? 200
+      : status.status === "degraded"
+        ? 202
+        : 503;
   res.status(statusCode).json(status);
 });
 
-// Readiness endpoint
+// Kubernetes-style liveness probe — alias of /health.
+// Returns 200 as long as the process is up and responding.
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Readiness endpoint — checks actual downstream dependency (Soroban RPC).
+// Returns 200 only when the indexer has successfully connected to the RPC
+// and is actively ingesting events; 503 otherwise.
+app.get("/readyz", async (req, res) => {
+  const rpcReachable = rpcClient.isConnected();
+  if (isRunning && rpcReachable) {
+    res.status(200).json({
+      ready: true,
+      checks: { rpc: "ok", indexer: "running" },
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.status(503).json({
+      ready: false,
+      checks: {
+        rpc: rpcReachable ? "ok" : "unreachable",
+        indexer: isRunning ? "running" : "not_started",
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Readiness endpoint (original — kept for backwards compatibility)
 app.get("/ready", (req, res) => {
   if (isRunning) {
     res.status(200).json({ ready: true });
@@ -139,7 +180,7 @@ app.listen(PORT, async () => {
   startIndexer().catch((error) => {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },
-      "Indexer crashed"
+      "Indexer crashed",
     );
     process.exit(1);
   });
