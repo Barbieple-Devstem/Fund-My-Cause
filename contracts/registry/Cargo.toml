@@ -26,4 +26,3 @@ common = { path = "../common" }
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
-insta = { workspace = true }

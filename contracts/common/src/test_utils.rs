@@ -11,9 +11,7 @@
 //! use common::test_utils::{setup_env, generate_addresses};
 //! ```
 
-#![cfg(test)]
-
-use soroban_sdk::{testutils::Address as _, Address, Env};
+use soroban_sdk::{testutils::Address as _, Address, Env, Vec};
 
 /// Creates and configures a new test environment with mock authentication.
 ///
@@ -51,9 +49,9 @@ pub fn generate_address(env: &Env) -> Address {
 ///
 /// A vector of `count` unique addresses.
 pub fn generate_addresses(env: &Env, count: usize) -> Vec<Address> {
-    let mut addresses = Vec::new();
+    let mut addresses = Vec::new(env);
     for _ in 0..count {
-        addresses.push(Address::generate(env));
+        addresses.push_back(Address::generate(env));
     }
     addresses
 }
@@ -85,7 +83,7 @@ mod tests {
         // Verify uniqueness
         for i in 0..addresses.len() {
             for j in (i + 1)..addresses.len() {
-                assert_ne!(addresses[i], addresses[j]);
+                assert_ne!(addresses.get(i).unwrap(), addresses.get(j).unwrap());
             }
         }
     }
