@@ -12,7 +12,6 @@ output-dir = "target/doc"
 
 [workspace.dependencies]
 soroban-sdk = "25.3.0"
-insta = { version = "1.37", features = ["redactions"] }
 
 [profile.release]
 opt-level = "z"
