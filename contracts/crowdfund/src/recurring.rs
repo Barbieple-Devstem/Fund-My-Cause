@@ -33,7 +33,9 @@ pub(crate) fn setup(
     };
     let key = DataKey::RecurringPlan(contributor.clone());
     env.storage().persistent().set(&key, &plan);
-    env.storage().persistent().extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
     env.events().publish(
         ("campaign", "recurring_setup"),

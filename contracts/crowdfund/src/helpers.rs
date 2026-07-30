@@ -10,7 +10,7 @@ use soroban_sdk::{Address, Env};
 use crate::{
     errors::ContractError,
     storage::{
-        BASIS_POINTS_MAX, DataKey, KEY_CREATOR, KEY_INSURANCE, KEY_INSURANCE_POOL, KEY_PLATFORM,
+        DataKey, BASIS_POINTS_MAX, KEY_CREATOR, KEY_INSURANCE, KEY_INSURANCE_POOL, KEY_PLATFORM,
         KEY_RATE_LIMIT, KEY_STATUS, KEY_VISIBILITY, TTL_PERSISTENT_ENTRY,
     },
     types::{
@@ -108,13 +108,13 @@ pub(crate) fn register_contributor_if_new(
 
     if !is_present {
         persistent.set(&presence_key, &true);
-        persistent.extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        persistent.extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         // Store contributor address at insertion-order index
         let count: u32 = inst.get(&DataKey::ContributorCount).unwrap_or(0);
         let index_key = DataKey::ContributorIndex(count);
         persistent.set(&index_key, &contributor);
-        persistent.extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        persistent.extend_ttl(&index_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         // Increment count
         inst.set(&DataKey::ContributorCount, &(count + 1));
@@ -235,7 +235,7 @@ pub(crate) fn apply_insurance_fee(
             // this path is unreachable under normal conditions.
             .unwrap_or(prev_fee); // saturate: never reduce the stored fee
         persistent.set(&fee_key, &new_fee);
-        persistent.extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        persistent.extend_ttl(&fee_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
         let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
         let new_pool = pool.checked_add(insurance_fee).unwrap_or(pool); // saturate pool rather than panic

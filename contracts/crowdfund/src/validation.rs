@@ -132,7 +132,10 @@ pub(crate) fn validate_contribution_amount(
 /// # Returns
 /// * `Ok(())` if status matches
 /// * `Err(ContractError::NotActive)` if status doesn't match
-pub(crate) fn validate_status(status: Status, required_status: Status) -> Result<(), ContractError> {
+pub(crate) fn validate_status(
+    status: Status,
+    required_status: Status,
+) -> Result<(), ContractError> {
     if status != required_status {
         return Err(ContractError::NotActive);
     }
@@ -148,7 +151,10 @@ pub(crate) fn validate_status(status: Status, required_status: Status) -> Result
 /// # Returns
 /// * `Ok(())` if deadline has passed
 /// * `Err(ContractError::CampaignStillActive)` if deadline hasn't passed
-pub(crate) fn validate_deadline_passed(current_time: u64, deadline: u64) -> Result<(), ContractError> {
+pub(crate) fn validate_deadline_passed(
+    current_time: u64,
+    deadline: u64,
+) -> Result<(), ContractError> {
     if current_time < deadline {
         return Err(ContractError::CampaignStillActive);
     }
@@ -164,7 +170,10 @@ pub(crate) fn validate_deadline_passed(current_time: u64, deadline: u64) -> Resu
 /// # Returns
 /// * `Ok(())` if deadline hasn't passed
 /// * `Err(ContractError::CampaignEnded)` if deadline has passed
-pub(crate) fn validate_deadline_not_passed(current_time: u64, deadline: u64) -> Result<(), ContractError> {
+pub(crate) fn validate_deadline_not_passed(
+    current_time: u64,
+    deadline: u64,
+) -> Result<(), ContractError> {
     if current_time >= deadline {
         return Err(ContractError::CampaignEnded);
     }
@@ -196,7 +205,10 @@ pub(crate) fn validate_goal_reached(total_raised: i128, goal: i128) -> Result<()
 /// # Returns
 /// * `Ok(())` if goal is not reached
 /// * `Err(ContractError::GoalReached)` if goal is reached
-pub(crate) fn validate_goal_not_reached(total_raised: i128, goal: i128) -> Result<(), ContractError> {
+pub(crate) fn validate_goal_not_reached(
+    total_raised: i128,
+    goal: i128,
+) -> Result<(), ContractError> {
     if total_raised >= goal {
         return Err(ContractError::GoalReached);
     }
@@ -216,7 +228,10 @@ pub(crate) fn validate_goal_not_reached(total_raised: i128, goal: i128) -> Resul
 /// # Returns
 /// * `Ok(())` if `new_deadline` is later than `reference`
 /// * `Err(ContractError::InvalidDeadline)` if it is not
-pub(crate) fn validate_deadline_extension(new_deadline: u64, reference: u64) -> Result<(), ContractError> {
+pub(crate) fn validate_deadline_extension(
+    new_deadline: u64,
+    reference: u64,
+) -> Result<(), ContractError> {
     if new_deadline <= reference {
         return Err(ContractError::InvalidDeadline);
     }
@@ -320,7 +335,10 @@ pub(crate) fn validate_message_length(message_len: usize) -> Result<(), Contract
 /// * `Ok(())` if valid
 /// * `Err(ContractError::StringEmpty)` if the string is empty
 /// * `Err(ContractError::StringTooLong)` if the string exceeds `max_len`
-pub(crate) fn validate_string_length(s: &soroban_sdk::String, max_len: u32) -> Result<(), ContractError> {
+pub(crate) fn validate_string_length(
+    s: &soroban_sdk::String,
+    max_len: u32,
+) -> Result<(), ContractError> {
     let len = s.len();
     if len == 0 {
         return Err(ContractError::StringEmpty);

@@ -117,8 +117,6 @@ pub use storage::{
     KEY_MILESTONE_STATUS,
     KEY_MIN,
     KEY_NEXT_RELEASE,
-    MAX_BATCH_REFUND_SIZE,
-    MAX_MESSAGE_LENGTH,
     // #696 Pause timelock
     KEY_PAUSE_TIMELOCK,
     KEY_PERF_STATS,
@@ -149,6 +147,8 @@ pub use storage::{
     // DeFi yield
     KEY_YIELD_CONFIG,
     KEY_YIELD_TOTAL,
+    MAX_BATCH_REFUND_SIZE,
+    MAX_MESSAGE_LENGTH,
     MIN_SUPPORTED_VERSION,
     TTL_INSTANCE_EXTEND_MAX,
     TTL_INSTANCE_EXTEND_MIN,
@@ -676,7 +676,11 @@ impl CrowdfundContract {
                 .checked_add(insurance_fee)
                 .ok_or(ContractError::Overflow)?;
             env.storage().persistent().set(&fee_key, &new_fee);
-            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &fee_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
 
             let pool: i128 = inst.get(&KEY_INSURANCE_POOL).unwrap_or(0);
             let new_pool = pool
@@ -690,14 +694,20 @@ impl CrowdfundContract {
             .checked_add(effective_amount)
             .ok_or(ContractError::Overflow)?;
         env.storage().persistent().set(&contrib_key, &new_contrib);
-        env.storage()
-            .persistent()
-            .extend_ttl(&contrib_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &contrib_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         if let Some(msg) = message {
             let msg_key = DataKey::ContributionMessage(contributor.clone());
             env.storage().persistent().set(&msg_key, &msg);
-            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &msg_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
         }
 
         // ── Apply matching (cached instance read) ─────────────────────────────
@@ -741,9 +751,11 @@ impl CrowdfundContract {
             .unwrap_or(false);
         if !is_present {
             env.storage().persistent().set(&presence_key, &true);
-            env.storage()
-                .persistent()
-                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &presence_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
 
             // O(1) indexed write: store address at its insertion-order index.
             // Previously used an O(n) Vec append into KEY_CONTRIBS; with many
@@ -751,7 +763,11 @@ impl CrowdfundContract {
             // on every new contribution.
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &contributor);
-            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &index_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
 
             // Use cached `count` — single write
             let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
@@ -780,9 +796,11 @@ impl CrowdfundContract {
             running_total: new_contrib,
         });
         env.storage().persistent().set(&history_key, &history);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &history_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         // ── #418: Assign reward tier based on updated cumulative total ────────
         if let Some(tiers) = inst.get::<_, Vec<RewardTier>>(&DataKey::RewardTiers) {
@@ -1206,9 +1224,11 @@ impl CrowdfundContract {
             timestamp: now,
         });
         env.storage().persistent().set(&KEY_META_HIST, &meta_hist);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &KEY_META_HIST,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         env.events().publish(
             ("campaign", "metadata_updated"),
@@ -1371,9 +1391,11 @@ impl CrowdfundContract {
             timestamp: now,
         });
         env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &KEY_GOAL_HISTORY,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
@@ -2700,9 +2722,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&DataKey::Whitelist(address.clone()), &true);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Whitelist(address.clone()),
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
         env.events()
             .publish(("campaign", "whitelisted"), EventWhitelisted { address });
         Ok(())
@@ -2743,9 +2767,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&DataKey::Blacklist(address.clone()), &true);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Blacklist(address.clone()),
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
         env.events()
             .publish(("campaign", "blacklisted"), EventBlacklisted { address });
         Ok(())
@@ -2925,9 +2951,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&DataKey::Delegation(delegator.clone()), &delegation);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Delegation(delegator.clone()),
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
         env.events().publish(
             ("campaign", "delegation_created"),
             EventDelegationCreated {
@@ -3039,12 +3067,18 @@ impl CrowdfundContract {
 
         let new_amount = prev.checked_add(amount).ok_or(ContractError::Overflow)?;
         env.storage().persistent().set(&key, &new_amount);
-        env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
-
-        env.storage().persistent().set(&delegated_key, &new_delegated);
         env.storage()
             .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            .extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+
+        env.storage()
+            .persistent()
+            .set(&delegated_key, &new_delegated);
+        env.storage().persistent().extend_ttl(
+            &delegated_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         let total: i128 = env.storage().instance().get(&KEY_TOTAL).unwrap();
         let new_total = total.checked_add(amount).ok_or(ContractError::Overflow)?;
@@ -3058,9 +3092,11 @@ impl CrowdfundContract {
             .unwrap_or(false);
         if !is_present {
             env.storage().persistent().set(&presence_key, &true);
-            env.storage()
-                .persistent()
-                .extend_ttl(&presence_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &presence_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
             let count: u32 = env
                 .storage()
                 .instance()
@@ -3069,7 +3105,11 @@ impl CrowdfundContract {
             // O(1) indexed write, same pattern as contribute()
             let index_key = DataKey::ContributorIndex(count);
             env.storage().persistent().set(&index_key, &delegator);
-            env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+            env.storage().persistent().extend_ttl(
+                &index_key,
+                TTL_PERSISTENT_ENTRY,
+                TTL_PERSISTENT_ENTRY,
+            );
             let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
             env.storage()
                 .instance()
@@ -4513,9 +4553,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&KEY_VERSION_HISTORY, &history);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &KEY_VERSION_HISTORY,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         env.events().publish(
             ("contract", "migrated"),
@@ -4777,7 +4819,11 @@ impl CrowdfundContract {
         }
 
         env.storage().persistent().set(&stats_key, &stats);
-        env.storage().persistent().extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &stats_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         env.events().publish(
             ("perf", "execution_recorded"),
@@ -5941,9 +5987,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&DataKey::Whitelist(address.clone()), &true);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Whitelist(address.clone()),
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
         env.events()
             .publish(("campaign", "allowlisted"), EventAllowlisted { address });
         Ok(())
@@ -5972,9 +6020,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&DataKey::Blacklist(address.clone()), &true);
-        env.storage()
-            .persistent()
-            .extend_ttl(&\1, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &DataKey::Blacklist(address.clone()),
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
         env.events()
             .publish(("campaign", "denylisted"), EventDenylisted { address });
         Ok(())
