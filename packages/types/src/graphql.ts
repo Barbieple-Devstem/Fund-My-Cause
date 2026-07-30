@@ -8,7 +8,8 @@ export type Scalars = {
   Int: { input: number; output: number };
   Float: { input: number; output: number };
   BigInt: { input: string; output: string };
-  DateTime: { input: string; output: string };
+  // DateTime scalar removed in #913 — it was defined in the schema but
+  // never referenced by any field (all date/time fields use String!).
 };
 
 export type AuthPayload = {
