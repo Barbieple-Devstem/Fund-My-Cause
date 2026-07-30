@@ -5,12 +5,20 @@ import { SorobanRPCClient } from "./rpc-client.js";
 import { HealthChecker } from "./health-checker.js";
 import { EventStore } from "./event-store.js";
 import { EventStoreRepository } from "./repository-impl.js";
+import { runMigrations } from "./migrations/run-migrations.js";
+import {
+  CampaignHandler,
+  DonationHandler,
+  AchievementHandler,
+  EventDispatcher,
+} from "./handlers/index.js";
 import type { EventRepository } from "./repository.js";
 import { loadStoreConfig } from "./store-config.js";
 
 // Environment variables
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
-const RPC_URL = process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
+const RPC_URL =
+  process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
 const CONTRACT_ID = process.env.CROWDFUND_CONTRACT_ID ?? "";
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
 
@@ -26,7 +34,7 @@ const app: Express = express();
 // Global state
 const rpcClient = new SorobanRPCClient(
   { url: RPC_URL, contractId: CONTRACT_ID },
-  logger
+  logger,
 );
 const healthChecker = new HealthChecker(logger);
 
@@ -34,7 +42,36 @@ const healthChecker = new HealthChecker(logger);
 // `eventRepository` (the interface) rather than `eventStore` directly,
 // so the storage layer can be replaced without touching handler code.
 const eventStore = new EventStore(logger, 10000, storeConfig.maxEventCapacity);
-const eventRepository: EventRepository = new EventStoreRepository(eventStore, logger);
+
+// Apply migrations (#894) — adds secondary indexes for O(k) query lookups.
+// Runs at startup; idempotent so a restart never double-applies.
+const migrationResults = runMigrations(eventStore, "up", logger);
+if (migrationResults.some((r) => !r.success)) {
+  logger.warn(
+    { migrationResults },
+    "One or more migrations failed — indexes may be inactive",
+  );
+} else {
+  logger.info({ migrationResults }, "Migrations applied successfully");
+}
+
+const eventRepository: EventRepository = new EventStoreRepository(
+  eventStore,
+  logger,
+);
+
+// Build domain-specific event handlers and wire them into the dispatcher (#896).
+// Each handler processes one event type; the dispatcher routes by event.type.
+// Unknown event types fall back to eventRepository so no event is ever lost.
+const dispatcher = new EventDispatcher(
+  [
+    new CampaignHandler(logger),
+    new DonationHandler(logger),
+    new AchievementHandler(logger),
+  ],
+  eventRepository,
+  logger,
+);
 
 let isRunning = false;
 
@@ -42,7 +79,10 @@ let isRunning = false;
  * Start the indexer service
  */
 async function startIndexer(): Promise<void> {
-  logger.info({ rpc: RPC_URL, contract: CONTRACT_ID }, "Starting indexer service");
+  logger.info(
+    { rpc: RPC_URL, contract: CONTRACT_ID },
+    "Starting indexer service",
+  );
   logger.info({ storeConfig }, "Effective store configuration");
 
   // Connect to RPC
@@ -59,8 +99,10 @@ async function startIndexer(): Promise<void> {
   logger.info("Streaming events from Soroban RPC");
   for await (const events of rpcClient.streamEvents()) {
     try {
-      // Store events via repository (no direct EventStore access here)
-      eventRepository.addEvents(events);
+      // Route events to domain handlers via the dispatcher (#896).
+      // Each handler stores events and emits domain-specific log lines.
+      // Unknown event types fall back to the repository directly.
+      dispatcher.dispatch(events);
 
       // Update health
       for (const event of events) {
@@ -72,7 +114,7 @@ async function startIndexer(): Promise<void> {
     } catch (error) {
       logger.error(
         { error: error instanceof Error ? error.message : String(error) },
-        "Error processing events"
+        "Error processing events",
       );
     }
   }
@@ -85,7 +127,12 @@ async function startIndexer(): Promise<void> {
 // Health endpoint
 app.get("/health", (req, res) => {
   const status = healthChecker.getStatus();
-  const statusCode = status.status === "healthy" ? 200 : status.status === "degraded" ? 202 : 503;
+  const statusCode =
+    status.status === "healthy"
+      ? 200
+      : status.status === "degraded"
+        ? 202
+        : 503;
   res.status(statusCode).json(status);
 });
 
@@ -139,7 +186,7 @@ app.listen(PORT, async () => {
   startIndexer().catch((error) => {
     logger.error(
       { error: error instanceof Error ? error.message : String(error) },
-      "Indexer crashed"
+      "Indexer crashed",
     );
     process.exit(1);
   });

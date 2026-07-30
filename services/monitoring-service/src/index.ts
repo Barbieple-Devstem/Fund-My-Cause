@@ -1,8 +1,9 @@
-import express, { Express, Request, Response } from 'express';
-import { IncidentResponseEngine } from './incident-response';
-import { PagerDutyIntegration } from './pagerduty-integration';
-import { register, Counter, Histogram, Gauge } from 'prom-client';
-import { emailTransport, slackTransport } from './notifier';
+import express, { Express, Request, Response } from "express";
+import { IncidentResponseEngine } from "./incident-response";
+import { PagerDutyIntegration } from "./pagerduty-integration";
+import { register, Counter, Histogram, Gauge } from "prom-client";
+import { emailTransport, slackTransport } from "./notifier";
+import { logger } from "./logger";
 
 const app: Express = express();
 const port = process.env.PORT || 9091;
@@ -12,49 +13,51 @@ app.use(express.json());
 
 // Initialize services
 const incidentEngine = new IncidentResponseEngine();
-const pagerDuty = new PagerDutyIntegration(process.env.PAGERDUTY_API_KEY || 'test-key');
+const pagerDuty = new PagerDutyIntegration(
+  process.env.PAGERDUTY_API_KEY || "test-key",
+);
 
 // Metrics
 const incidentCounter = new Counter({
-  name: 'incidents_created_total',
-  help: 'Total incidents created',
-  labelNames: ['severity', 'category'],
+  name: "incidents_created_total",
+  help: "Total incidents created",
+  labelNames: ["severity", "category"],
 });
 
 const incidentResolvedCounter = new Counter({
-  name: 'incidents_resolved_total',
-  help: 'Total incidents resolved',
-  labelNames: ['severity'],
+  name: "incidents_resolved_total",
+  help: "Total incidents resolved",
+  labelNames: ["severity"],
 });
 
 const remediationCounter = new Counter({
-  name: 'remediations_executed_total',
-  help: 'Total remediations executed',
-  labelNames: ['action', 'success'],
+  name: "remediations_executed_total",
+  help: "Total remediations executed",
+  labelNames: ["action", "success"],
 });
 
 const alertCounter = new Counter({
-  name: 'alerts_processed_total',
-  help: 'Total alerts processed',
-  labelNames: ['severity'],
+  name: "alerts_processed_total",
+  help: "Total alerts processed",
+  labelNames: ["severity"],
 });
 
 const escalationHistogram = new Histogram({
-  name: 'escalation_duration_seconds',
-  help: 'Escalation duration in seconds',
-  labelNames: ['level'],
+  name: "escalation_duration_seconds",
+  help: "Escalation duration in seconds",
+  labelNames: ["level"],
 });
 
 const responseTimeHistogram = new Histogram({
-  name: 'response_time_seconds',
-  help: 'API response time in seconds',
-  labelNames: ['endpoint', 'method'],
+  name: "response_time_seconds",
+  help: "API response time in seconds",
+  labelNames: ["endpoint", "method"],
 });
 
 const activeIncidentsGauge = new Gauge({
-  name: 'active_incidents_total',
-  help: 'Total active incidents',
-  labelNames: ['severity'],
+  name: "active_incidents_total",
+  help: "Total active incidents",
+  labelNames: ["severity"],
 });
 
 // ============================================================================
@@ -64,7 +67,7 @@ const activeIncidentsGauge = new Gauge({
 /**
  * 1. POST /incidents - Create incident
  */
-app.post('/incidents', async (req: Request, res: Response) => {
+app.post("/incidents", async (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const {
@@ -81,7 +84,7 @@ app.post('/incidents', async (req: Request, res: Response) => {
     // Validate required fields
     if (!alert_name || !severity || !description) {
       return res.status(400).json({
-        error: 'Missing required fields: alert_name, severity, description',
+        error: "Missing required fields: alert_name, severity, description",
       });
     }
 
@@ -91,10 +94,10 @@ app.post('/incidents', async (req: Request, res: Response) => {
       alert_name,
       severity,
       description,
-      category: category || 'application',
-      status: 'open' as const,
+      category: category || "application",
+      status: "open" as const,
       triggered_at: triggered_at || new Date().toISOString(),
-      source: source || 'alertmanager',
+      source: source || "alertmanager",
       labels: labels || {},
       annotations: annotations || {},
       created_at: new Date().toISOString(),
@@ -107,25 +110,25 @@ app.post('/incidents', async (req: Request, res: Response) => {
     incidentEngine.storeIncident(incident);
 
     // Update metrics
-    incidentCounter.labels(severity, category || 'application').inc();
+    incidentCounter.labels(severity, category || "application").inc();
     activeIncidentsGauge.labels(severity).inc();
 
     // Create PagerDuty incident if critical
-    if (severity === 'critical') {
+    if (severity === "critical") {
       try {
         const pdIncident = await pagerDuty.createIncident({
           title: alert_name,
           description,
-          severity: 'critical',
-          service_id: process.env.PAGERDUTY_SERVICE_ID || 'default',
+          severity: "critical",
+          service_id: process.env.PAGERDUTY_SERVICE_ID || "default",
           labels: {
-            category: category || 'application',
-            source: source || 'alertmanager',
+            category: category || "application",
+            source: source || "alertmanager",
           },
         });
         incident.id = pdIncident.id;
       } catch (error) {
-        console.error('Failed to create PagerDuty incident:', error);
+        logger.error({ err: error }, "Failed to create PagerDuty incident");
       }
     }
 
@@ -135,11 +138,11 @@ app.post('/incidents', async (req: Request, res: Response) => {
         title: alert_name,
         description,
         severity,
-        channel: 'email',
+        channel: "email",
         timestamp: incident.created_at,
       });
     } catch (error) {
-      console.error('Failed to deliver email alert:', error);
+      logger.error({ err: error }, "Failed to deliver email alert");
     }
 
     // Deliver alert to Slack transport
@@ -148,47 +151,57 @@ app.post('/incidents', async (req: Request, res: Response) => {
         title: alert_name,
         description,
         severity,
-        channel: 'slack',
+        channel: "slack",
         timestamp: incident.created_at,
       });
     } catch (error) {
-      console.error('Failed to deliver slack alert:', error);
+      logger.error({ err: error }, "Failed to deliver slack alert");
     }
 
-    responseTimeHistogram.labels('/incidents', 'POST').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/incidents", "POST")
+      .observe((Date.now() - startTime) / 1000);
     res.status(201).json(incident);
   } catch (error) {
-    responseTimeHistogram.labels('/incidents', 'POST').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to create incident' });
+    responseTimeHistogram
+      .labels("/incidents", "POST")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to create incident" });
   }
 });
 
 /**
  * 2. GET /incidents/:id - Get incident
  */
-app.get('/incidents/:id', (req: Request, res: Response) => {
+app.get("/incidents/:id", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { id } = req.params;
     const incident = incidentEngine.getIncident(id);
 
     if (!incident) {
-      responseTimeHistogram.labels('/incidents/:id', 'GET').observe((Date.now() - startTime) / 1000);
-      return res.status(404).json({ error: 'Incident not found' });
+      responseTimeHistogram
+        .labels("/incidents/:id", "GET")
+        .observe((Date.now() - startTime) / 1000);
+      return res.status(404).json({ error: "Incident not found" });
     }
 
-    responseTimeHistogram.labels('/incidents/:id', 'GET').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/incidents/:id", "GET")
+      .observe((Date.now() - startTime) / 1000);
     res.json(incident);
   } catch (error) {
-    responseTimeHistogram.labels('/incidents/:id', 'GET').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to retrieve incident' });
+    responseTimeHistogram
+      .labels("/incidents/:id", "GET")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to retrieve incident" });
   }
 });
 
 /**
  * 3. PUT /incidents/:id - Update incident
  */
-app.put('/incidents/:id', (req: Request, res: Response) => {
+app.put("/incidents/:id", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { id } = req.params;
@@ -202,27 +215,33 @@ app.put('/incidents/:id', (req: Request, res: Response) => {
     });
 
     if (!incident) {
-      responseTimeHistogram.labels('/incidents/:id', 'PUT').observe((Date.now() - startTime) / 1000);
-      return res.status(404).json({ error: 'Incident not found' });
+      responseTimeHistogram
+        .labels("/incidents/:id", "PUT")
+        .observe((Date.now() - startTime) / 1000);
+      return res.status(404).json({ error: "Incident not found" });
     }
 
-    if (status === 'resolved') {
+    if (status === "resolved") {
       incidentResolvedCounter.labels(incident.severity).inc();
       activeIncidentsGauge.labels(incident.severity).dec();
     }
 
-    responseTimeHistogram.labels('/incidents/:id', 'PUT').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/incidents/:id", "PUT")
+      .observe((Date.now() - startTime) / 1000);
     res.json(incident);
   } catch (error) {
-    responseTimeHistogram.labels('/incidents/:id', 'PUT').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to update incident' });
+    responseTimeHistogram
+      .labels("/incidents/:id", "PUT")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to update incident" });
   }
 });
 
 /**
  * 4. GET /incidents - List incidents
  */
-app.get('/incidents', (req: Request, res: Response) => {
+app.get("/incidents", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { status, severity, limit = 50, offset = 0 } = req.query;
@@ -234,18 +253,22 @@ app.get('/incidents', (req: Request, res: Response) => {
       offset: parseInt(offset as string),
     });
 
-    responseTimeHistogram.labels('/incidents', 'GET').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/incidents", "GET")
+      .observe((Date.now() - startTime) / 1000);
     res.json(incidents);
   } catch (error) {
-    responseTimeHistogram.labels('/incidents', 'GET').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to list incidents' });
+    responseTimeHistogram
+      .labels("/incidents", "GET")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to list incidents" });
   }
 });
 
 /**
  * 5. POST /alerts - Create alert
  */
-app.post('/alerts', (req: Request, res: Response) => {
+app.post("/alerts", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const alert = {
@@ -256,18 +279,22 @@ app.post('/alerts', (req: Request, res: Response) => {
 
     alertCounter.labels(alert.severity).inc();
 
-    responseTimeHistogram.labels('/alerts', 'POST').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/alerts", "POST")
+      .observe((Date.now() - startTime) / 1000);
     res.status(201).json(alert);
   } catch (error) {
-    responseTimeHistogram.labels('/alerts', 'POST').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to create alert' });
+    responseTimeHistogram
+      .labels("/alerts", "POST")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to create alert" });
   }
 });
 
 /**
  * 6. GET /alerts/:id - Get alert
  */
-app.get('/alerts/:id', (req: Request, res: Response) => {
+app.get("/alerts/:id", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { id } = req.params;
@@ -276,94 +303,118 @@ app.get('/alerts/:id', (req: Request, res: Response) => {
     const alert = incidentEngine.getAlert(id);
 
     if (!alert) {
-      responseTimeHistogram.labels('/alerts/:id', 'GET').observe((Date.now() - startTime) / 1000);
-      return res.status(404).json({ error: 'Alert not found' });
+      responseTimeHistogram
+        .labels("/alerts/:id", "GET")
+        .observe((Date.now() - startTime) / 1000);
+      return res.status(404).json({ error: "Alert not found" });
     }
 
-    responseTimeHistogram.labels('/alerts/:id', 'GET').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/alerts/:id", "GET")
+      .observe((Date.now() - startTime) / 1000);
     res.json(alert);
   } catch (error) {
-    responseTimeHistogram.labels('/alerts/:id', 'GET').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to retrieve alert' });
+    responseTimeHistogram
+      .labels("/alerts/:id", "GET")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to retrieve alert" });
   }
 });
 
 /**
  * 7. POST /remediate - Execute remediation
  */
-app.post('/remediate', async (req: Request, res: Response) => {
+app.post("/remediate", async (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { incident_id, action, parameters } = req.body;
 
     if (!incident_id || !action) {
-      responseTimeHistogram.labels('/remediate', 'POST').observe((Date.now() - startTime) / 1000);
+      responseTimeHistogram
+        .labels("/remediate", "POST")
+        .observe((Date.now() - startTime) / 1000);
       return res.status(400).json({
-        error: 'Missing required fields: incident_id, action',
+        error: "Missing required fields: incident_id, action",
       });
     }
 
     // Execute remediation action
-    const result = await incidentEngine.executeRemediation(incident_id, action, parameters);
+    const result = await incidentEngine.executeRemediation(
+      incident_id,
+      action,
+      parameters,
+    );
 
-    remediationCounter.labels(action, result.success ? 'true' : 'false').inc();
+    remediationCounter.labels(action, result.success ? "true" : "false").inc();
 
-    responseTimeHistogram.labels('/remediate', 'POST').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/remediate", "POST")
+      .observe((Date.now() - startTime) / 1000);
     res.json(result);
   } catch (error) {
-    remediationCounter.labels('unknown', 'false').inc();
-    responseTimeHistogram.labels('/remediate', 'POST').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to execute remediation' });
+    remediationCounter.labels("unknown", "false").inc();
+    responseTimeHistogram
+      .labels("/remediate", "POST")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to execute remediation" });
   }
 });
 
 /**
  * 8. GET /health - Service health
  */
-app.get('/health', (req: Request, res: Response) => {
+app.get("/health", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const health = {
-      status: 'healthy',
+      status: "healthy",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      version: '1.0.0',
+      version: "1.0.0",
       services: {
-        incident_engine: 'ok',
-        pagerduty: 'ok',
+        incident_engine: "ok",
+        pagerduty: "ok",
       },
     };
 
-    responseTimeHistogram.labels('/health', 'GET').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/health", "GET")
+      .observe((Date.now() - startTime) / 1000);
     res.json(health);
   } catch (error) {
-    responseTimeHistogram.labels('/health', 'GET').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ status: 'unhealthy' });
+    responseTimeHistogram
+      .labels("/health", "GET")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ status: "unhealthy" });
   }
 });
 
 /**
  * 9. POST /analyze - Performance analysis
  */
-app.post('/analyze', (req: Request, res: Response) => {
+app.post("/analyze", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { metric, threshold, window } = req.body;
 
     const analysis = incidentEngine.analyzeMetric(metric, threshold, window);
 
-    responseTimeHistogram.labels('/analyze', 'POST').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/analyze", "POST")
+      .observe((Date.now() - startTime) / 1000);
     res.json(analysis);
   } catch (error) {
-    responseTimeHistogram.labels('/analyze', 'POST').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to analyze metric' });
+    responseTimeHistogram
+      .labels("/analyze", "POST")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to analyze metric" });
   }
 });
 
 /**
  * 10. POST /costs - Track costs
  */
-app.post('/costs', (req: Request, res: Response) => {
+app.post("/costs", (req: Request, res: Response) => {
   const startTime = Date.now();
   try {
     const { category, amount, timestamp } = req.body;
@@ -376,11 +427,15 @@ app.post('/costs', (req: Request, res: Response) => {
       recorded_at: new Date().toISOString(),
     };
 
-    responseTimeHistogram.labels('/costs', 'POST').observe((Date.now() - startTime) / 1000);
+    responseTimeHistogram
+      .labels("/costs", "POST")
+      .observe((Date.now() - startTime) / 1000);
     res.status(201).json(cost);
   } catch (error) {
-    responseTimeHistogram.labels('/costs', 'POST').observe((Date.now() - startTime) / 1000);
-    res.status(500).json({ error: 'Failed to track cost' });
+    responseTimeHistogram
+      .labels("/costs", "POST")
+      .observe((Date.now() - startTime) / 1000);
+    res.status(500).json({ error: "Failed to track cost" });
   }
 });
 
@@ -388,12 +443,14 @@ app.post('/costs', (req: Request, res: Response) => {
 // Metrics Endpoint
 // ============================================================================
 
-app.get('/metrics', (req: Request, res: Response) => {
+app.get("/metrics", (req: Request, res: Response) => {
   try {
-    res.set('Content-Type', register.contentType);
+    res.set("Content-Type", register.contentType);
     res.end(register.metrics());
   } catch (error) {
-    res.status(500).end(error instanceof Error ? error.message : 'Unknown error');
+    res
+      .status(500)
+      .end(error instanceof Error ? error.message : "Unknown error");
   }
 });
 
@@ -401,8 +458,8 @@ app.get('/metrics', (req: Request, res: Response) => {
 // Health Check for Docker
 // ============================================================================
 
-app.get('/', (req: Request, res: Response) => {
-  res.json({ message: 'Fund My Cause Monitoring Service', version: '1.0.0' });
+app.get("/", (req: Request, res: Response) => {
+  res.json({ message: "Fund My Cause Monitoring Service", version: "1.0.0" });
 });
 
 // ============================================================================
@@ -410,14 +467,17 @@ app.get('/', (req: Request, res: Response) => {
 // ============================================================================
 
 app.listen(port, () => {
-  console.log(`🚀 Monitoring service running on http://localhost:${port}`);
-  console.log(`📊 Metrics available at http://localhost:${port}/metrics`);
-  console.log(`❤️  Health check at http://localhost:${port}/health`);
+  logger.info({ port }, "Monitoring service running");
+  logger.info({ url: `http://localhost:${port}/metrics` }, "Metrics available");
+  logger.info(
+    { url: `http://localhost:${port}/health` },
+    "Health check available",
+  );
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+process.on("SIGTERM", () => {
+  logger.info("SIGTERM signal received: closing HTTP server");
   process.exit(0);
 });
 

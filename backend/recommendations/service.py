@@ -46,19 +46,112 @@ When a real SQL/NoSQL persistence layer is introduced, drop any columns
 that are not present in the ``Campaign`` or ``IndexedActivity`` dataclasses
 above with a data-preserving rollback migration.  The migration template
 is documented in ``docs/adr/ADR-005-fraud-detection-vs-recommendations-service-split.md``.
+
+Structured logging (#895)
+──────────────────────────
+Uses structlog with the same configuration as fraud_detection/pipeline.py:
+  - merge_contextvars as the first processor (injects trace_id on every line)
+  - TraceIDMiddleware extracts X-Trace-ID from inbound requests and binds it
+    into structlog's context-var store for the request lifetime
+  - JSON output in production (LOG_FORMAT=json), coloured console in dev
+See docs/logging-conventions.md for the project-wide logging convention.
 """
 
 from __future__ import annotations
 
+import logging
 import math
+import re
 import time
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Callable, Optional
 
-from fastapi import FastAPI, Query
+import structlog
+from fastapi import FastAPI, Query, Request, Response
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from scoring_config import SCORING_CONFIG
+
+# ---------------------------------------------------------------------------
+# Structured logging — same configuration as fraud_detection/pipeline.py
+# (#895 — centralise logging across all backend services)
+# ---------------------------------------------------------------------------
+
+structlog.configure(
+    processors=[
+        structlog.contextvars.merge_contextvars,       # injects trace_id automatically
+        structlog.stdlib.add_log_level,
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.dev.ConsoleRenderer()
+        if __import__("os").getenv("LOG_FORMAT") != "json"
+        else structlog.processors.JSONRenderer(),
+    ],
+    wrapper_class=structlog.make_filtering_bound_logger(
+        logging.getLevelName(__import__("os").getenv("LOG_LEVEL", "INFO"))
+    ),
+    context_class=dict,
+    logger_factory=structlog.PrintLoggerFactory(),
+)
+
+log: structlog.BoundLogger = structlog.get_logger("recommendations")
+
+# ---------------------------------------------------------------------------
+# Trace-ID convention (mirrors fraud_detection/pipeline.py)
+# ---------------------------------------------------------------------------
+
+#: The canonical header name — must match TRACE_ID_HEADER in shared-utils.
+TRACE_ID_HEADER = "x-trace-id"
+
+#: Valid Fund-My-Cause trace IDs match this pattern.
+_TRACE_ID_RE = re.compile(r"^fmc-[0-9a-f]{8}-[0-9a-f]{16}$")
+
+
+def _is_valid_trace_id(value: str) -> bool:
+    return bool(_TRACE_ID_RE.match(value))
+
+
+# ---------------------------------------------------------------------------
+# Trace-ID middleware
+# ---------------------------------------------------------------------------
+
+class TraceIDMiddleware(BaseHTTPMiddleware):
+    """
+    Extract (or generate) an X-Trace-ID for every inbound request.
+
+    Mirrors the implementation in fraud_detection/pipeline.py — see
+    docs/logging-conventions.md for the canonical description.
+    """
+
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        raw = request.headers.get(TRACE_ID_HEADER, "")
+        trace_id = raw if _is_valid_trace_id(raw) else f"unknown-{int(time.time())}"
+
+        structlog.contextvars.clear_contextvars()
+        structlog.contextvars.bind_contextvars(trace_id=trace_id)
+
+        log.info(
+            "request_started",
+            method=request.method,
+            path=request.url.path,
+        )
+
+        response: Response = await call_next(request)
+
+        # Echo the trace ID back so callers can correlate their logs.
+        response.headers[TRACE_ID_HEADER] = trace_id
+
+        log.info(
+            "request_completed",
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+        )
+
+        return response
+
 
 # ---------------------------------------------------------------------------
 # In-process cache (TTL-based)
@@ -170,6 +263,9 @@ def _recommend(wallet: Optional[str], limit: int) -> list[dict]:
 # ---------------------------------------------------------------------------
 app = FastAPI(title="Fund-My-Cause Recommendation Service", version="1.0.0")
 
+# Register TraceIDMiddleware so every request gets trace_id bound in structlog.
+app.add_middleware(TraceIDMiddleware)
+
 
 @app.get("/health")
 def health() -> dict:
@@ -192,7 +288,10 @@ def get_recommendations(
     cache_key = f"{wallet}:{limit}"
     cached = _cache_get(cache_key)
     if cached is not None:
+        log.debug("recommendations_cache_hit", wallet=wallet, limit=limit)
         return JSONResponse(content=cached, headers={"X-Cache": "HIT"})
+
+    log.info("recommendations_requested", wallet=wallet, limit=limit, personalised=wallet in _ACTIVITY if wallet else False)
 
     recommendations = _recommend(wallet, limit)
     payload = {
@@ -202,4 +301,12 @@ def get_recommendations(
         "cached_at": time.time(),
     }
     _cache_set(cache_key, payload)
+
+    log.info(
+        "recommendations_returned",
+        wallet=wallet,
+        count=len(recommendations),
+        personalised=payload["personalised"],
+    )
+
     return JSONResponse(content=payload, headers={"X-Cache": "MISS"})
