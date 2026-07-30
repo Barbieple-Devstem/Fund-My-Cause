@@ -157,10 +157,9 @@ This project uses [Husky](https://typicode.github.io/husky/) and [lint-staged](h
 
 Pre-commit hooks automatically run the following checks on staged files:
 
-- **TypeScript/JavaScript files** (`.ts`, `.tsx`): Prettier formatting
-- **Rust files** (`.rs`): `cargo fmt --check` for formatting and `cargo clippy` for linting
-
-Note: ESLint checks are planned but require configuration updates for ESLint v9 compatibility.
+- **JavaScript/TypeScript files** (`.js`, `.ts`, `.tsx`, `.jsx`): Prettier formatting. ESLint is also run on `apps/interface` files.
+- **Rust files** (`.rs`): `cargo fmt --check` for formatting.
+- **Secrets scanning**: Staged files are scanned for common secret patterns (private keys, API tokens, etc.).
 
 ### Setup
 
@@ -172,15 +171,28 @@ If you need to manually install or update hooks:
 npm run prepare
 ```
 
-### Skipping Hooks
+### Skipping Hooks (Emergency `--no-verify` Policy)
 
-In rare cases, you can skip pre-commit hooks with:
+In rare emergency situations — for example, an urgent hotfix that cannot wait for formatting or lint fixes — you can bypass all pre-commit checks with:
 
 ```bash
 git commit --no-verify
 ```
 
-Use this sparingly and ensure checks pass before pushing.
+**Policy:**
+
+1. `--no-verify` **bypasses all checks** (formatting, linting, and secrets scanning). Use it only when the commit must go through immediately and you have no time to address failures.
+2. **Always verify locally before pushing.** After committing with `--no-verify`, run the relevant checks manually:
+   ```bash
+   # JS/TS
+   npx prettier --check .
+   # Rust
+   cargo fmt --check
+   cargo clippy --workspace --all-targets --all-features
+   ```
+3. **Do not use `--no-verify` to bypass secrets scanning.** If a secret is accidentally staged, remove it immediately and rotate the exposed credential.
+4. **CI will catch issues.** Even if a commit bypasses pre-commit hooks, CI enforces the same checks. A `--no-verify` commit that fails CI must be fixed before merging.
+5. **Document the bypass.** If you use `--no-verify` for a non-obvious reason, add a brief note in the commit message or PR description explaining why.
 
 ## Development Setup
 

@@ -29,13 +29,14 @@
     "prettier": "^3.8.3"
   },
   "lint-staged": {
-    "apps/interface/**/*.{ts,tsx}": [
-      "eslint --config apps/interface/eslint.config.js --max-warnings=0",
+    "*.{js,ts,tsx,jsx}": [
       "prettier --write"
     ],
+    "apps/interface/**/*.{ts,tsx}": [
+      "eslint --config apps/interface/eslint.config.js --max-warnings=0"
+    ],
     "*.rs": [
-      "bash -c 'cargo fmt --all -- --check'",
-      "bash -c 'cargo clippy --workspace'"
+      "bash -c 'cargo fmt --all -- --check'"
     ]
   }
 }
