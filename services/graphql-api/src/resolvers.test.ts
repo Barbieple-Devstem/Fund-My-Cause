@@ -90,7 +90,11 @@ describe("resolvers", () => {
       const cached = sampleCampaign();
       (context.cache.get as any).mockResolvedValue(cached);
 
-      const result = await (resolvers.Query as any).campaign(null, { id: "camp_1" }, context);
+      const result = await (resolvers.Query as any).campaign(
+        null,
+        { id: "camp_1" },
+        context,
+      );
 
       expect(result).toBe(cached);
       expect(context.contractService.getCampaign).not.toHaveBeenCalled();
@@ -101,10 +105,18 @@ describe("resolvers", () => {
       const campaign = sampleCampaign();
       (context.contractService.getCampaign as any).mockResolvedValue(campaign);
 
-      const result = await (resolvers.Query as any).campaign(null, { id: "camp_1" }, context);
+      const result = await (resolvers.Query as any).campaign(
+        null,
+        { id: "camp_1" },
+        context,
+      );
 
       expect(result).toBe(campaign);
-      expect(context.cache.set).toHaveBeenCalledWith("campaign:camp_1", campaign, 300);
+      expect(context.cache.set).toHaveBeenCalledWith(
+        "campaign:camp_1",
+        campaign,
+        300,
+      );
     });
 
     it("throws a GraphQLError when the campaign does not exist", async () => {
@@ -112,7 +124,7 @@ describe("resolvers", () => {
       (context.contractService.getCampaign as any).mockResolvedValue(null);
 
       await expect(
-        (resolvers.Query as any).campaign(null, { id: "missing" }, context)
+        (resolvers.Query as any).campaign(null, { id: "missing" }, context),
       ).rejects.toThrow(GraphQLError);
       expect(context.cache.set).not.toHaveBeenCalled();
     });
@@ -127,7 +139,7 @@ describe("resolvers", () => {
       const result = await (resolvers.Query as any).campaigns(
         null,
         { pagination: { limit: 20, offset: 0 } },
-        context
+        context,
       );
 
       expect(result).toBe(cached);
@@ -137,14 +149,19 @@ describe("resolvers", () => {
     it("builds a cursor-paginated connection from contract service results on a cache miss", async () => {
       const context = createMockContext();
       // Two campaigns, resolver requests limit+1 (21) — only 2 come back, so hasNextPage = false.
-      const campaigns = [sampleCampaign({ id: "a" }), sampleCampaign({ id: "b" })];
-      (context.contractService.getCampaigns as any).mockResolvedValue(campaigns);
+      const campaigns = [
+        sampleCampaign({ id: "a" }),
+        sampleCampaign({ id: "b" }),
+      ];
+      (context.contractService.getCampaigns as any).mockResolvedValue(
+        campaigns,
+      );
       (context.contractService.getCampaignCount as any).mockResolvedValue(2);
 
       const result = await (resolvers.Query as any).campaigns(
         null,
         { pagination: { limit: 20, offset: 0 } },
-        context
+        context,
       );
 
       expect(result.edges).toHaveLength(2);
@@ -154,20 +171,28 @@ describe("resolvers", () => {
       expect(result.totalCount).toBe(2);
       expect(result.pageInfo.hasPreviousPage).toBe(false);
       expect(result.pageInfo.hasNextPage).toBe(false); // 2 returned < limit+1 (21)
-      expect(context.cache.set).toHaveBeenCalledWith(expect.any(String), result, 600);
+      expect(context.cache.set).toHaveBeenCalledWith(
+        expect.any(String),
+        result,
+        600,
+      );
     });
 
     it("sets hasNextPage true when N+1 items are returned", async () => {
       const context = createMockContext();
       // Resolver requests pageSize+1 (limit=2 → requests 3). Return 3 items → hasNextPage = true.
-      const campaigns = Array.from({ length: 3 }, (_, i) => sampleCampaign({ id: `c${i}` }));
-      (context.contractService.getCampaigns as any).mockResolvedValue(campaigns);
+      const campaigns = Array.from({ length: 3 }, (_, i) =>
+        sampleCampaign({ id: `c${i}` }),
+      );
+      (context.contractService.getCampaigns as any).mockResolvedValue(
+        campaigns,
+      );
       (context.contractService.getCampaignCount as any).mockResolvedValue(50);
 
       const result = await (resolvers.Query as any).campaigns(
         null,
         { pagination: { limit: 2, offset: 4 } },
-        context
+        context,
       );
 
       expect(result.edges).toHaveLength(2); // sliced to pageSize
@@ -179,16 +204,21 @@ describe("resolvers", () => {
       const context = createMockContext();
       // Import encodeCursor to build a valid cursor for the test.
       const { encodeCursor } = await import("./services/cursor-pagination.js");
-      const validCursor = encodeCursor({ id: "camp_prev", sortKey: "2024-01-01T00:00:00.000Z" });
+      const validCursor = encodeCursor({
+        id: "camp_prev",
+        sortKey: "2024-01-01T00:00:00.000Z",
+      });
 
       const campaigns = [sampleCampaign({ id: "x" })];
-      (context.contractService.getCampaigns as any).mockResolvedValue(campaigns);
+      (context.contractService.getCampaigns as any).mockResolvedValue(
+        campaigns,
+      );
       (context.contractService.getCampaignCount as any).mockResolvedValue(1);
 
       const result = await (resolvers.Query as any).campaigns(
         null,
         { first: 10, after: validCursor },
-        context
+        context,
       );
 
       expect(result.edges).toHaveLength(1);
@@ -202,8 +232,8 @@ describe("resolvers", () => {
         (resolvers.Query as any).campaigns(
           null,
           { first: 10, after: "tampered.invalidsig" },
-          context
-        )
+          context,
+        ),
       ).rejects.toMatchObject({
         extensions: { code: "BAD_USER_INPUT" },
       });
@@ -211,19 +241,19 @@ describe("resolvers", () => {
 
     it("clamps first to a maximum of 100", async () => {
       const context = createMockContext();
-      const campaigns = Array.from({ length: 5 }, (_, i) => sampleCampaign({ id: `d${i}` }));
-      (context.contractService.getCampaigns as any).mockResolvedValue(campaigns);
+      const campaigns = Array.from({ length: 5 }, (_, i) =>
+        sampleCampaign({ id: `d${i}` }),
+      );
+      (context.contractService.getCampaigns as any).mockResolvedValue(
+        campaigns,
+      );
       (context.contractService.getCampaignCount as any).mockResolvedValue(5);
 
-      await (resolvers.Query as any).campaigns(
-        null,
-        { first: 9999 },
-        context
-      );
+      await (resolvers.Query as any).campaigns(null, { first: 9999 }, context);
 
       // Resolver clamps to 100; passes limit=101 to getCampaigns (N+1 trick).
       expect(context.contractService.getCampaigns).toHaveBeenCalledWith(
-        expect.objectContaining({ pagination: { limit: 101, offset: 0 } })
+        expect.objectContaining({ pagination: { limit: 101, offset: 0 } }),
       );
     });
   });
@@ -232,9 +262,15 @@ describe("resolvers", () => {
     it("delegates to the campaignsByStatus dataloader", async () => {
       const context = createMockContext();
       const campaigns = [sampleCampaign()];
-      (context.dataLoader.campaignsByStatus.load as any).mockResolvedValue(campaigns);
+      (context.dataLoader.campaignsByStatus.load as any).mockResolvedValue(
+        campaigns,
+      );
 
-      const result = await (resolvers.Query as any).activeCampaigns(null, { limit: 5 }, context);
+      const result = await (resolvers.Query as any).activeCampaigns(
+        null,
+        { limit: 5 },
+        context,
+      );
 
       expect(result).toBe(campaigns);
       expect(context.dataLoader.campaignsByStatus.load).toHaveBeenCalledWith({
@@ -250,21 +286,37 @@ describe("resolvers", () => {
       const cached = [sampleCampaign()];
       (context.cache.get as any).mockResolvedValue(cached);
 
-      const result = await (resolvers.Query as any).trendingCampaigns(null, { limit: 10 }, context);
+      const result = await (resolvers.Query as any).trendingCampaigns(
+        null,
+        { limit: 10 },
+        context,
+      );
 
       expect(result).toBe(cached);
-      expect(context.contractService.getTrendingCampaigns).not.toHaveBeenCalled();
+      expect(
+        context.contractService.getTrendingCampaigns,
+      ).not.toHaveBeenCalled();
     });
 
     it("fetches and caches trending campaigns on a miss", async () => {
       const context = createMockContext();
       const campaigns = [sampleCampaign()];
-      (context.contractService.getTrendingCampaigns as any).mockResolvedValue(campaigns);
+      (context.contractService.getTrendingCampaigns as any).mockResolvedValue(
+        campaigns,
+      );
 
-      const result = await (resolvers.Query as any).trendingCampaigns(null, { limit: 10 }, context);
+      const result = await (resolvers.Query as any).trendingCampaigns(
+        null,
+        { limit: 10 },
+        context,
+      );
 
       expect(result).toBe(campaigns);
-      expect(context.cache.set).toHaveBeenCalledWith("trending:10", campaigns, 1800);
+      expect(context.cache.set).toHaveBeenCalledWith(
+        "trending:10",
+        campaigns,
+        1800,
+      );
     });
   });
 
@@ -272,16 +324,21 @@ describe("resolvers", () => {
     it("delegates to contractService.searchCampaigns", async () => {
       const context = createMockContext();
       const campaigns = [sampleCampaign()];
-      (context.contractService.searchCampaigns as any).mockResolvedValue(campaigns);
+      (context.contractService.searchCampaigns as any).mockResolvedValue(
+        campaigns,
+      );
 
       const result = await (resolvers.Query as any).searchCampaigns(
         null,
         { query: "water", limit: 5 },
-        context
+        context,
       );
 
       expect(result).toBe(campaigns);
-      expect(context.contractService.searchCampaigns).toHaveBeenCalledWith("water", 5);
+      expect(context.contractService.searchCampaigns).toHaveBeenCalledWith(
+        "water",
+        5,
+      );
     });
   });
 
@@ -294,11 +351,21 @@ describe("resolvers", () => {
       const milestones = [{ id: "m1" }];
 
       (context.dataLoader.campaigns.load as any).mockResolvedValue(campaign);
-      (context.dataLoader.campaignContributors.load as any).mockResolvedValue(contributors);
-      (context.dataLoader.campaignUpdates.load as any).mockResolvedValue(updates);
-      (context.dataLoader.campaignMilestones.load as any).mockResolvedValue(milestones);
+      (context.dataLoader.campaignContributors.load as any).mockResolvedValue(
+        contributors,
+      );
+      (context.dataLoader.campaignUpdates.load as any).mockResolvedValue(
+        updates,
+      );
+      (context.dataLoader.campaignMilestones.load as any).mockResolvedValue(
+        milestones,
+      );
 
-      const result = await (resolvers.Query as any).campaignDetail(null, { id: "camp_1" }, context);
+      const result = await (resolvers.Query as any).campaignDetail(
+        null,
+        { id: "camp_1" },
+        context,
+      );
 
       expect(result).toEqual({ campaign, contributors, updates, milestones });
     });
@@ -308,7 +375,11 @@ describe("resolvers", () => {
       (context.dataLoader.campaigns.load as any).mockResolvedValue(null);
 
       await expect(
-        (resolvers.Query as any).campaignDetail(null, { id: "missing" }, context)
+        (resolvers.Query as any).campaignDetail(
+          null,
+          { id: "missing" },
+          context,
+        ),
       ).rejects.toThrow(GraphQLError);
     });
   });
@@ -317,9 +388,15 @@ describe("resolvers", () => {
     it("contribution loads by id via the dataloader", async () => {
       const context = createMockContext();
       const contribution = { id: "contrib_1" };
-      (context.dataLoader.contributions.load as any).mockResolvedValue(contribution);
+      (context.dataLoader.contributions.load as any).mockResolvedValue(
+        contribution,
+      );
 
-      const result = await (resolvers.Query as any).contribution(null, { id: "contrib_1" }, context);
+      const result = await (resolvers.Query as any).contribution(
+        null,
+        { id: "contrib_1" },
+        context,
+      );
 
       expect(result).toBe(contribution);
     });
@@ -327,12 +404,14 @@ describe("resolvers", () => {
     it("contributions loads by campaignId when provided", async () => {
       const context = createMockContext();
       const contributions = [{ id: "c1" }];
-      (context.dataLoader.campaignContributions.load as any).mockResolvedValue(contributions);
+      (context.dataLoader.campaignContributions.load as any).mockResolvedValue(
+        contributions,
+      );
 
       const result = await (resolvers.Query as any).contributions(
         null,
         { campaignId: "camp_1" },
-        context
+        context,
       );
 
       expect(result).toBe(contributions);
@@ -342,12 +421,14 @@ describe("resolvers", () => {
     it("contributions loads by contributor when campaignId is absent", async () => {
       const context = createMockContext();
       const contributions = [{ id: "c2" }];
-      (context.dataLoader.userContributions.load as any).mockResolvedValue(contributions);
+      (context.dataLoader.userContributions.load as any).mockResolvedValue(
+        contributions,
+      );
 
       const result = await (resolvers.Query as any).contributions(
         null,
         { contributor: "GADDR" },
-        context
+        context,
       );
 
       expect(result).toBe(contributions);
@@ -357,7 +438,7 @@ describe("resolvers", () => {
       const context = createMockContext();
 
       await expect(
-        (resolvers.Query as any).contributions(null, {}, context)
+        (resolvers.Query as any).contributions(null, {}, context),
       ).rejects.toThrow(GraphQLError);
     });
   });
@@ -368,7 +449,11 @@ describe("resolvers", () => {
       const user = { address: "GADDR" };
       (context.cache.get as any).mockResolvedValue(user);
 
-      const result = await (resolvers.Query as any).user(null, { address: "GADDR" }, context);
+      const result = await (resolvers.Query as any).user(
+        null,
+        { address: "GADDR" },
+        context,
+      );
 
       expect(result).toBe(user);
       expect(context.contractService.getUser).not.toHaveBeenCalled();
@@ -379,7 +464,11 @@ describe("resolvers", () => {
       const user = { address: "GADDR" };
       (context.contractService.getUser as any).mockResolvedValue(user);
 
-      const result = await (resolvers.Query as any).user(null, { address: "GADDR" }, context);
+      const result = await (resolvers.Query as any).user(
+        null,
+        { address: "GADDR" },
+        context,
+      );
 
       expect(result).toBe(user);
       expect(context.cache.set).toHaveBeenCalledWith("user:GADDR", user, 600);
@@ -390,7 +479,7 @@ describe("resolvers", () => {
       (context.contractService.getUser as any).mockResolvedValue(null);
 
       await expect(
-        (resolvers.Query as any).user(null, { address: "unknown" }, context)
+        (resolvers.Query as any).user(null, { address: "unknown" }, context),
       ).rejects.toThrow(GraphQLError);
     });
   });
@@ -415,7 +504,11 @@ describe("resolvers", () => {
       const result = await (resolvers.Query as any).stats(null, null, context);
 
       expect(result).toBe(stats);
-      expect(context.cache.set).toHaveBeenCalledWith("platform:stats", stats, 1800);
+      expect(context.cache.set).toHaveBeenCalledWith(
+        "platform:stats",
+        stats,
+        1800,
+      );
     });
   });
 
@@ -466,11 +559,21 @@ describe("resolvers", () => {
         ],
       };
 
-      const result = (resolvers.CampaignDetail as any).topContributors(parent, { limit: 10 });
+      const result = (resolvers.CampaignDetail as any).topContributors(parent, {
+        limit: 10,
+      });
 
       expect(result.map((c: any) => c.address)).toEqual(["b", "c", "a"]);
-      expect(result[0]).toMatchObject({ rank: 1, address: "b", percentage: 50 });
-      expect(result[1]).toMatchObject({ rank: 2, address: "c", percentage: 40 });
+      expect(result[0]).toMatchObject({
+        rank: 1,
+        address: "b",
+        percentage: 50,
+      });
+      expect(result[1]).toMatchObject({
+        rank: 2,
+        address: "c",
+        percentage: 40,
+      });
     });
 
     it("respects the limit argument", () => {
@@ -483,7 +586,9 @@ describe("resolvers", () => {
         ],
       };
 
-      const result = (resolvers.CampaignDetail as any).topContributors(parent, { limit: 1 });
+      const result = (resolvers.CampaignDetail as any).topContributors(parent, {
+        limit: 1,
+      });
 
       expect(result).toHaveLength(1);
       expect(result[0].address).toBe("b");
@@ -494,23 +599,39 @@ describe("resolvers", () => {
     it("campaigns delegates to userCampaigns dataloader", async () => {
       const context = createMockContext();
       const campaigns = [sampleCampaign()];
-      (context.dataLoader.userCampaigns.load as any).mockResolvedValue(campaigns);
+      (context.dataLoader.userCampaigns.load as any).mockResolvedValue(
+        campaigns,
+      );
 
-      const result = await (resolvers.User as any).campaigns({ address: "GADDR" }, null, context);
+      const result = await (resolvers.User as any).campaigns(
+        { address: "GADDR" },
+        null,
+        context,
+      );
 
       expect(result).toBe(campaigns);
-      expect(context.dataLoader.userCampaigns.load).toHaveBeenCalledWith("GADDR");
+      expect(context.dataLoader.userCampaigns.load).toHaveBeenCalledWith(
+        "GADDR",
+      );
     });
 
     it("contributions delegates to userContributions dataloader", async () => {
       const context = createMockContext();
       const contributions = [{ id: "c1" }];
-      (context.dataLoader.userContributions.load as any).mockResolvedValue(contributions);
+      (context.dataLoader.userContributions.load as any).mockResolvedValue(
+        contributions,
+      );
 
-      const result = await (resolvers.User as any).contributions({ address: "GADDR" }, null, context);
+      const result = await (resolvers.User as any).contributions(
+        { address: "GADDR" },
+        null,
+        context,
+      );
 
       expect(result).toBe(contributions);
-      expect(context.dataLoader.userContributions.load).toHaveBeenCalledWith("GADDR");
+      expect(context.dataLoader.userContributions.load).toHaveBeenCalledWith(
+        "GADDR",
+      );
     });
   });
 
@@ -524,60 +645,42 @@ describe("resolvers", () => {
     });
 
     it("parses an IntValue AST literal into a BigInt", () => {
-      expect((resolvers.BigInt as any).parseLiteral({ kind: "IntValue", value: "789" })).toBe(789n);
+      expect(
+        (resolvers.BigInt as any).parseLiteral({
+          kind: "IntValue",
+          value: "789",
+        }),
+      ).toBe(789n);
     });
 
     it("throws a GraphQLError for a non-int AST literal", () => {
       expect(() =>
-        (resolvers.BigInt as any).parseLiteral({ kind: "StringValue", value: "789" })
+        (resolvers.BigInt as any).parseLiteral({
+          kind: "StringValue",
+          value: "789",
+        }),
       ).toThrow(GraphQLError);
     });
   });
 
-  describe("DateTime scalar", () => {
-    it("serializes a Date to an ISO string", () => {
-      const date = new Date("2026-01-01T00:00:00.000Z");
-      expect((resolvers.DateTime as any).serialize(date)).toBe(date.toISOString());
-    });
-
-    it("passes through a string value unchanged when serializing", () => {
-      expect((resolvers.DateTime as any).serialize("2026-01-01T00:00:00.000Z")).toBe(
-        "2026-01-01T00:00:00.000Z"
-      );
-    });
-
-    it("parses an ISO string value", () => {
-      const result = (resolvers.DateTime as any).parseValue("2026-01-01T00:00:00.000Z");
-      expect(result).toBe(new Date("2026-01-01T00:00:00.000Z").toISOString());
-    });
-
-    it("parses a StringValue AST literal", () => {
-      const result = (resolvers.DateTime as any).parseLiteral({
-        kind: "StringValue",
-        value: "2026-01-01T00:00:00.000Z",
-      });
-      expect(result).toBe(new Date("2026-01-01T00:00:00.000Z").toISOString());
-    });
-
-    it("throws a GraphQLError for a non-string AST literal", () => {
-      expect(() =>
-        (resolvers.DateTime as any).parseLiteral({ kind: "IntValue", value: "123" })
-      ).toThrow(GraphQLError);
-    });
-  });
+  // DateTime scalar tests removed in #913 — the DateTime scalar was dropped from
+  // the schema because no field ever used it (all date/time fields use String!).
+  // The resolver entry was removed accordingly; there is nothing left to test.
 
   describe("Mutation.authenticate", () => {
     it("issues a token and returns the user on a valid signature", async () => {
       const context = createMockContext();
       (context.contractService.verifySignature as any).mockResolvedValue(true);
-      (context.authService.generateToken as any).mockReturnValue("signed-token");
+      (context.authService.generateToken as any).mockReturnValue(
+        "signed-token",
+      );
       const user = { address: "GADDR" };
       (context.contractService.getUser as any).mockResolvedValue(user);
 
       const result = await (resolvers.Mutation as any).authenticate(
         null,
         { signature: "sig", message: "msg", address: "GADDR" },
-        context
+        context,
       );
 
       expect(result).toEqual({ token: "signed-token", user });
@@ -591,8 +694,8 @@ describe("resolvers", () => {
         (resolvers.Mutation as any).authenticate(
           null,
           { signature: "bad", message: "msg", address: "GADDR" },
-          context
-        )
+          context,
+        ),
       ).rejects.toThrow(GraphQLError);
       expect(context.authService.generateToken).not.toHaveBeenCalled();
     });
@@ -603,7 +706,11 @@ describe("resolvers", () => {
       const context = createMockContext({ user: undefined });
 
       await expect(
-        (resolvers.Mutation as any).createCampaign(null, { input: {} }, context)
+        (resolvers.Mutation as any).createCampaign(
+          null,
+          { input: {} },
+          context,
+        ),
       ).rejects.toThrow(GraphQLError);
       expect(context.contractService.createCampaign).not.toHaveBeenCalled();
     });
@@ -613,18 +720,23 @@ describe("resolvers", () => {
         user: { address: "GCREATOR", isAuthenticated: true },
       });
       const campaign = sampleCampaign();
-      (context.contractService.createCampaign as any).mockResolvedValue(campaign);
+      (context.contractService.createCampaign as any).mockResolvedValue(
+        campaign,
+      );
 
       const result = await (resolvers.Mutation as any).createCampaign(
         null,
         { input: { title: "New" } },
-        context
+        context,
       );
 
       expect(result).toBe(campaign);
-      expect(context.contractService.createCampaign).toHaveBeenCalledWith(context.user, {
-        title: "New",
-      });
+      expect(context.contractService.createCampaign).toHaveBeenCalledWith(
+        context.user,
+        {
+          title: "New",
+        },
+      );
       expect(context.cache.del).toHaveBeenCalledWith("campaigns:*");
       expect(context.cache.del).toHaveBeenCalledWith("trending:*");
     });
@@ -635,7 +747,11 @@ describe("resolvers", () => {
       const context = createMockContext({ user: undefined });
 
       await expect(
-        (resolvers.Mutation as any).updateCampaign(null, { id: "camp_1", input: {} }, context)
+        (resolvers.Mutation as any).updateCampaign(
+          null,
+          { id: "camp_1", input: {} },
+          context,
+        ),
       ).rejects.toThrow(GraphQLError);
       expect(context.contractService.updateCampaign).not.toHaveBeenCalled();
     });
@@ -645,18 +761,23 @@ describe("resolvers", () => {
         user: { address: "GCREATOR", isAuthenticated: true },
       });
       const campaign = sampleCampaign({ id: "camp_1" });
-      (context.contractService.updateCampaign as any).mockResolvedValue(campaign);
+      (context.contractService.updateCampaign as any).mockResolvedValue(
+        campaign,
+      );
 
       const result = await (resolvers.Mutation as any).updateCampaign(
         null,
         { id: "camp_1", input: { title: "Updated" } },
-        context
+        context,
       );
 
       expect(result).toBe(campaign);
       expect(context.cache.del).toHaveBeenCalledWith("campaign:camp_1");
       expect(context.cache.del).toHaveBeenCalledWith("campaigns:*");
-      expect(context.pubsub.publish).toHaveBeenCalledWith("campaign_updated:camp_1", campaign);
+      expect(context.pubsub.publish).toHaveBeenCalledWith(
+        "campaign_updated:camp_1",
+        campaign,
+      );
     });
   });
 
@@ -665,7 +786,11 @@ describe("resolvers", () => {
       const context = createMockContext({ user: undefined });
 
       await expect(
-        (resolvers.Mutation as any).recordContribution(null, { input: {} }, context)
+        (resolvers.Mutation as any).recordContribution(
+          null,
+          { input: {} },
+          context,
+        ),
       ).rejects.toThrow(GraphQLError);
       expect(context.contractService.recordContribution).not.toHaveBeenCalled();
     });
@@ -681,21 +806,34 @@ describe("resolvers", () => {
         transactionHash: "hash",
       };
       const contribution = { id: "contrib_1", ...input };
-      const campaign = sampleCampaign({ id: "camp_1", raised: 5000n, goal: 10000n });
+      const campaign = sampleCampaign({
+        id: "camp_1",
+        raised: 5000n,
+        goal: 10000n,
+      });
 
-      (context.contractService.recordContribution as any).mockResolvedValue(contribution);
+      (context.contractService.recordContribution as any).mockResolvedValue(
+        contribution,
+      );
       (context.contractService.getCampaign as any).mockResolvedValue(campaign);
 
-      const result = await (resolvers.Mutation as any).recordContribution(null, { input }, context);
+      const result = await (resolvers.Mutation as any).recordContribution(
+        null,
+        { input },
+        context,
+      );
 
       expect(result).toBe(contribution);
       expect(context.cache.del).toHaveBeenCalledWith("campaign:camp_1");
       expect(context.cache.del).toHaveBeenCalledWith("platform:stats");
       expect(context.cache.del).toHaveBeenCalledWith("user:GCONTRIBUTOR");
-      expect(context.pubsub.publish).toHaveBeenCalledWith("contribution:camp_1", contribution);
+      expect(context.pubsub.publish).toHaveBeenCalledWith(
+        "contribution:camp_1",
+        contribution,
+      );
       expect(context.pubsub.publish).toHaveBeenCalledWith(
         "progress:camp_1",
-        expect.objectContaining({ campaignId: "camp_1", percentageFunded: 50 })
+        expect.objectContaining({ campaignId: "camp_1", percentageFunded: 50 }),
       );
     });
 
@@ -711,13 +849,22 @@ describe("resolvers", () => {
       };
       const contribution = { id: "contrib_1", ...input };
 
-      (context.contractService.recordContribution as any).mockResolvedValue(contribution);
+      (context.contractService.recordContribution as any).mockResolvedValue(
+        contribution,
+      );
       (context.contractService.getCampaign as any).mockResolvedValue(null);
 
-      await (resolvers.Mutation as any).recordContribution(null, { input }, context);
+      await (resolvers.Mutation as any).recordContribution(
+        null,
+        { input },
+        context,
+      );
 
       expect(context.pubsub.publish).toHaveBeenCalledTimes(1); // only the contribution event
-      expect(context.pubsub.publish).toHaveBeenCalledWith("contribution:camp_missing", contribution);
+      expect(context.pubsub.publish).toHaveBeenCalledWith(
+        "contribution:camp_missing",
+        contribution,
+      );
     });
   });
 });
