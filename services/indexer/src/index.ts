@@ -5,6 +5,13 @@ import { SorobanRPCClient } from "./rpc-client.js";
 import { HealthChecker } from "./health-checker.js";
 import { EventStore } from "./event-store.js";
 import { EventStoreRepository } from "./repository-impl.js";
+import { runMigrations } from "./migrations/run-migrations.js";
+import {
+  CampaignHandler,
+  DonationHandler,
+  AchievementHandler,
+  EventDispatcher,
+} from "./handlers/index.js";
 import type { EventRepository } from "./repository.js";
 import { loadStoreConfig } from "./store-config.js";
 
@@ -66,8 +73,10 @@ async function startIndexer(): Promise<void> {
   logger.info("Streaming events from Soroban RPC");
   for await (const events of rpcClient.streamEvents()) {
     try {
-      // Store events via repository (no direct EventStore access here)
-      eventRepository.addEvents(events);
+      // Route events to domain handlers via the dispatcher (#896).
+      // Each handler stores events and emits domain-specific log lines.
+      // Unknown event types fall back to the repository directly.
+      dispatcher.dispatch(events);
 
       // Update health
       for (const event of events) {

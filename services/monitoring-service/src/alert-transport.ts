@@ -10,6 +10,8 @@
  *   - CompositeAlertTransport — fans out to multiple transports simultaneously
  */
 
+import { logger } from "./logger";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 /** The normalized payload that every transport receives. */
@@ -17,7 +19,7 @@ export interface AlertPayload {
   /** Identifier of the rule that fired. */
   ruleId: string;
   /** Severity of the alert. */
-  severity: 'critical' | 'warning' | 'info';
+  severity: "critical" | "warning" | "info";
   /** Human-readable message describing what fired. */
   message: string;
   /** Key/value context captured at evaluation time (metric name, value, threshold, etc.). */
@@ -64,7 +66,7 @@ export class EmailAlertTransport implements AlertTransport {
 
   constructor(options: EmailAlertTransportOptions) {
     this.to = options.to;
-    this.subjectPrefix = options.subjectPrefix ?? '[Alert]';
+    this.subjectPrefix = options.subjectPrefix ?? "[Alert]";
   }
 
   async deliver(payload: AlertPayload): Promise<void> {
@@ -75,12 +77,14 @@ export class EmailAlertTransport implements AlertTransport {
       `Message:   ${payload.message}`,
       `Timestamp: ${payload.timestamp}`,
       `Context:   ${JSON.stringify(payload.context, null, 2)}`,
-    ].join('\n');
+    ].join("\n");
 
     // Simulated send — replace with real mailer in production.
-    console.log(`[EmailAlertTransport] Sending to: ${this.to}`);
-    console.log(`[EmailAlertTransport] Subject: ${subject}`);
-    console.log(`[EmailAlertTransport] Body:\n${body}`);
+    logger.info(
+      { to: this.to, subject, severity: payload.severity },
+      "[EmailAlertTransport] Sending alert email",
+    );
+    logger.debug({ body }, "[EmailAlertTransport] Alert email body");
   }
 }
 
@@ -98,10 +102,10 @@ export interface SlackAlertTransportOptions {
 }
 
 /** Emoji map for severity levels. */
-const SEVERITY_EMOJI: Record<AlertPayload['severity'], string> = {
-  critical: '🔴',
-  warning:  '🟡',
-  info:     '🔵',
+const SEVERITY_EMOJI: Record<AlertPayload["severity"], string> = {
+  critical: "🔴",
+  warning: "🟡",
+  info: "🔵",
 };
 
 /**
@@ -126,13 +130,13 @@ export class SlackAlertTransport implements AlertTransport {
       `*Rule:* ${payload.ruleId}`,
       `*Time:* ${payload.timestamp}`,
       `*Context:* \`${JSON.stringify(payload.context)}\``,
-    ].join('\n');
+    ].join("\n");
 
     if (this.webhookUrl) {
       // Production path — POST to Slack Incoming Webhook.
       const res = await fetch(this.webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ channel: this.channel, text }),
         signal: AbortSignal.timeout(10_000),
       });
@@ -140,9 +144,12 @@ export class SlackAlertTransport implements AlertTransport {
         throw new Error(`Slack delivery failed: HTTP ${res.status}`);
       }
     } else {
-      // Simulated path — log to console.
-      console.log(`[SlackAlertTransport] Channel: ${this.channel}`);
-      console.log(`[SlackAlertTransport] Message:\n${text}`);
+      // Simulated path — log via structured logger.
+      logger.info(
+        { channel: this.channel, severity: payload.severity },
+        "[SlackAlertTransport] Sending alert (simulated)",
+      );
+      logger.debug({ text }, "[SlackAlertTransport] Slack message body");
     }
   }
 }
@@ -160,7 +167,9 @@ export class CompositeAlertTransport implements AlertTransport {
 
   constructor(transports: AlertTransport[]) {
     if (transports.length === 0) {
-      throw new Error('CompositeAlertTransport requires at least one transport');
+      throw new Error(
+        "CompositeAlertTransport requires at least one transport",
+      );
     }
     this.transports = transports;
   }
@@ -170,11 +179,18 @@ export class CompositeAlertTransport implements AlertTransport {
       this.transports.map((t) => t.deliver(payload)),
     );
 
-    const failures = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    const failures = results.filter(
+      (r): r is PromiseRejectedResult => r.status === "rejected",
+    );
     if (failures.length > 0) {
-      const messages = failures.map((f) => String(f.reason)).join('; ');
-      console.error(
-        `[CompositeAlertTransport] ${failures.length}/${results.length} transport(s) failed: ${messages}`,
+      const messages = failures.map((f) => String(f.reason)).join("; ");
+      logger.error(
+        {
+          failureCount: failures.length,
+          totalTransports: results.length,
+          messages,
+        },
+        "[CompositeAlertTransport] One or more transports failed",
       );
     }
   }
