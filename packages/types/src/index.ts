@@ -39,3 +39,17 @@ export type {
 
 export * from "./validation";
 
+export const CAMPAIGN_TITLE_MAX_LENGTH = 100;
+export const CAMPAIGN_DESCRIPTION_MAX_LENGTH = 1000;
+export const CAMPAIGN_DEADLINE_MIN_HOURS = 1;
+export const CAMPAIGN_DEADLINE_MAX_YEARS = 1;
+export const DONATION_MIN_XLM = 1;
+export const XLM_TO_STROOPS = 10_000_000;
+
+export { validateTitle as validateCampaignTitle } from "./validation";
+export { validateDescription as validateCampaignDescription } from "./validation";
+export { validateGoal as validateCampaignGoal } from "./validation";
+export { validateDeadline as validateCampaignDeadline } from "./validation";
+export { validateMinContribution as validateMinContributionShared } from "./validation";
+export { validateFeeBps } from "./validation";
+
