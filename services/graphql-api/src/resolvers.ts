@@ -1,13 +1,23 @@
 import { GraphQLError } from "graphql";
 import type { IResolvers } from "@graphql-tools/utils";
-import { CAMPAIGN_STATUS_VALUES, type CampaignStatus, validateCampaignInput, validateDonationAmount, XLM_TO_STROOPS } from "@fund-my-cause/types";
+import {
+  CAMPAIGN_STATUS_VALUES,
+  type CampaignStatus,
+  validateCampaignInput,
+  validateDonationAmount,
+  XLM_TO_STROOPS,
+} from "@fund-my-cause/types";
 import type { Context, Campaign } from "./types.js";
 import { CacheService } from "./services/cache.js";
 import { ContractService } from "./services/contract.js";
 import { PubSubService } from "./services/pubsub.js";
 import { notifyContribution } from "./services/fraud-client.js";
 import type { MutationName } from "./services/rate-limiter.js";
-import { buildPage, decodeCursor, CursorError } from "./services/cursor-pagination.js";
+import {
+  buildPage,
+  decodeCursor,
+  CursorError,
+} from "./services/cursor-pagination.js";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -17,9 +27,10 @@ import { buildPage, decodeCursor, CursorError } from "./services/cursor-paginati
  * instead of silently drifting out of sync — this is the contract test
  * that guards against the bug this resolver map exists to fix.
  */
-export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> = Object.fromEntries(
-  CAMPAIGN_STATUS_VALUES.map((value) => [value.toUpperCase(), value])
-);
+export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> =
+  Object.fromEntries(
+    CAMPAIGN_STATUS_VALUES.map((value) => [value.toUpperCase(), value]),
+  );
 
 // ---------------------------------------------------------------------------
 // Mutation rate-limit helper (#899)
@@ -37,7 +48,7 @@ export const CAMPAIGN_STATUS_ENUM_MAP: Record<string, CampaignStatus> = Object.f
  */
 async function enforceMutationRateLimit(
   mutation: MutationName,
-  context: Context
+  context: Context,
 ): Promise<void> {
   const rateLimiter = (context as any).rateLimiter;
   if (!rateLimiter) return; // not present in test stubs — skip
@@ -48,7 +59,8 @@ async function enforceMutationRateLimit(
   } catch (error: any) {
     const retryAfter: number = error.retryAfter ?? 60;
     throw new GraphQLError(
-      error.message ?? `Rate limit exceeded for mutation '${mutation}'. Retry after ${retryAfter}s.`,
+      error.message ??
+        `Rate limit exceeded for mutation '${mutation}'. Retry after ${retryAfter}s.`,
       {
         extensions: {
           code: "TOO_MANY_REQUESTS",
@@ -56,7 +68,7 @@ async function enforceMutationRateLimit(
           retryAfter,
           mutation,
         },
-      }
+      },
     );
   }
 }
@@ -75,22 +87,6 @@ export const resolvers: IResolvers<any, Context> = {
     parseLiteral(ast: any) {
       if (ast.kind === "IntValue") {
         return BigInt(ast.value);
-      }
-      throw new GraphQLError(`Cannot coerce value: ${ast}`);
-    },
-  },
-
-  DateTime: {
-    serialize(value: Date | string) {
-      if (typeof value === "string") return value;
-      return value.toISOString();
-    },
-    parseValue(value: string) {
-      return new Date(value).toISOString();
-    },
-    parseLiteral(ast: any) {
-      if (ast.kind === "StringValue") {
-        return new Date(ast.value).toISOString();
       }
       throw new GraphQLError(`Cannot coerce value: ${ast}`);
     },
@@ -118,7 +114,7 @@ export const resolvers: IResolvers<any, Context> = {
     async campaigns(
       _,
       { filter, first, after, pagination = { limit: 20, offset: 0 }, sort },
-      context: Context
+      context: Context,
     ) {
       // ---------------------------------------------------------------------------
       // Resolve effective page size and offset.
@@ -141,9 +137,12 @@ export const resolvers: IResolvers<any, Context> = {
           afterId = decoded.id;
         } catch (err) {
           if (err instanceof CursorError) {
-            throw new GraphQLError(`Invalid pagination cursor: ${err.message}`, {
-              extensions: { code: "BAD_USER_INPUT" },
-            });
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
           }
           throw err;
         }
@@ -192,7 +191,10 @@ export const resolvers: IResolvers<any, Context> = {
     },
 
     async activeCampaigns(_, { limit = 20 }, context: Context) {
-      return context.dataLoader.campaignsByStatus.load({ status: "Active", limit });
+      return context.dataLoader.campaignsByStatus.load({
+        status: "Active",
+        limit,
+      });
     },
 
     async trendingCampaigns(_, { limit = 10 }, context: Context) {
@@ -203,7 +205,8 @@ export const resolvers: IResolvers<any, Context> = {
         return cached;
       }
 
-      const campaigns = await context.contractService.getTrendingCampaigns(limit);
+      const campaigns =
+        await context.contractService.getTrendingCampaigns(limit);
       await context.cache.set(cacheKey, campaigns, 1800); // Cache for 30 minutes
       return campaigns;
     },
@@ -246,7 +249,9 @@ export const resolvers: IResolvers<any, Context> = {
         return context.dataLoader.userContributions.load(contributor);
       }
 
-      throw new GraphQLError("Either campaignId or contributor must be provided");
+      throw new GraphQLError(
+        "Either campaignId or contributor must be provided",
+      );
     },
 
     async user(_, { address }, context: Context) {
@@ -309,8 +314,7 @@ export const resolvers: IResolvers<any, Context> = {
           address: contributor.address,
           amount: contributor.amount,
           percentage: Number(
-            (contributor.amount * 100n) /
-              parent.campaign.raised
+            (contributor.amount * 100n) / parent.campaign.raised,
           ),
         }));
     },
@@ -386,7 +390,7 @@ export const resolvers: IResolvers<any, Context> = {
       const verified = await context.contractService.verifySignature(
         address,
         message,
-        signature
+        signature,
       );
 
       if (!verified) {
@@ -425,7 +429,7 @@ export const resolvers: IResolvers<any, Context> = {
 
       const campaign = await context.contractService.createCampaign(
         context.user,
-        input
+        input,
       );
 
       // Invalidate cache
@@ -443,7 +447,7 @@ export const resolvers: IResolvers<any, Context> = {
       const campaign = await context.contractService.updateCampaign(
         id,
         context.user,
-        input
+        input,
       );
 
       // Invalidate cache
@@ -486,7 +490,8 @@ export const resolvers: IResolvers<any, Context> = {
         "recordContribution: started",
       );
 
-      const contribution = await context.contractService.recordContribution(input);
+      const contribution =
+        await context.contractService.recordContribution(input);
 
       log.info(
         { contributionId: contribution.id, campaignId: input.campaignId },

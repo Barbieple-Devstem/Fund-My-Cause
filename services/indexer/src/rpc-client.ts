@@ -56,7 +56,7 @@ const RPC_HTTP_OPTIONS: Partial<HttpClientOptions> = {
 
 // Poll / stream delays — separate from the HTTP client; these throttle ledger
 // polling rather than controlling retry behaviour.
-const POLL_INTERVAL_MS = 5_000;   // wait between ledger polls when no error
+const POLL_INTERVAL_MS = 5_000; // wait between ledger polls when no error
 const STREAM_RETRY_DELAY_MS = 10_000; // wait after a stream-level error
 
 export class SorobanRPCClient {
@@ -65,6 +65,8 @@ export class SorobanRPCClient {
   private config: SorobanRPCConfig;
   private lastLedger: number = 0;
   private readonly circuitBreaker: CircuitBreaker;
+  /** Set to true after the first successful connect() call. */
+  private _connected: boolean = false;
 
   /**
    * Injectable sleep used by unit tests to skip real delays.
@@ -97,6 +99,7 @@ export class SorobanRPCClient {
       const status = await this.server.getLatestLedger();
       this.lastLedger = status.sequence;
       this.logger.info({ ledger: this.lastLedger }, "Connected to Soroban RPC");
+      this._connected = true;
       return true;
     } catch (error) {
       this.logger.error(
@@ -105,6 +108,14 @@ export class SorobanRPCClient {
       );
       return false;
     }
+  }
+
+  /**
+   * Returns true if the RPC client has successfully connected at least once.
+   * Used by /readyz to report whether the downstream dependency is reachable.
+   */
+  isConnected(): boolean {
+    return this._connected;
   }
 
   /**
@@ -183,7 +194,9 @@ export class SorobanRPCClient {
             method: "getEvents",
             params: {
               startLedger: ledgerSequence,
-              filters: [{ type: "contract", contractIds: [this.config.contractId] }],
+              filters: [
+                { type: "contract", contractIds: [this.config.contractId] },
+              ],
             },
           }),
         }),
@@ -256,8 +269,8 @@ export class SorobanRPCClient {
     const rawTimestamp = event.timestamp as number | undefined;
     const timestampMs =
       rawTimestamp != null
-        ? rawTimestamp * 1000          // seconds → milliseconds
-        : Date.now();                  // fallback: current UTC ms
+        ? rawTimestamp * 1000 // seconds → milliseconds
+        : Date.now(); // fallback: current UTC ms
 
     return {
       id: `${event.id}`,

@@ -42,34 +42,8 @@ const healthChecker = new HealthChecker(logger);
 // `eventRepository` (the interface) rather than `eventStore` directly,
 // so the storage layer can be replaced without touching handler code.
 const eventStore = new EventStore(logger, 10000, storeConfig.maxEventCapacity);
-
-// Apply migrations (#894) — adds secondary indexes for O(k) query lookups.
-// Runs at startup; idempotent so a restart never double-applies.
-const migrationResults = runMigrations(eventStore, "up", logger);
-if (migrationResults.some((r) => !r.success)) {
-  logger.warn(
-    { migrationResults },
-    "One or more migrations failed — indexes may be inactive",
-  );
-} else {
-  logger.info({ migrationResults }, "Migrations applied successfully");
-}
-
 const eventRepository: EventRepository = new EventStoreRepository(
   eventStore,
-  logger,
-);
-
-// Build domain-specific event handlers and wire them into the dispatcher (#896).
-// Each handler processes one event type; the dispatcher routes by event.type.
-// Unknown event types fall back to eventRepository so no event is ever lost.
-const dispatcher = new EventDispatcher(
-  [
-    new CampaignHandler(logger),
-    new DonationHandler(logger),
-    new AchievementHandler(logger),
-  ],
-  eventRepository,
   logger,
 );
 
@@ -124,7 +98,7 @@ async function startIndexer(): Promise<void> {
  * Routes
  */
 
-// Health endpoint
+// Health endpoint (liveness)
 app.get("/health", (req, res) => {
   const status = healthChecker.getStatus();
   const statusCode =
@@ -136,7 +110,36 @@ app.get("/health", (req, res) => {
   res.status(statusCode).json(status);
 });
 
-// Readiness endpoint
+// Kubernetes-style liveness probe — alias of /health.
+// Returns 200 as long as the process is up and responding.
+app.get("/healthz", (req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
+
+// Readiness endpoint — checks actual downstream dependency (Soroban RPC).
+// Returns 200 only when the indexer has successfully connected to the RPC
+// and is actively ingesting events; 503 otherwise.
+app.get("/readyz", async (req, res) => {
+  const rpcReachable = rpcClient.isConnected();
+  if (isRunning && rpcReachable) {
+    res.status(200).json({
+      ready: true,
+      checks: { rpc: "ok", indexer: "running" },
+      timestamp: new Date().toISOString(),
+    });
+  } else {
+    res.status(503).json({
+      ready: false,
+      checks: {
+        rpc: rpcReachable ? "ok" : "unreachable",
+        indexer: isRunning ? "running" : "not_started",
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// Readiness endpoint (original — kept for backwards compatibility)
 app.get("/ready", (req, res) => {
   if (isRunning) {
     res.status(200).json({ ready: true });

@@ -308,6 +308,27 @@ pub use types::{
 
 use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Vec};
 
+use crate::validation::{
+    validate_address_not_self,
+    validate_category,
+    validate_contributor_cap,
+    validate_deadline_extension,
+    validate_deadline_not_passed,
+    validate_deadline_passed,
+    validate_delegation,
+    validate_fee_bps,
+    validate_goal_not_overflow,
+    validate_goal_reached,
+    validate_governance_config,
+    validate_initialization,
+    validate_message_length,
+    validate_min_contribution,
+    validate_partial_refund,
+    validate_positive_amount,
+    validate_refund_eligibility,
+    validate_string_length,
+};
+
 // ── Contract ──────────────────────────────────────────────────────────────────
 
 #[contract]
