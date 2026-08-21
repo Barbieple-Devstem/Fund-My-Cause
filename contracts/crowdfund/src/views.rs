@@ -12,12 +12,13 @@ use soroban_sdk::{Address, Env, String, Vec};
 
 use crate::{
     storage::{
-        DataKey, KEY_CATEGORY, KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_GOAL,
-        KEY_GOAL_HISTORY, KEY_MAX, KEY_MIN, KEY_PLATFORM, KEY_SOCIAL, KEY_STATUS,
-        KEY_TITLE, KEY_TOKEN, KEY_TOTAL, KEY_VESTING,
+        DataKey, KEY_CATEGORY, KEY_CREATOR, KEY_DEADLINE, KEY_DESC, KEY_GOAL, KEY_GOAL_HISTORY,
+        KEY_MAX, KEY_MIN, KEY_PLATFORM, KEY_SOCIAL, KEY_STATUS, KEY_TITLE, KEY_TOKEN, KEY_TOTAL,
+        KEY_VESTING,
     },
     types::{
-        CampaignInfo, Category, ContributionRecord, ExtensionProposal, FeeMode, GoalAdjustment, PlatformConfig, RecurringPlan, Status, VestingSchedule,
+        CampaignInfo, Category, ContributionRecord, ExtensionProposal, FeeMode, GoalAdjustment,
+        PlatformConfig, RecurringPlan, Status, VestingSchedule,
     },
 };
 

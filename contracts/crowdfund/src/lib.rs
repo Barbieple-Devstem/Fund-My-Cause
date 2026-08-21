@@ -63,6 +63,10 @@
 
 #![no_std]
 #![allow(clippy::too_many_arguments)]
+// The SDK deprecated `Events::publish` in favour of the `#[contractevent]` macro.
+// Migrating changes how events are encoded on the wire, so it is a behaviour change
+// for every off-chain consumer, not a lint cleanup, and is tracked separately.
+#![allow(deprecated)]
 
 mod access;
 mod analytics;
@@ -313,15 +317,9 @@ pub use types::{
 use soroban_sdk::{contract, contractimpl, token, Address, Env, String, Vec};
 
 use crate::validation::{
-    validate_address_not_self,
-    validate_category,
-    validate_deadline_extension,
-    validate_fee_bps,
-    validate_goal_not_overflow,
-    validate_governance_config,
-    validate_positive_amount,
-    validate_refund_eligibility,
-    validate_string_length,
+    validate_address_not_self, validate_category, validate_deadline_extension, validate_fee_bps,
+    validate_goal_not_overflow, validate_governance_config, validate_positive_amount,
+    validate_refund_eligibility, validate_string_length,
 };
 
 // ── Contract ──────────────────────────────────────────────────────────────────
@@ -389,7 +387,23 @@ impl CrowdfundContract {
         vesting: Option<VestingSchedule>,
         penalty_bps: Option<u32>,
     ) -> Result<(), ContractError> {
-        lifecycle::initialize(env, creator, token, goal, deadline, min_contribution, max_contribution, title, description, social_links, platform_config, accepted_tokens, category, vesting, penalty_bps)
+        lifecycle::initialize(
+            env,
+            creator,
+            token,
+            goal,
+            deadline,
+            min_contribution,
+            max_contribution,
+            title,
+            description,
+            social_links,
+            platform_config,
+            accepted_tokens,
+            category,
+            vesting,
+            penalty_bps,
+        )
     }
 
     /// Submits a contribution to the campaign.
@@ -637,9 +651,11 @@ impl CrowdfundContract {
             timestamp: now,
         });
         env.storage().persistent().set(&KEY_GOAL_HISTORY, &history);
-        env.storage()
-            .persistent()
-            .extend_ttl(&KEY_GOAL_HISTORY, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &KEY_GOAL_HISTORY,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
 
@@ -912,8 +928,7 @@ impl CrowdfundContract {
         Ok(())
     }
 
-    /// Pauses the campaign, preventing new contributions (admin only).
-    // ── Emergency Multi-Sig Functions ─────────────────────────────────────────
+    // === Emergency Multi-Sig Functions
 
     /// Configures multi-sig approval requirements for emergency withdrawals (admin only).
     ///
@@ -1076,7 +1091,22 @@ impl CrowdfundContract {
         vesting: Option<VestingSchedule>,
         penalty_bps: Option<u32>,
     ) -> Result<(), ContractError> {
-        lifecycle::initialize_from_template(env, creator, token, goal, deadline, max_contribution, title, description, template, social_links, platform_config, accepted_tokens, vesting, penalty_bps)
+        lifecycle::initialize_from_template(
+            env,
+            creator,
+            token,
+            goal,
+            deadline,
+            max_contribution,
+            title,
+            description,
+            template,
+            social_links,
+            platform_config,
+            accepted_tokens,
+            vesting,
+            penalty_bps,
+        )
     }
 
     // ── Matching Functions ────────────────────────────────────────────────────
@@ -1125,7 +1155,7 @@ impl CrowdfundContract {
         let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
         token::Client::new(&env, &token_address).transfer(
             &sponsor,
-            &env.current_contract_address(),
+            env.current_contract_address(),
             &max_match,
         );
 
@@ -1790,7 +1820,7 @@ impl CrowdfundContract {
         let creator: Address = env.storage().instance().get(&KEY_CREATOR).unwrap();
         creator.require_auth();
 
-        if tiers.len() == 0 {
+        if tiers.is_empty() {
             return Err(ContractError::InvalidGoal);
         }
 
@@ -2659,7 +2689,7 @@ impl CrowdfundContract {
             .instance()
             .get(&KEY_CONTRACT_VERSION)
             .unwrap_or(CONTRACT_VERSION);
-        let compatible = stored >= storage::MIN_SUPPORTED_VERSION && stored <= CONTRACT_VERSION;
+        let compatible = (storage::MIN_SUPPORTED_VERSION..=CONTRACT_VERSION).contains(&stored);
         env.events().publish(
             ("contract", "version_checked"),
             EventVersionChecked {
@@ -2701,9 +2731,11 @@ impl CrowdfundContract {
         env.storage()
             .persistent()
             .set(&KEY_VERSION_HISTORY, &history);
-        env.storage()
-            .persistent()
-            .extend_ttl(&KEY_VERSION_HISTORY, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &KEY_VERSION_HISTORY,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         env.events().publish(
             ("contract", "migrated"),
@@ -2875,7 +2907,11 @@ impl CrowdfundContract {
         }
 
         env.storage().persistent().set(&stats_key, &stats);
-        env.storage().persistent().extend_ttl(&stats_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &stats_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         env.events().publish(
             ("perf", "execution_recorded"),
@@ -3190,12 +3226,10 @@ impl CrowdfundContract {
         for i in 0..disputes.len() {
             let mut dispute = disputes.get(i).ok_or(ContractError::DisputeNotFound)?;
             if dispute.id == dispute_id {
-                let status = if dispute.votes_for > dispute.votes_against {
-                    DisputeStatus::ResolvedInFavor
-                } else if dispute.votes_against > dispute.votes_for {
-                    DisputeStatus::ResolvedAgainst
-                } else {
-                    DisputeStatus::Dismissed
+                let status = match dispute.votes_for.cmp(&dispute.votes_against) {
+                    core::cmp::Ordering::Greater => DisputeStatus::ResolvedInFavor,
+                    core::cmp::Ordering::Less => DisputeStatus::ResolvedAgainst,
+                    core::cmp::Ordering::Equal => DisputeStatus::Dismissed,
                 };
 
                 dispute.status = status;
@@ -3722,7 +3756,7 @@ impl CrowdfundContract {
         // Transfer reward pool from creator into the contract
         token::Client::new(&env, &reward_token).transfer(
             &creator,
-            &env.current_contract_address(),
+            env.current_contract_address(),
             &pool,
         );
 

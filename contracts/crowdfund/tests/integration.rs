@@ -1,7 +1,8 @@
 #![cfg(test)]
 
 use soroban_sdk::{
-    testutils::{Address as _, Ledger}, Address, Env,
+    testutils::{Address as _, Ledger},
+    Address, Env,
 };
 
 use crowdfund::PlatformConfig;

@@ -12,7 +12,9 @@ use crate::{
         KEY_CREATOR, KEY_DESC, KEY_IPFS_CID, KEY_META_HIST, KEY_SOCIAL, KEY_STATUS, KEY_TITLE,
         TTL_PERSISTENT_ENTRY,
     },
-    types::{EventIpfsCidUpdated, EventMetadataUpdated, EventMetadataVersioned, MetadataVersion, Status},
+    types::{
+        EventIpfsCidUpdated, EventMetadataUpdated, EventMetadataVersioned, MetadataVersion, Status,
+    },
     validation::validate_string_length,
     CrowdfundContract,
 };
@@ -79,9 +81,11 @@ pub(crate) fn update_metadata(
         timestamp: now,
     });
     env.storage().persistent().set(&KEY_META_HIST, &meta_hist);
-    env.storage()
-        .persistent()
-        .extend_ttl(&KEY_META_HIST, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+    env.storage().persistent().extend_ttl(
+        &KEY_META_HIST,
+        TTL_PERSISTENT_ENTRY,
+        TTL_PERSISTENT_ENTRY,
+    );
 
     env.events().publish(
         ("campaign", "metadata_updated"),

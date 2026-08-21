@@ -2,6 +2,10 @@
 
 //! Adversarial scenario testing: reentrancy, race conditions, MEV, manipulation
 
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
+
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     token, Address, Env,
@@ -257,7 +261,7 @@ fn test_adversarial_selective_refund_targeting() {
     let c = setup(&env, goal, deadline, None);
 
     let contributors: Vec<Address> = (0..5).map(|_| Address::generate(&env)).collect();
-    let amounts = vec![1_000i128, 2_000, 3_000, 4_000, 5_000];
+    let amounts = [1_000i128, 2_000, 3_000, 4_000, 5_000];
 
     env.ledger().set_timestamp(500);
     for (addr, &amt) in contributors.iter().zip(amounts.iter()) {

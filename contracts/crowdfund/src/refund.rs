@@ -147,7 +147,7 @@ pub(crate) fn refund_batch(env: Env, contributors: Vec<Address>) -> Result<u32, 
     let token_client = token::Client::new(&env, &token_address);
 
     // Cap batch size to avoid resource exhaustion
-    let limit = (contributors.len() as u32).min(MAX_BATCH_REFUND_SIZE);
+    let limit = contributors.len().min(MAX_BATCH_REFUND_SIZE);
     let mut refunded: u32 = 0;
 
     for contributor in contributors.iter().take(limit as usize) {
@@ -252,7 +252,9 @@ pub(crate) fn refund_matching_sponsor(env: Env) -> Result<(), ContractError> {
     }
 
     // Require the sponsor (or creator) to authorise the refund
-    let creator: Address = inst.get(&KEY_CREATOR).ok_or(ContractError::InvalidAddress)?;
+    let creator: Address = inst
+        .get(&KEY_CREATOR)
+        .ok_or(ContractError::InvalidAddress)?;
     creator.require_auth();
 
     let token_address: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;

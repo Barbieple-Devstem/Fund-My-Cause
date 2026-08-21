@@ -203,10 +203,9 @@ pub(crate) fn get_performance_metrics(env: Env) -> PerformanceMetrics {
         let remaining = goal.saturating_sub(total_raised);
         let days_needed = remaining / contribution_velocity;
         days_needed.saturating_mul(86400).max(0) as u64
-    } else if total_raised >= goal {
-        0 // Goal already reached
     } else {
-        0 // Cannot estimate (no velocity or already at goal)
+        // Goal already reached, or no velocity to extrapolate from
+        0
     };
 
     // For now, set milestone tracking to 0 (would need milestone storage)

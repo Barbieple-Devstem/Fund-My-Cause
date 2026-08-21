@@ -1,4 +1,3 @@
-#![cfg(test)]
 #![allow(deprecated)]
 
 use super::*;
@@ -966,7 +965,7 @@ fn delegate_contribution_rejects_non_positive_amount() {
 fn setup_and_execute_recurring_contribution() {
     let env = setup_env();
     let deadline = 1_000_000u64;
-    let (_creator, token_id, client, token_admin_client) =
+    let (_creator, _token_id, client, token_admin_client) =
         setup_contract(&env, deadline, 1_000_000, 100);
 
     let contributor = Address::generate(&env);
@@ -1527,7 +1526,7 @@ fn refund_partial_updates_total_raised() {
 fn archive_successful_campaign() {
     let env = setup_env();
     env.ledger().set_timestamp(1000);
-    let (creator, token_id, client, token_admin_client) = setup_contract(&env, 2000, 100, 0);
+    let (_creator, token_id, client, token_admin_client) = setup_contract(&env, 2000, 100, 0);
 
     let contributor = Address::generate(&env);
     token_admin_client.mint(&contributor, &100);
@@ -1598,7 +1597,7 @@ fn is_archived_returns_false_before_archiving() {
 fn transfer_ownership_updates_creator_and_admin() {
     let env = setup_env();
     env.ledger().set_timestamp(1000);
-    let (creator, _token_id, client, _token_admin_client) = setup_contract(&env, 2000, 100, 0);
+    let (_creator, _token_id, client, _token_admin_client) = setup_contract(&env, 2000, 100, 0);
 
     let new_owner = Address::generate(&env);
     client.transfer_ownership(&new_owner);
@@ -1742,7 +1741,7 @@ fn below_minimum_returned_before_blacklist_check() {
     // The optimised path checks amount first, so BelowMinimum should be
     // returned without ever consulting the blacklist storage.
     let env = setup_env();
-    let (creator, token_id, client, token_admin_client) =
+    let (_creator, token_id, client, token_admin_client) =
         setup_contract(&env, 10_000, 100_000, 500); // min = 500
 
     let c = Address::generate(&env);

@@ -3,7 +3,7 @@
 /// This module contains validation functions for campaign parameters and operations.
 use crate::errors::ContractError;
 use crate::storage::BASIS_POINTS_MAX;
-use crate::types::{Category, Status};
+use crate::types::Category;
 use soroban_sdk::Address;
 
 /// Validates campaign initialization parameters.
@@ -97,51 +97,6 @@ pub(crate) fn validate_contributor_cap(
     Ok(())
 }
 
-/// Validates a contribution amount against both the campaign minimum and the
-/// per-contributor cap in one call — equivalent to calling
-/// [`validate_min_contribution`] followed by [`validate_contributor_cap`].
-/// Entry points that need to interleave a storage read between the two
-/// checks (to preserve a short-circuit optimisation) should call the split
-/// functions directly instead.
-///
-/// # Arguments
-/// * `amount` - Contribution amount
-/// * `min_contribution` - Minimum allowed contribution
-/// * `max_contribution` - Maximum allowed contribution per contributor (0 = no cap)
-/// * `current_contribution` - Current total contribution by this address
-///
-/// # Returns
-/// * `Ok(())` if amount is valid
-/// * `Err(ContractError)` if amount is invalid
-pub(crate) fn validate_contribution_amount(
-    amount: i128,
-    min_contribution: i128,
-    max_contribution: i128,
-    current_contribution: i128,
-) -> Result<(), ContractError> {
-    validate_min_contribution(amount, min_contribution)?;
-    validate_contributor_cap(amount, max_contribution, current_contribution)
-}
-
-/// Validates campaign status for operations.
-///
-/// # Arguments
-/// * `status` - Current campaign status
-/// * `required_status` - Required status for the operation
-///
-/// # Returns
-/// * `Ok(())` if status matches
-/// * `Err(ContractError::NotActive)` if status doesn't match
-pub(crate) fn validate_status(
-    status: Status,
-    required_status: Status,
-) -> Result<(), ContractError> {
-    if status != required_status {
-        return Err(ContractError::NotActive);
-    }
-    Ok(())
-}
-
 /// Validates campaign deadline has passed.
 ///
 /// # Arguments
@@ -180,41 +135,6 @@ pub(crate) fn validate_deadline_not_passed(
     Ok(())
 }
 
-/// Validates goal has been reached.
-///
-/// # Arguments
-/// * `total_raised` - Total amount raised
-/// * `goal` - Campaign goal
-///
-/// # Returns
-/// * `Ok(())` if goal is reached
-/// * `Err(ContractError::GoalNotReached)` if goal is not reached
-pub(crate) fn validate_goal_reached(total_raised: i128, goal: i128) -> Result<(), ContractError> {
-    if total_raised < goal {
-        return Err(ContractError::GoalNotReached);
-    }
-    Ok(())
-}
-
-/// Validates goal has not been reached.
-///
-/// # Arguments
-/// * `total_raised` - Total amount raised
-/// * `goal` - Campaign goal
-///
-/// # Returns
-/// * `Ok(())` if goal is not reached
-/// * `Err(ContractError::GoalReached)` if goal is reached
-pub(crate) fn validate_goal_not_reached(
-    total_raised: i128,
-    goal: i128,
-) -> Result<(), ContractError> {
-    if total_raised >= goal {
-        return Err(ContractError::GoalReached);
-    }
-    Ok(())
-}
-
 /// Validates that a new deadline timestamp is strictly later than a
 /// reference point. Used both for extending an existing deadline (reference
 /// = the current stored deadline, e.g. `extend_deadline`/`propose_extension`)
@@ -234,21 +154,6 @@ pub(crate) fn validate_deadline_extension(
 ) -> Result<(), ContractError> {
     if new_deadline <= reference {
         return Err(ContractError::InvalidDeadline);
-    }
-    Ok(())
-}
-
-/// Validates insurance fee configuration.
-///
-/// # Arguments
-/// * `fee_bps` - Insurance fee in basis points
-///
-/// # Returns
-/// * `Ok(())` if fee is valid
-/// * `Err(ContractError::InvalidFee)` if fee is invalid
-pub(crate) fn validate_insurance_fee(fee_bps: u32) -> Result<(), ContractError> {
-    if fee_bps > 10_000 {
-        return Err(ContractError::InvalidFee);
     }
     Ok(())
 }
@@ -306,21 +211,6 @@ pub(crate) fn validate_partial_refund(
 ) -> Result<(), ContractError> {
     if refund_amount > total_contribution / 2 {
         return Err(ContractError::RefundLimitExceeded);
-    }
-    Ok(())
-}
-
-/// Validates message length.
-///
-/// # Arguments
-/// * `message_len` - Length of the message
-///
-/// # Returns
-/// * `Ok(())` if message is valid
-/// * `Err(ContractError::MessageTooLong)` if message is too long
-pub(crate) fn validate_message_length(message_len: usize) -> Result<(), ContractError> {
-    if message_len > 256 {
-        return Err(ContractError::MessageTooLong);
     }
     Ok(())
 }

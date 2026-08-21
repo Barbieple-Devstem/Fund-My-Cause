@@ -14,6 +14,7 @@ pub const CONTRACT_VERSION: u32 = 6;
 pub const MIN_SUPPORTED_VERSION: u32 = 1;
 
 /// Maximum number of updates per campaign
+#[allow(dead_code)] // documented cap, not yet enforced anywhere
 pub const MAX_UPDATES: u32 = 100;
 
 /// Maximum number of milestones per campaign

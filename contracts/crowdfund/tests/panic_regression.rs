@@ -36,6 +36,9 @@
 //! | `lib.rs` | `contribute` total accumulation | `checked_add(...).unwrap()` | `ContractError::Overflow` | `test_856_r12_*` |
 
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
@@ -43,8 +46,7 @@ use soroban_sdk::{
 };
 
 use crowdfund::{
-    Category, ContractError, CrowdfundContract, CrowdfundContractClient, KEY_GROSS_TOTAL,
-    KEY_TOTAL,
+    Category, ContractError, CrowdfundContract, CrowdfundContractClient, KEY_GROSS_TOTAL, KEY_TOTAL,
 };
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
@@ -57,16 +59,16 @@ fn deploy_raw(env: &Env) -> CrowdfundContractClient {
 }
 
 /// Full deploy + init.  Returns (client, creator, token_id, token_admin_client).
-fn setup<'e>(
-    env: &'e Env,
+fn setup(
+    env: &Env,
     goal: i128,
     deadline: u64,
     min: i128,
 ) -> (
-    CrowdfundContractClient<'e>,
+    CrowdfundContractClient<'_>,
     Address,
     Address,
-    token::StellarAssetClient<'e>,
+    token::StellarAssetClient<'_>,
 ) {
     env.mock_all_auths();
     let creator = Address::generate(env);
@@ -445,8 +447,7 @@ fn test_856_r11_apply_matching_large_contribution_does_not_panic() {
     // setup_matching escrows the pool from the sponsor, so fund the sponsor first.
     token_admin.mint(&sponsor, &1_000i128);
     client.setup_matching(
-        &sponsor,
-        &10_000u32, // 100% match ratio in bps
+        &sponsor, &10_000u32, // 100% match ratio in bps
         &1_000i128, // max_match
     );
 

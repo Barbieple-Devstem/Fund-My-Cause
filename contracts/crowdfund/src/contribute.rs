@@ -22,9 +22,10 @@ use crate::{
     },
     types::{
         ContributionRecord, Delegation, EventContributed, EventContributionRecorded,
-        EventDelegatedContribution, EventDelegationCreated, EventDelegationRevoked, EventQfContribution,
-        EventRateLimitHit, EventTierAssigned, FeeMode, InsuranceConfig, MatchingConfig,
-        PlatformConfig, RateLimit, RewardTier, Status, Visibility, EVENT_SCHEMA_VERSION,
+        EventDelegatedContribution, EventDelegationCreated, EventDelegationRevoked,
+        EventQfContribution, EventRateLimitHit, EventTierAssigned, FeeMode, InsuranceConfig,
+        MatchingConfig, PlatformConfig, RateLimit, RewardTier, Status, Visibility,
+        EVENT_SCHEMA_VERSION,
     },
     validation::{
         validate_contributor_cap, validate_deadline_not_passed, validate_delegation,
@@ -361,9 +362,11 @@ fn record_contributor(
         // on every new contribution.
         let index_key = DataKey::ContributorIndex(snap.count);
         env.storage().persistent().set(&index_key, contributor);
-        env.storage()
-            .persistent()
-            .extend_ttl(&index_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &index_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
 
         let new_count = snap.count.checked_add(1).ok_or(ContractError::Overflow)?;
         inst.set(&DataKey::ContributorCount, &new_count);
@@ -519,7 +522,7 @@ pub(crate) fn contribute(
 
     token::Client::new(&env, &token).transfer(
         &contributor,
-        &env.current_contract_address(),
+        env.current_contract_address(),
         &amount,
     );
 
@@ -530,11 +533,9 @@ pub(crate) fn contribute(
         .ok_or(ContractError::Overflow)?;
     let contrib_key = DataKey::Contribution(contributor.clone());
     env.storage().persistent().set(&contrib_key, &new_contrib);
-    env.storage().persistent().extend_ttl(
-        &contrib_key,
-        TTL_PERSISTENT_ENTRY,
-        TTL_PERSISTENT_ENTRY,
-    );
+    env.storage()
+        .persistent()
+        .extend_ttl(&contrib_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
     if let Some(msg) = message {
         let msg_key = DataKey::ContributionMessage(contributor.clone());
@@ -596,9 +597,11 @@ pub(crate) fn delegate_contribution(
     env.storage()
         .persistent()
         .set(&DataKey::Delegation(delegator.clone()), &delegation);
-    env.storage()
-        .persistent()
-        .extend_ttl(&DataKey::Delegation(delegator.clone()), TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+    env.storage().persistent().extend_ttl(
+        &DataKey::Delegation(delegator.clone()),
+        TTL_PERSISTENT_ENTRY,
+        TTL_PERSISTENT_ENTRY,
+    );
     env.events().publish(
         ("campaign", "delegation_created"),
         EventDelegationCreated {
@@ -702,24 +705,26 @@ pub(crate) fn contribute_on_behalf(
         return Err(ContractError::NotWhitelisted);
     }
 
-    token::Client::new(&env, &token).transfer(
-        &delegate,
-        &env.current_contract_address(),
-        &amount,
-    );
+    token::Client::new(&env, &token).transfer(&delegate, env.current_contract_address(), &amount);
 
     let new_amount = prev.checked_add(amount).ok_or(ContractError::Overflow)?;
     env.storage().persistent().set(&key, &new_amount);
-    env.storage().persistent().extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
     // The running delegated-spend tally must be persisted, not just computed:
     // without this write the cap check above always compares `amount` against
     // a `delegated_so_far` that is permanently 0, and `extend_ttl` below
     // panics with MissingValue on a key that was never set.
-    env.storage().persistent().set(&delegated_key, &new_delegated);
     env.storage()
         .persistent()
-        .extend_ttl(&delegated_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        .set(&delegated_key, &new_delegated);
+    env.storage().persistent().extend_ttl(
+        &delegated_key,
+        TTL_PERSISTENT_ENTRY,
+        TTL_PERSISTENT_ENTRY,
+    );
 
     let total: i128 = env.storage().instance().get(&KEY_TOTAL).unwrap();
     let new_total = total.checked_add(amount).ok_or(ContractError::Overflow)?;
@@ -746,7 +751,11 @@ pub(crate) fn contribute_on_behalf(
         // O(1) indexed write, same pattern as contribute()
         let index_key = DataKey::ContributorIndex(count);
         env.storage().persistent().set(&index_key, &delegator);
-        env.storage().persistent().extend_ttl(&index_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
+        env.storage().persistent().extend_ttl(
+            &index_key,
+            TTL_PERSISTENT_ENTRY,
+            TTL_PERSISTENT_ENTRY,
+        );
         let new_count = count.checked_add(1).ok_or(ContractError::Overflow)?;
         env.storage()
             .instance()

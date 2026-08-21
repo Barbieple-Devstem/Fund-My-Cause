@@ -69,7 +69,7 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
     let token: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(env, &token).transfer(
         &contributor,
-        &env.current_contract_address(),
+        env.current_contract_address(),
         &plan.amount,
     );
 
