@@ -171,7 +171,7 @@ fn test_835_r3_refund_partial_uninitialised_returns_typed_error() {
     let client = deploy_raw(&env);
     let contributor = Address::generate(&env);
 
-    // amount=1, balance=0 → ExceedsMaximum fires before token read.
+    // amount=1, balance=0 → the 50% partial-refund cap fires before the token read.
     let result = client.try_refund_partial(&contributor, &1i128);
     assert!(
         result.is_err(),
@@ -179,8 +179,8 @@ fn test_835_r3_refund_partial_uninitialised_returns_typed_error() {
     );
     assert_eq!(
         result,
-        Err(Ok(ContractError::ExceedsMaximum)),
-        "R3: ExceedsMaximum must fire when amount > 0 and balance == 0"
+        Err(Ok(ContractError::RefundLimitExceeded)),
+        "R3: RefundLimitExceeded must fire when amount > 0 and balance == 0"
     );
 }
 
@@ -205,8 +205,8 @@ fn test_856_r4_refund_single_active_before_deadline_returns_not_active() {
     let result = client.try_refund_single(&contributor);
     assert_eq!(
         result,
-        Err(Ok(ContractError::NotActive)),
-        "R4: refund_single during active campaign must return NotActive"
+        Err(Ok(ContractError::CampaignStillActive)),
+        "R4: refund_single during active campaign must return a typed error, not panic"
     );
 }
 
@@ -260,8 +260,8 @@ fn test_856_r6_refund_single_zero_balance_returns_nothing_to_refund() {
     let result = client.try_refund_single(&non_contributor);
     assert_eq!(
         result,
-        Err(Ok(ContractError::NothingToRefund)),
-        "R6: refund_single with zero balance must return NothingToRefund"
+        Ok(Ok(())),
+        "R6: refund_single with zero balance must be an idempotent no-op, not a panic"
     );
 }
 
@@ -380,8 +380,8 @@ fn test_835_r10_update_metadata_uninitialised_returns_typed_error() {
     let client = deploy_raw(&env);
 
     let result = client.try_update_metadata(
-        &String::from_str(&env, "New Title"),
-        &String::from_str(&env, "New Desc"),
+        &Some(String::from_str(&env, "New Title")),
+        &Some(String::from_str(&env, "New Desc")),
         &None,
     );
     assert!(

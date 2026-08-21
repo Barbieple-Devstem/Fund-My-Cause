@@ -1564,71 +1564,7 @@ impl CrowdfundContract {
     /// - Sets contributor's contribution to 0
     /// - Publishes "refunded" event
     pub fn refund_single(env: Env, contributor: Address) -> Result<(), ContractError> {
-        // ── Batch instance reads up-front ─────────────────────────────────────
-        let inst = env.storage().instance();
-        let status: Status = inst.get(&KEY_STATUS).unwrap();
-
-        // `withdraw()` resets KEY_TOTAL to 0 and moves status to `Successful`,
-        // which would otherwise make `validate_refund_eligibility` see
-        // `total(0) < goal` and treat an already-paid-out campaign as an
-        // eligible-for-refund "failed" one — attempting to pay contributors
-        // a second time out of a contract balance withdraw() already drained.
-        if status == Status::Successful {
-            return Err(ContractError::AlreadyWithdrawn);
-        }
-
-        if status != Status::Cancelled {
-            validate_refund_eligibility(
-                env.ledger().timestamp(),
-                inst.get(&KEY_DEADLINE).unwrap(),
-                inst.get(&KEY_TOTAL).unwrap(),
-                inst.get(&KEY_GOAL).unwrap(),
-            )?;
-        }
-
-        let key = DataKey::Contribution(contributor.clone());
-        let amount: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-        if amount > 0 {
-            // #695: on cancellation, only the unreleased portion is refundable.
-            // released_amount is the total already paid out via milestones; each
-            // contributor's refund is proportionally reduced.
-            let refund_amount = if status == Status::Cancelled {
-                let total: i128 = inst.get(&KEY_TOTAL).unwrap_or(0);
-                let released: i128 = inst.get(&KEY_RELEASED).unwrap_or(0);
-                if released > 0 && total > 0 {
-                    // unreleased_ratio = (total - released) / total
-                    // contributor_refund = amount * unreleased_ratio
-                    let unreleased = total.saturating_sub(released).max(0);
-                    amount
-                        .checked_mul(unreleased)
-                        .ok_or(ContractError::Overflow)?
-                        / total
-                } else {
-                    amount
-                }
-            } else {
-                amount
-            };
-
-            let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
-            if refund_amount > 0 {
-                token::Client::new(&env, &token_address).transfer(
-                    &env.current_contract_address(),
-                    &contributor,
-                    &refund_amount,
-                );
-            }
-            env.storage().persistent().set(&key, &0i128);
-            env.events().publish(
-                ("campaign", "refunded"),
-                EventRefunded {
-                    contributor,
-                    amount: refund_amount,
-                    schema_version: EVENT_SCHEMA_VERSION,
-                },
-            );
-        }
-        Ok(())
+        refund::refund_single(env, contributor)
     }
 
     /// Refunds multiple contributors in a single transaction (batch refund).
@@ -1646,62 +1582,7 @@ impl CrowdfundContract {
     /// * `Err(ContractError::CampaignStillActive)` if deadline not passed and not cancelled
     /// * `Err(ContractError::GoalReached)` if goal was reached and campaign not cancelled
     pub fn refund_batch(env: Env, contributors: Vec<Address>) -> Result<u32, ContractError> {
-        // ── Batch instance reads up-front ─────────────────────────────────────
-        let inst = env.storage().instance();
-        let status: Status = inst.get(&KEY_STATUS).unwrap();
-
-        // See the matching guard in `refund_single` for why this is needed:
-        // without it, a post-withdraw batch refund would see `total(0) < goal`
-        // and try to pay contributors out of an already-drained balance.
-        if status == Status::Successful {
-            return Err(ContractError::AlreadyWithdrawn);
-        }
-
-        if status != Status::Cancelled {
-            validate_refund_eligibility(
-                env.ledger().timestamp(),
-                inst.get(&KEY_DEADLINE).unwrap(),
-                inst.get(&KEY_TOTAL).unwrap(),
-                inst.get(&KEY_GOAL).unwrap(),
-            )?;
-        }
-
-        // Cache token address once for the whole batch
-        let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
-        let token_client = token::Client::new(&env, &token_address);
-
-        // Cap batch size to avoid resource exhaustion
-        let limit = (contributors.len() as u32).min(MAX_BATCH_REFUND_SIZE);
-        let mut refunded: u32 = 0;
-
-        for contributor in contributors.iter().take(limit as usize) {
-            let key = DataKey::Contribution(contributor.clone());
-            let amount: i128 = env.storage().persistent().get(&key).unwrap_or(0);
-            if amount > 0 {
-                token_client.transfer(&env.current_contract_address(), &contributor, &amount);
-                env.storage().persistent().set(&key, &0i128);
-                env.events().publish(
-                    ("campaign", "refunded"),
-                    EventRefunded {
-                        contributor,
-                        amount,
-                        schema_version: EVENT_SCHEMA_VERSION,
-                    },
-                );
-                refunded += 1;
-            }
-        }
-
-        // Issue #422: emit a single batch-level event summarising the run
-        env.events().publish(
-            ("campaign", "batch_refund_completed"),
-            EventBatchRefundCompleted {
-                total_refunded: refunded,
-                batch_size: limit,
-            },
-        );
-
-        Ok(refunded)
+        refund::refund_batch(env, contributors)
     }
 
     /// Sets the per-address contribution rate limit (admin only).
@@ -2252,41 +2133,7 @@ impl CrowdfundContract {
     /// * `Ok(())` on success
     /// * `Err(ContractError::NotActive)` if the campaign is still Active
     pub fn refund_matching_sponsor(env: Env) -> Result<(), ContractError> {
-        let inst = env.storage().instance();
-        let status: Status = inst.get(&KEY_STATUS).unwrap();
-        if status == Status::Active || status == Status::Paused {
-            return Err(ContractError::CampaignStillActive);
-        }
-
-        let config: MatchingConfig = match inst.get(&DataKey::MatchingConfig) {
-            Some(c) => c,
-            None => return Ok(()), // nothing to refund
-        };
-
-        let pool: i128 = inst.get(&DataKey::MatchingPool).unwrap_or(0);
-        if pool <= 0 {
-            return Ok(());
-        }
-
-        // Require the sponsor (or creator) to authorise the refund
-        let creator: Address = inst.get(&KEY_CREATOR).unwrap();
-        creator.require_auth();
-
-        let token_address: Address = inst.get(&KEY_TOKEN).unwrap();
-        token::Client::new(&env, &token_address).transfer(
-            &env.current_contract_address(),
-            &config.sponsor,
-            &pool,
-        );
-
-        inst.set(&DataKey::MatchingPool, &0i128);
-        inst.extend_ttl(TTL_INSTANCE_EXTEND_MIN, TTL_INSTANCE_EXTEND_MAX);
-
-        env.events().publish(
-            ("campaign", "matching_sponsor_refunded"),
-            (config.sponsor, pool),
-        );
-        Ok(())
+        refund::refund_matching_sponsor(env)
     }
 
     // ── Category Functions ────────────────────────────────────────────────────
@@ -2677,36 +2524,7 @@ impl CrowdfundContract {
         contributor: Address,
         amount: i128,
     ) -> Result<(), ContractError> {
-        contributor.require_auth();
-
-        let contrib_key = DataKey::Contribution(contributor.clone());
-        let total_contrib: i128 = env.storage().persistent().get(&contrib_key).unwrap_or(0);
-
-        validate_partial_refund(amount, total_contrib)?;
-
-        let inst = env.storage().instance();
-        let token: Address = inst.get(&KEY_TOKEN).unwrap();
-        token::Client::new(&env, &token).transfer(
-            &env.current_contract_address(),
-            &contributor,
-            &amount,
-        );
-
-        let remaining = total_contrib - amount;
-        env.storage().persistent().set(&contrib_key, &remaining);
-
-        let total: i128 = inst.get(&KEY_TOTAL).unwrap();
-        inst.set(&KEY_TOTAL, &(total - amount));
-
-        env.events().publish(
-            ("campaign", "partial_refund"),
-            EventPartialRefund {
-                contributor,
-                amount,
-                remaining,
-            },
-        );
-        Ok(())
+        refund::refund_partial(env, contributor, amount)
     }
 
     // ── Whitelist/Blacklist Functions ─────────────────────────────────────────
@@ -3066,6 +2884,11 @@ impl CrowdfundContract {
         env.storage().persistent().set(&key, &new_amount);
         env.storage().persistent().extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
+        // The running delegated-spend tally must be persisted, not just computed:
+        // without this write the cap check above always compares `amount` against
+        // a `delegated_so_far` that is permanently 0, and `extend_ttl` below
+        // panics with MissingValue on a key that was never set.
+        env.storage().persistent().set(&delegated_key, &new_delegated);
         env.storage()
             .persistent()
             .extend_ttl(&delegated_key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
