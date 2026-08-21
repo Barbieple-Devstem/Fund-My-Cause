@@ -42,7 +42,10 @@ use soroban_sdk::{
     token, Address, Env, String, Vec,
 };
 
-use crowdfund::{Category, ContractError, CrowdfundContract, CrowdfundContractClient};
+use crowdfund::{
+    Category, ContractError, CrowdfundContract, CrowdfundContractClient, KEY_GROSS_TOTAL,
+    KEY_TOTAL,
+};
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -439,13 +442,13 @@ fn test_856_r11_apply_matching_large_contribution_does_not_panic() {
     // Setup a small matching pool (1_000) with 100% match ratio.
     // setup_matching(sponsor, match_ratio, max_match)
     let sponsor = sponsor_addr(&env, &creator);
+    // setup_matching escrows the pool from the sponsor, so fund the sponsor first.
+    token_admin.mint(&sponsor, &1_000i128);
     client.setup_matching(
         &sponsor,
         &10_000u32, // 100% match ratio in bps
         &1_000i128, // max_match
     );
-    // Fund the pool by minting directly to the contract address.
-    token_admin.mint(&client.address, &1_000i128);
 
     let contributor = Address::generate(&env);
     let amount: i128 = 5_000; // match = min(5000, 1000) = 1000 → capped
@@ -475,17 +478,20 @@ fn test_856_r11_apply_matching_large_contribution_does_not_panic() {
 fn test_856_r12_contribute_overflow_returns_overflow_error() {
     let env = Env::default();
     env.ledger().set_timestamp(500);
-    // Use i128::MAX as goal so no cap fires.
-    let (client, _creator, token_id, token_admin) = setup(&env, i128::MAX, 10_000, 1);
+    // Largest goal `initialize` accepts (validate_goal_not_overflow caps at MAX / 2).
+    let (client, _creator, token_id, token_admin) = setup(&env, i128::MAX / 2, 10_000, 1);
 
-    // First contribution: large but valid (fits in i128).
-    let c1 = Address::generate(&env);
-    // Use a value large enough that adding 1 more would overflow.
+    // Drive the running total to the edge of i128 directly. It cannot be reached
+    // by contributing: the amounts would have to sum past i128::MAX, which exceeds
+    // what the asset contract will issue, so the transfer fails long before the
+    // accumulator does.
     let near_max: i128 = i128::MAX - 1;
-    token_admin.mint(&c1, &near_max);
-    client.contribute(&c1, &near_max, &token_id, &None);
+    env.as_contract(&client.address, || {
+        env.storage().instance().set(&KEY_TOTAL, &near_max);
+        env.storage().instance().set(&KEY_GROSS_TOTAL, &near_max);
+    });
 
-    // Second contribution: 2 more would overflow the total.
+    // One more contribution would overflow the total.
     let c2 = Address::generate(&env);
     let overflow_amount: i128 = 2; // near_max + 2 > i128::MAX
     token_admin.mint(&c2, &overflow_amount);

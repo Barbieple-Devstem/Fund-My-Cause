@@ -9,7 +9,7 @@ use soroban_sdk::{
 use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig, RewardTier};
 
 mod common;
-use common::{setup, Campaign};
+use common::setup;
 
 prop_compose! {
     fn valid_amount()(amount in 1i128..10_000_000i128) -> i128 { amount }

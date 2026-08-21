@@ -22,7 +22,7 @@ use soroban_sdk::{
     token, Address, Env, String,
 };
 
-use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig};
+use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient};
 
 mod common;
 use common::{setup, Campaign};

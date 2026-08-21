@@ -201,7 +201,7 @@ pub fn get_admin(env: &soroban_sdk::Env) -> Result<Address, crate::ContractError
 }
 
 /// Helper function to create a rate limit key for an address
-pub fn make_rate_limit_key(addr: &Address) -> SorobanSymbol {
+pub fn make_rate_limit_key(_addr: &Address) -> SorobanSymbol {
     // This creates a unique persistent key for rate limiting per address
     // In a full implementation, this would use the address hash
     soroban_sdk::symbol_short!("RATELIM")
