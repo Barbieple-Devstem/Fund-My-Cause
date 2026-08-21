@@ -11,6 +11,7 @@ from pipeline import (
     CampaignRecord,
     ContributionEvent,
     ContributionPayload,
+    DUPLICATE_SCAN_MIN_INTERVAL_SECONDS,
     FlagReason,
     RefundEvent,
     ScoringJob,
@@ -40,6 +41,7 @@ def _clear():
     _REFUNDS.clear()
     _CAMPAIGN_RECORDS.clear()
     _QUEUE.clear()
+    pipeline_module._last_duplicate_scan_at = 0.0
     # Drain the scoring queue
     while not _scoring_queue.empty():
         try:
@@ -440,3 +442,68 @@ def test_scan_endpoint_still_works():
     r = client.post("/scan")
     assert r.status_code == 200
     assert r.json()["status"] == "scan_scheduled"
+
+
+# ── Duplicate-content scan rate limiting ──────────────────────────────────────
+#
+# scan_duplicate_content() is O(N^2) in the number of campaigns. Running it on
+# every single queued contribution would make per-contribution scoring cost
+# scale with the full campaign-content scan. run_full_scan() rate-limits it.
+
+def test_duplicate_scan_is_rate_limited_across_repeated_calls():
+    """
+    Calling run_full_scan() repeatedly in quick succession (as the scoring
+    worker does, once per contribution) must not re-run the O(N^2)
+    duplicate-content scan every time.
+    """
+    _clear()
+    _CAMPAIGN_RECORDS.append(CampaignRecord("DUP_A", "Fund the Open Commons", "desc"))
+    _CAMPAIGN_RECORDS.append(CampaignRecord("DUP_B", "Fund the Open Commons", "desc2"))
+
+    first = run_full_scan()
+    assert any(f.reason == FlagReason.DUPLICATE_CONTENT for f in first), (
+        "First scan after a cold start should run the duplicate-content pass"
+    )
+
+    before = pipeline_module._last_duplicate_scan_at
+    second = run_full_scan()
+    after = pipeline_module._last_duplicate_scan_at
+
+    assert after == before, (
+        "A second run_full_scan() call within the rate-limit window must "
+        "skip scan_duplicate_content() (timestamp should not advance)"
+    )
+    assert not any(f.reason == FlagReason.DUPLICATE_CONTENT for f in second), (
+        "Duplicate-content flags should not be re-emitted within the "
+        "rate-limit window"
+    )
+
+
+def test_duplicate_scan_runs_again_after_interval_elapses():
+    """Once DUPLICATE_SCAN_MIN_INTERVAL_SECONDS has passed, the duplicate scan runs again."""
+    _clear()
+    _CAMPAIGN_RECORDS.append(CampaignRecord("DUP_A", "Fund the Open Commons", "desc"))
+    _CAMPAIGN_RECORDS.append(CampaignRecord("DUP_B", "Fund the Open Commons", "desc2"))
+
+    run_full_scan()
+    # Simulate the interval having elapsed.
+    pipeline_module._last_duplicate_scan_at -= DUPLICATE_SCAN_MIN_INTERVAL_SECONDS + 1
+
+    flags = run_full_scan()
+    assert any(f.reason == FlagReason.DUPLICATE_CONTENT for f in flags)
+
+
+def test_scan_endpoint_forces_duplicate_scan_bypassing_rate_limit():
+    """POST /scan (explicit manual trigger) must bypass the rate limit."""
+    _clear()
+    _CAMPAIGN_RECORDS.append(CampaignRecord("DUP_A", "Fund the Open Commons", "desc"))
+    _CAMPAIGN_RECORDS.append(CampaignRecord("DUP_B", "Fund the Open Commons", "desc2"))
+
+    run_full_scan()  # primes _last_duplicate_scan_at
+    before = pipeline_module._last_duplicate_scan_at
+
+    flags = run_full_scan(force_duplicate_scan=True)
+    after = pipeline_module._last_duplicate_scan_at
+
+    assert after > before
+    assert any(f.reason == FlagReason.DUPLICATE_CONTENT for f in flags)

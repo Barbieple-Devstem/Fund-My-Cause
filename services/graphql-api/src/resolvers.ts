@@ -104,7 +104,9 @@ export const resolvers: IResolvers<any, Context> = {
 
       const campaign = await context.contractService.getCampaign(id);
       if (!campaign) {
-        throw new GraphQLError(`Campaign not found: ${id}`);
+        throw new GraphQLError(`Campaign not found: ${id}`, {
+          extensions: { code: "NOT_FOUND" },
+        });
       }
 
       await context.cache.set(cacheKey, campaign, 300); // Cache for 5 minutes
@@ -219,7 +221,9 @@ export const resolvers: IResolvers<any, Context> = {
       const campaign = await context.dataLoader.campaigns.load(id);
 
       if (!campaign) {
-        throw new GraphQLError(`Campaign not found: ${id}`);
+        throw new GraphQLError(`Campaign not found: ${id}`, {
+          extensions: { code: "NOT_FOUND" },
+        });
       }
 
       const [contributors, updates, milestones] = await Promise.all([
@@ -264,7 +268,9 @@ export const resolvers: IResolvers<any, Context> = {
 
       const user = await context.contractService.getUser(address);
       if (!user) {
-        throw new GraphQLError(`User not found: ${address}`);
+        throw new GraphQLError(`User not found: ${address}`, {
+          extensions: { code: "NOT_FOUND" },
+        });
       }
 
       await context.cache.set(cacheKey, user, 600); // Cache for 10 minutes
@@ -433,8 +439,8 @@ export const resolvers: IResolvers<any, Context> = {
       );
 
       // Invalidate cache
-      await context.cache.del("campaigns:*");
-      await context.cache.del("trending:*");
+      await context.cache.delPattern("campaigns:*");
+      await context.cache.delPattern("trending:*");
 
       return campaign;
     },
@@ -452,7 +458,8 @@ export const resolvers: IResolvers<any, Context> = {
 
       // Invalidate cache
       await context.cache.del(`campaign:${id}`);
-      await context.cache.del("campaigns:*");
+      await context.cache.delPattern("campaigns:*");
+      await context.cache.delPattern("trending:*");
 
       // Publish update
       await context.pubsub.publish(`campaign_updated:${id}`, campaign);
@@ -517,6 +524,11 @@ export const resolvers: IResolvers<any, Context> = {
       await context.cache.del(`campaign:${input.campaignId}`);
       await context.cache.del("platform:stats");
       await context.cache.del(`user:${input.contributor}`);
+      // A new contribution changes each campaign's `raised` total, which is
+      // embedded in cached list/trending payloads — those must be busted too
+      // or campaign lists show stale progress after every contribution.
+      await context.cache.delPattern("campaigns:*");
+      await context.cache.delPattern("trending:*");
 
       // Publish events
       await context.pubsub.publish(

@@ -187,6 +187,12 @@ export interface DataLoaders {
   userContributions: DataLoader<string, Contribution[]>;
 }
 
+/** An authenticated caller, derived from a verified JWT. */
+export interface AuthenticatedUser {
+  address: string;
+  isAuthenticated: boolean;
+}
+
 // Context type
 export interface Context {
   cache: any; // Redis cache service
@@ -194,10 +200,7 @@ export interface Context {
   dataLoader: DataLoaders;
   pubsub: PubSubService;
   authService: any; // Auth service
-  user?: {
-    address: string;
-    isAuthenticated: boolean;
-  };
+  user?: AuthenticatedUser;
   redis: RedisClientType;
   /** Trace ID for this request — generated once in the Apollo context factory
    *  and forwarded as X-Trace-ID to all downstream HTTP calls. */

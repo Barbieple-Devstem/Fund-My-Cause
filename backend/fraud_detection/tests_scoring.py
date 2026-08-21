@@ -18,6 +18,7 @@ from pipeline import (
     _CAMPAIGN_RECORDS, _CONTRIBUTIONS, _QUEUE, _REFUNDS,
     run_full_scan, scan_contribution_spikes, scan_duplicate_content, scan_wash_contributions,
 )
+import pipeline as pipeline_module
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +30,12 @@ def _clear():
     _REFUNDS.clear()
     _CAMPAIGN_RECORDS.clear()
     _QUEUE.clear()
+    # run_full_scan() rate-limits scan_duplicate_content() (see
+    # DUPLICATE_SCAN_MIN_INTERVAL_SECONDS in pipeline.py); reset it here so
+    # every test in this file gets a fresh duplicate-content scan regardless
+    # of what other tests (possibly in other files, sharing this process)
+    # ran run_full_scan() before it.
+    pipeline_module._last_duplicate_scan_at = 0.0
 
 
 @pytest.fixture(autouse=True)

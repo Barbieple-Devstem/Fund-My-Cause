@@ -90,16 +90,19 @@ export class EventStore implements IndexedEventStore {
         this._indexEvent(event);
       }
 
-      // Simple LRU: remove oldest events if over capacity
+      // Simple LRU: remove the oldest-inserted event once over capacity.
+      // A Map iterates keys in insertion order, so the first key is always
+      // the oldest entry — an O(1) amortized eviction instead of the
+      // previous full Array.from(...).sort() on every insert once at
+      // capacity (O(n log n) on the hot ingestion path).
       if (this.events.size > this.maxSize) {
-        const oldest = Array.from(this.events.entries()).sort(
-          (a, b) => a[1].timestamp - b[1].timestamp,
-        )[0];
-        if (oldest) {
-          this.events.delete(oldest[0]);
+        const oldestKey = this.events.keys().next().value;
+        if (oldestKey !== undefined) {
+          const oldestEvent = this.events.get(oldestKey);
+          this.events.delete(oldestKey);
           // Keep indexes consistent with eviction
-          if (this.indexesEnabled) {
-            this._unindexEvent(oldest[1]);
+          if (this.indexesEnabled && oldestEvent) {
+            this._unindexEvent(oldestEvent);
           }
         }
       }
@@ -153,6 +156,44 @@ export class EventStore implements IndexedEventStore {
     // Fallback: linear scan
     return Array.from(this.events.values())
       .filter((e) => e.type === type)
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, limit);
+  }
+
+  /**
+   * Query events by both contract ID and type in a single pass.
+   *
+   * Used by ContributionRepository.getContributionsForCampaign to filter by
+   * type directly instead of over-fetching queryByContract() results with an
+   * arbitrary multiplier and filtering client-side.
+   *
+   * When secondary indexes are enabled (#894), intersects the two index sets
+   * (iterating the smaller one) instead of a linear scan.
+   */
+  queryByContractAndType(
+    contractId: string,
+    type: string,
+    limit: number = 100,
+  ): IndexerEvent[] {
+    if (this.indexesEnabled) {
+      const cIds = this.contractIndex.get(contractId);
+      const tIds = this.typeIndex.get(type);
+      if (!cIds || !tIds || cIds.size === 0 || tIds.size === 0) return [];
+
+      const [smaller, larger] =
+        cIds.size <= tIds.size ? [cIds, tIds] : [tIds, cIds];
+      const matches: IndexerEvent[] = [];
+      for (const id of smaller) {
+        if (!larger.has(id)) continue;
+        const event = this.events.get(id);
+        if (event) matches.push(event);
+      }
+      return matches.sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    }
+
+    // Fallback: linear scan
+    return Array.from(this.events.values())
+      .filter((e) => e.contractId === contractId && e.type === type)
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, limit);
   }
