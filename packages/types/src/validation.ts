@@ -103,7 +103,9 @@ export function validateVideoUrl(videoUrl: string): string | null {
   }
 
   try {
-    new URL(trimmed);
+    if (typeof URL !== "undefined") {
+      new URL(trimmed);
+    }
     return null;
   } catch {
     return "Enter a valid URL.";
