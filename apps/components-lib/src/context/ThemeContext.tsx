@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, ReactNode } from "react";
 
 export type Theme = "dark" | "light";
@@ -44,12 +46,13 @@ export function ThemeProvider({
   );
 }
 
+const defaultThemeContext: ThemeContextType = {
+  theme: "dark",
+  toggleTheme: () => {},
+  setTheme: () => {},
+};
+
 export function useTheme(): ThemeContextType {
   const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error(
-      "useTheme must be used within a ThemeProvider. Wrap your component tree with <ThemeProvider>."
-    );
-  }
-  return context;
+  return context || defaultThemeContext;
 }

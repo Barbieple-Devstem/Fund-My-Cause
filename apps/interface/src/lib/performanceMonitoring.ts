@@ -8,7 +8,7 @@ export interface PerformanceMetrics {
   cls?: number;
   fid?: number;
   ttfb?: number;
-  navigationTiming?: PerformanceTiming;
+  navigationTiming?: PerformanceTiming | PerformanceNavigationTiming;
 }
 
 export interface CoreWebVitals {
@@ -85,7 +85,7 @@ export function measureCoreWebVitals(
   if (navigationTiming) {
     metrics.ttfb = (navigationTiming as PerformanceNavigationTiming).responseStart -
       (navigationTiming as PerformanceNavigationTiming).requestStart;
-    metrics.navigationTiming = navigationTiming as PerformanceTiming;
+    metrics.navigationTiming = navigationTiming as PerformanceNavigationTiming;
   }
 
   callback(metrics);
@@ -143,20 +143,22 @@ export function getResourceTimings(): PerformanceResourceTiming[] {
 /**
  * Report performance metrics
  */
-export function reportPerformanceMetrics(
+export async function reportPerformanceMetrics(
   endpoint: string,
   metrics: PerformanceMetrics
 ): Promise<void> {
-  if (typeof window === "undefined") return Promise.resolve();
+  if (typeof window === "undefined") return;
 
-  return fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(metrics),
-    keepalive: true,
-  }).catch((error) => {
+  try {
+    await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(metrics),
+      keepalive: true,
+    });
+  } catch (error) {
     console.warn("Performance reporting failed:", error);
-  });
+  }
 }
 
 /**

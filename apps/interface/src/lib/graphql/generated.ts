@@ -353,44 +353,6 @@ export type User = {
   totalContributed: Scalars["BigInt"]["output"];
 };
 
-export type CampaignFilter = {
-  category?: Array<string> | null | undefined;
-  creator?: string | null | undefined;
-  maxGoal?: string | null | undefined;
-  minGoal?: string | null | undefined;
-  search?: string | null | undefined;
-  status?: Array<CampaignStatus> | null | undefined;
-};
-
-export type CampaignSort = {
-  direction: SortDirection;
-  field: SortField;
-};
-
-export type CampaignStatus =
-  | "ACTIVE"
-  | "ARCHIVED"
-  | "CANCELLED"
-  | "PAUSED"
-  | "REFUNDED"
-  | "SUCCESSFUL";
-
-export type MilestoneStatus = "PENDING" | "REACHED" | "RELEASED";
-
-export type PaginationInput = {
-  limit?: number | null | undefined;
-  offset?: number | null | undefined;
-};
-
-export type SortDirection = "ASC" | "DESC";
-
-export type SortField =
-  | "CONTRIBUTORS"
-  | "CREATED_AT"
-  | "DEADLINE"
-  | "GOAL"
-  | "RAISED_AMOUNT";
-
 export type CampaignQueryVariables = Exact<{
   id: string | number;
 }>;

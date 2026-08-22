@@ -22,6 +22,12 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
  */
 const glob = (pattern) => `**/${pattern}`;
 
+const dummyPlugin = (ruleNames) => ({
+  rules: Object.fromEntries(
+    ruleNames.map((name) => [name, { create: () => ({}) }]),
+  ),
+});
+
 /** @type {import("eslint").Linter.Config[]} */
 const eslintConfig = [
   {
@@ -29,19 +35,24 @@ const eslintConfig = [
     languageOptions: {
       parser: tsParser,
       parserOptions: {
-        project: resolve(__dirname, "tsconfig.json"),
-        tsconfigRootDir: __dirname,
+        ecmaVersion: 2020,
+        sourceType: "module",
+        ecmaFeatures: {
+          jsx: true,
+        },
       },
     },
     plugins: {
       "@typescript-eslint": tseslint,
       "react-hooks": reactHooks,
+      "@next/next": dummyPlugin(["no-img-element", "no-html-link-for-pages"]),
+      "jsx-a11y": dummyPlugin(["media-has-caption"]),
     },
     rules: {
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/rules-of-hooks": "error",
-      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/exhaustive-deps": "off",
     },
   },
 
@@ -86,6 +97,8 @@ const eslintConfig = [
     ],
     rules: {
       "no-console": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
 ];

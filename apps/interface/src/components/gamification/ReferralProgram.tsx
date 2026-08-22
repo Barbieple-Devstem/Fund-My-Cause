@@ -44,14 +44,14 @@ function ReferralCodeCard({
   onCopy,
 }: {
   code: string;
-  onCopy?: () => void;
+  onCopy?: (code: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(code);
     setCopied(true);
-    onCopy?.();
+    onCopy?.(code);
     setTimeout(() => setCopied(false), 2000);
   };
 

@@ -39,7 +39,7 @@ export async function generateStaticParams() {
 
 // ── ISR Configuration ─────────────────────────────────────────────────────────
 
-export const revalidate = CAMPAIGN_PAGE_REVALIDATE_SECONDS;
+export const revalidate = 60;
 
 // ── SEO ───────────────────────────────────────────────────────────────────────
 

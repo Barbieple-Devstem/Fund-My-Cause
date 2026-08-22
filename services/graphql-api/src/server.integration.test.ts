@@ -231,7 +231,7 @@ describe("GraphQL API integration", () => {
           title: "New Campaign",
           description: "desc",
           goal: "1000",
-          deadline: new Date().toISOString(),
+          deadline: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           category: "Health",
           minContribution: "10",
         },

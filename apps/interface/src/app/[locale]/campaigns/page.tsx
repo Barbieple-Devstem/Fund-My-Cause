@@ -192,7 +192,7 @@ function CampaignsInner() {
 
         {/* Advanced filters toggle */}
         <button
-          onClick={() => setShowAdvanced((v) => !v)}
+          onClick={() => setShowAdvanced(!showAdvanced)}
           aria-expanded={showAdvanced}
           className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition border ${
             hasAdvanced
@@ -219,7 +219,7 @@ function CampaignsInner() {
               <input
                 type="number"
                 min={0}
-                value={goalMin}
+                value={filters.goalMin}
                 onChange={(e) => setGoalMin(e.target.value)}
                 placeholder="e.g. 1000"
                 className={inputCls}
@@ -232,7 +232,7 @@ function CampaignsInner() {
               <input
                 type="number"
                 min={0}
-                value={goalMax}
+                value={filters.goalMax}
                 onChange={(e) => setGoalMax(e.target.value)}
                 placeholder="e.g. 50000"
                 className={inputCls}
@@ -244,7 +244,7 @@ function CampaignsInner() {
               </label>
               <input
                 type="date"
-                value={dateFrom}
+                value={filters.dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
                 className={inputCls}
               />
@@ -255,7 +255,7 @@ function CampaignsInner() {
               </label>
               <input
                 type="date"
-                value={dateTo}
+                value={filters.dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
                 className={inputCls}
               />
@@ -350,7 +350,7 @@ function CampaignsInner() {
                 onPledge={(id) => setPledge(id)}
                 onShare={(id, title) => setShareTarget({ id, title })}
                 index={i}
-                query={query}
+                query={filters.query}
               />
             ))}
           </div>
@@ -381,6 +381,7 @@ function CampaignsInner() {
 
       {pledge && (
         <PledgeModal
+          contractId={pledge}
           campaignTitle={
             ALL_CAMPAIGNS.find((c) => c.id === pledge)?.title ?? pledge
           }

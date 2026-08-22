@@ -207,3 +207,62 @@ export function sanitizeTitle(title: string): string {
 export function sanitizeDescription(description: string): string {
   return stripHtmlTags(description).trim();
 }
+
+/**
+ * Validate donation amount in XLM.
+ * @returns Error message if invalid, null if valid
+ */
+export function validateDonationAmount(amount: string): string | null {
+  if (!amount || amount.trim() === "") {
+    return "Donation amount is required.";
+  }
+  const num = Number(amount);
+  if (isNaN(num) || num <= 0) {
+    return "Donation amount must be a positive number.";
+  }
+  return null;
+}
+
+export interface CampaignInputValidation {
+  title?: string;
+  description?: string;
+  goal?: string;
+  deadline?: string;
+  minContribution?: string;
+}
+
+/**
+ * Validate all campaign creation inputs together.
+ * @returns Map of field name to error message, empty if all valid
+ */
+export function validateCampaignInput(
+  input: CampaignInputValidation,
+): Record<string, string> {
+  const errors: Record<string, string> = {};
+  if (input.title !== undefined) {
+    const err = validateTitle(input.title);
+    if (err) errors.title = err;
+  }
+  if (input.description !== undefined && input.description !== "") {
+    const err = validateDescription(input.description);
+    if (err) errors.description = err;
+  }
+  if (input.goal !== undefined && input.goal !== "") {
+    const err = validateGoal(input.goal);
+    if (err) errors.goal = err;
+  }
+  if (input.deadline !== undefined && input.deadline !== "") {
+    const err = validateDeadline(input.deadline);
+    if (err) errors.deadline = err;
+  }
+  if (
+    input.minContribution !== undefined &&
+    input.minContribution !== "" &&
+    input.goal
+  ) {
+    const err = validateMinContribution(input.minContribution, input.goal);
+    if (err) errors.minContribution = err;
+  }
+  return errors;
+}
+

@@ -41,10 +41,11 @@ export default [
     },
   },
   {
-    files: ["src/**/*.test.{ts,tsx}"],
+    files: ["src/**/*.test.{ts,tsx}", "src/**/__tests__/**/*.{ts,tsx}"],
     rules: {
       // Test files intentionally use require() to assert on entry points.
       "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
 ];

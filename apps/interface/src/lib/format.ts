@@ -8,4 +8,5 @@ export {
   formatTimeLeft,
   formatCompactNumber,
   formatDateTime,
+  localeToIntlCode,
 } from "@fund-my-cause/shared-utils";

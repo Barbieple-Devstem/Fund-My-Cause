@@ -18,7 +18,7 @@ import { Leaderboard } from "@/components/gamification/Leaderboard";
 import { ReferralProgram } from "@/components/gamification/ReferralProgram";
 import type { ProfileData } from "@/types/profile";
 import type { CampaignData } from "@fund-my-cause/types";
-import type { LeaderboardEntry, AchievementType } from "@/types/gamification";
+import { AchievementType, type LeaderboardEntry } from "@/types/gamification";
 import { BreadcrumbProvider } from "@/context/BreadcrumbContext";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 
@@ -171,7 +171,7 @@ export default function ProfilePage({
               <button
                 type="button"
                 onClick={() =>
-                  unlockAchievement("first_contribution" as AchievementType)
+                  unlockAchievement(AchievementType.FIRST_CONTRIBUTION)
                 }
                 className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700"
               >

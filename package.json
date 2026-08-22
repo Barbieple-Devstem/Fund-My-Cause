@@ -4,7 +4,9 @@
   "private": true,
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "sdks/*",
+    "services/*"
   ],
   "scripts": {
     "dev": "npm run dev --workspace=apps/interface",

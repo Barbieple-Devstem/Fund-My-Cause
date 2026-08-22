@@ -14,7 +14,7 @@ const LOCALE_MAP: Record<string, string> = {
 
 const RTL_LOCALES = ["ar", "he"];
 
-function localeToIntlCode(locale: string): string {
+export function localeToIntlCode(locale: string): string {
   return LOCALE_MAP[locale] ?? locale;
 }
 

@@ -68,9 +68,9 @@ export async function uploadDocument(
   return response.json();
 }
 
-export function downloadDocument(document: CampaignDocument): void {
+export function downloadDocument(doc: CampaignDocument): void {
   const a = document.createElement("a");
-  a.href = document.url;
-  a.download = document.name;
+  a.href = doc.url;
+  a.download = doc.name;
   a.click();
 }

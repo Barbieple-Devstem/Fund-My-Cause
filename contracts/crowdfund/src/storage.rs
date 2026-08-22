@@ -168,7 +168,7 @@ pub const BASIS_POINTS_MAX: i128 = 10_000;
 
 /// Maximum message length (characters) for contribution messages.
 /// Validated when storing contribution messages to prevent unbounded storage.
-pub const MAX_MESSAGE_LENGTH: usize = 256;
+pub const MAX_MESSAGE_LENGTH: u32 = 256;
 
 /// TTL extension value for persistent storage entries (in ledger entries).
 /// Used to extend time-to-live for frequently accessed per-contributor data.

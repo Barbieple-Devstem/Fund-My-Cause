@@ -1,4 +1,5 @@
-import { errorTracker, ErrorContext } from './error-tracking';
+import React, { Component, type ReactNode } from 'react';
+import { errorTracker, type ErrorContext } from '@/lib/error-tracking';
 
 /**
  * Error boundary component for React

@@ -96,7 +96,7 @@ export async function fetchAnalyticsSnapshot(
     const payload = (await response.json()) as RealtimeAnalyticsPayload;
     setCachedAnalyticsData<RealtimeAnalyticsPayload>(ANALYTICS_CACHE_KEY, payload, SNAPSHOT_TTL);
     return payload;
-  } catch (error) {
+  } catch {
     return { campaigns: [], timestamp: Date.now() };
   }
 }
