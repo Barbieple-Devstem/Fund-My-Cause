@@ -44,7 +44,9 @@ export function PostUpdateModal({
   const titleRef = useRef<HTMLInputElement>(null);
   const isLocked = state === "submitting";
   const dialogRef = useFocusTrap(true, {
-    onEscape: () => { if (!isLocked) onClose(); },
+    onEscape: () => {
+      if (!isLocked) onClose();
+    },
   }) as React.RefObject<HTMLDivElement>;
 
   // Focus title on open
@@ -87,15 +89,15 @@ export function PostUpdateModal({
       }
       onSuccess(cid);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed. Please try again.");
+      setError(
+        err instanceof Error ? err.message : "Upload failed. Please try again.",
+      );
       setState("error");
     }
   };
 
   const inputCls =
     "w-full rounded-xl border border-gray-700 bg-gray-800 px-4 py-2 text-white placeholder-gray-500 focus:border-indigo-500 focus:outline-none disabled:opacity-50";
-
-  const isLocked = state === "submitting";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
@@ -131,7 +133,10 @@ export function PostUpdateModal({
             htmlFor="update-title"
             className="mb-1 block text-sm text-gray-400"
           >
-            Title <span className="text-gray-600">({title.length}/{MAX_TITLE})</span>
+            Title{" "}
+            <span className="text-gray-600">
+              ({title.length}/{MAX_TITLE})
+            </span>
           </label>
           <input
             id="update-title"
@@ -151,7 +156,10 @@ export function PostUpdateModal({
             htmlFor="update-body"
             className="mb-1 block text-sm text-gray-400"
           >
-            Body <span className="text-gray-600">({body.length}/{MAX_BODY})</span>
+            Body{" "}
+            <span className="text-gray-600">
+              ({body.length}/{MAX_BODY})
+            </span>
           </label>
           <textarea
             id="update-body"
@@ -166,9 +174,7 @@ export function PostUpdateModal({
         </div>
 
         {/* Error */}
-        {error && (
-          <p className="text-sm text-red-400">{error}</p>
-        )}
+        {error && <p className="text-sm text-red-400">{error}</p>}
 
         {/* Actions */}
         <div className="flex justify-end gap-3 pt-1">
