@@ -85,11 +85,11 @@ jobs:
 
       - name: Typecheck (apps/interface)
         working-directory: apps/interface
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Typecheck (apps/components-lib)
         working-directory: apps/components-lib
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   test:
     runs-on: ubuntu-latest

@@ -68,8 +68,7 @@ jobs:
             --exclude benchmarks \
             --ignore-filename-regex '(test_snapshots|benches|fuzz_tests)' \
             --lcov \
-            --output-path lcov.info \
-            -- --exclude-should-panic
+            --output-path lcov.info
 
       # Generate a human-readable summary table
       - name: Generate coverage summary

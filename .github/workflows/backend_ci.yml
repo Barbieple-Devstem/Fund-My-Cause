@@ -136,11 +136,11 @@ jobs:
 
       - name: Typecheck (indexer)
         working-directory: services/indexer
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Typecheck (graphql-api)
         working-directory: services/graphql-api
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
   # ── Unit tests ────────────────────────────────────────────────────────────────
   unit-tests:
