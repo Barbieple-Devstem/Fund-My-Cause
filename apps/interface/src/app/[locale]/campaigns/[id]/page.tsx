@@ -6,7 +6,8 @@ import { Navbar } from "@/components/layout/Navbar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { ShareTrigger } from "./ShareTrigger";
-import { fetchCampaign, getStaticCampaignIds } from "@/lib/soroban";
+import { fetchCampaign } from "@/lib/graphql/client";
+import { getStaticCampaignIds } from "@/lib/soroban";
 import { ShareButton } from "@/components/ui/ShareButton";
 import { TransactionHistory } from "@/components/ui/TransactionHistory";
 import { XlmAmount } from "@/components/ui/XlmAmount";
@@ -18,6 +19,10 @@ import {
 } from "@/lib/constants";
 import { CampaignActions } from "./CampaignActions";
 import { CampaignDetailContent } from "./CampaignDetailContent";
+
+function truncate(addr: string) {
+  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+}
 
 // ── Static Generation (SSG + ISR) ─────────────────────────────────────────────
 

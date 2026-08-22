@@ -5,13 +5,17 @@ import { ExternalLink, Download, Loader2, Filter } from "lucide-react";
 import {
   fetchTransactionHistory,
   type ContributionRecord,
-} from "@/lib/soroban";
+} from "@/lib/graphql/client";
 import {
   EmptyState,
   NoTransactionsIllustration,
 } from "@/components/ui/EmptyState";
 import { TransactionExportModal } from "@/components/ui/TransactionExportModal";
-import { applyFilters, type ExportRecord, type DateRange } from "@/lib/exportTransactions";
+import {
+  applyFilters,
+  type ExportRecord,
+  type DateRange,
+} from "@/lib/exportTransactions";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
@@ -209,7 +213,9 @@ export function TransactionHistory({
           <div className="flex flex-wrap gap-3 p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700">
             {/* Type filter */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 dark:text-gray-400">Type</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">
+                Type
+              </label>
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
@@ -225,22 +231,30 @@ export function TransactionHistory({
 
             {/* Date range */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 dark:text-gray-400">From</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">
+                From
+              </label>
               <input
                 type="date"
                 value={dateRange.from}
-                onChange={(e) => setDateRange((p) => ({ ...p, from: e.target.value }))}
+                onChange={(e) =>
+                  setDateRange((p) => ({ ...p, from: e.target.value }))
+                }
                 className={inputCls}
                 aria-label="Filter from date"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-gray-500 dark:text-gray-400">To</label>
+              <label className="text-xs text-gray-500 dark:text-gray-400">
+                To
+              </label>
               <input
                 type="date"
                 value={dateRange.to}
                 min={dateRange.from || undefined}
-                onChange={(e) => setDateRange((p) => ({ ...p, to: e.target.value }))}
+                onChange={(e) =>
+                  setDateRange((p) => ({ ...p, to: e.target.value }))
+                }
                 className={inputCls}
                 aria-label="Filter to date"
               />
@@ -249,7 +263,9 @@ export function TransactionHistory({
             {/* Campaign filter (shown when multiple campaigns could appear) */}
             {campaignIds.length > 1 && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-500 dark:text-gray-400">Campaign</label>
+                <label className="text-xs text-gray-500 dark:text-gray-400">
+                  Campaign
+                </label>
                 <select
                   value={campaignFilter}
                   onChange={(e) => setCampaignFilter(e.target.value)}
@@ -284,7 +300,10 @@ export function TransactionHistory({
 
         {/* Result count when filtered */}
         {isFiltered && (
-          <p className="text-xs text-gray-400 dark:text-gray-500" aria-live="polite">
+          <p
+            className="text-xs text-gray-400 dark:text-gray-500"
+            aria-live="polite"
+          >
             Showing {filteredRecords.length} of {records.length} contributions
           </p>
         )}
@@ -299,7 +318,9 @@ export function TransactionHistory({
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-xs uppercase tracking-wide">
-                  <th className="px-4 py-2 text-left font-medium">Contributor</th>
+                  <th className="px-4 py-2 text-left font-medium">
+                    Contributor
+                  </th>
                   <th className="px-4 py-2 text-right font-medium">Amount</th>
                   <th className="px-4 py-2 text-right font-medium">Date</th>
                   <th
@@ -317,7 +338,9 @@ export function TransactionHistory({
                     className="bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-colors"
                   >
                     <td className="px-4 py-3 font-mono text-gray-700 dark:text-gray-300">
-                      <span title={r.contributor}>{truncate(r.contributor)}</span>
+                      <span title={r.contributor}>
+                        {truncate(r.contributor)}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right text-gray-900 dark:text-white font-medium">
                       {r.amountXlm > 0

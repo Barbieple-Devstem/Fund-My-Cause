@@ -5,7 +5,8 @@ import { useWallet } from "@/hooks/useWallet";
 import { PledgeModal } from "@/components/ui/PledgeModal";
 import { TransactionStatus, TxStatus } from "@/components/ui/TransactionStatus";
 import { withdraw, refundSingle, getCampaignStats } from "@/lib/contract";
-import { fetchContribution, type CampaignStatus } from "@/lib/soroban";
+import { fetchContribution } from "@/lib/graphql/client";
+import type { CampaignStatus } from "@fund-my-cause/types";
 import { useNotifications } from "@/hooks/useNotifications";
 
 interface Props {

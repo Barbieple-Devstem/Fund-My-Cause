@@ -8,10 +8,14 @@ import { Navbar } from "@/components/layout/Navbar";
 import { WalletGuard } from "@/components/WalletGuard";
 import { AnalyticsDashboard } from "@/components/ui/AnalyticsDashboard";
 import { useWallet } from "@/hooks/useWallet";
-import { fetchCampaignView } from "@/lib/soroban";
+import { fetchCampaignView } from "@/lib/graphql/client";
 import { isValidContractId } from "@/lib/validation";
 import { QUERY_KEYS } from "@/lib/queryKeys";
-import type { CampaignData, CampaignInfo, CampaignStats } from "@/lib/soroban";
+import type {
+  CampaignData,
+  CampaignInfo,
+  CampaignStats,
+} from "@fund-my-cause/types";
 
 const REGISTRY_KEY = "fmc:campaigns";
 

@@ -3,7 +3,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { fetchContributorList, type ContributorEntry } from "@/lib/soroban";
+import {
+  fetchContributorList,
+  type ContributorEntry,
+} from "@/lib/graphql/client";
 import { QUERY_KEYS } from "@/lib/queryKeys";
 import { formatXLM, formatAddress } from "@/lib/format";
 import {

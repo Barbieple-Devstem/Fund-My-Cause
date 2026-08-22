@@ -15,6 +15,7 @@ const config: Config = {
     "^@fund-my-cause/types$": "<rootDir>/../../packages/types/src/index.ts",
     "^@fund-my-cause/types/(.*)$": "<rootDir>/../../packages/types/src/$1",
     "^@/lib/soroban$": "<rootDir>/src/__mocks__/lib/soroban.ts",
+    "^@/lib/graphql/client$": "<rootDir>/src/__mocks__/lib/graphql/client.ts",
     "^@/lib/constants$": "<rootDir>/src/__mocks__/lib/constants.ts",
     "^@/i18n/(.*)$": "<rootDir>/src/__mocks__/i18n/$1",
     "^next-intl$": "<rootDir>/src/__mocks__/next-intl.ts",

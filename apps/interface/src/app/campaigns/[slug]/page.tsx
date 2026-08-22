@@ -16,9 +16,9 @@ import { notFound } from "next/navigation";
 import { Navbar } from "@/components/layout/Navbar";
 import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { BreadcrumbProvider } from "@/context/BreadcrumbContext";
-import { CampaignDetailContent } from "@/app/campaigns/[id]/CampaignDetailContent";
+import { CampaignDetailContent } from "@/app/[locale]/campaigns/[id]/CampaignDetailContent";
 import { resolveCampaignSlug, getAllSlugs } from "@/lib/slugs";
-import { fetchCampaign } from "@/lib/soroban";
+import { fetchCampaign } from "@/lib/graphql/client";
 import { APP_BASE_URL, DEFAULT_HERO_IMAGE } from "@/lib/constants";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
 
@@ -53,7 +53,9 @@ export async function generateMetadata({
         description,
         url,
         siteName: "Fund-My-Cause",
-        images: [{ url: DEFAULT_HERO_IMAGE, width: 1200, height: 630, alt: c.title }],
+        images: [
+          { url: DEFAULT_HERO_IMAGE, width: 1200, height: 630, alt: c.title },
+        ],
         type: "website",
       },
       twitter: {
