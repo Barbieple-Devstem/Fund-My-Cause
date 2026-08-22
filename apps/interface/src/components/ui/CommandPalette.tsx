@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "@/hooks/useWallet";
 
 interface Command {
   id: string;
@@ -94,6 +94,15 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       keywords: ["analytics", "stats", "data"],
     },
     {
+      id: "nav-settings",
+      title: "Go to Settings",
+      description: "Manage your account settings",
+      icon: <Settings size={16} />,
+      category: "navigation",
+      action: () => router.push("/settings"),
+      keywords: ["settings", "preferences", "account"],
+    },
+    {
       id: "nav-create",
       title: "Create Campaign",
       description: "Start a new fundraising campaign",
@@ -157,7 +166,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setActiveIndex((prev) =>
-          Math.min(prev + 1, filteredCommands.length - 1)
+          Math.min(prev + 1, filteredCommands.length - 1),
         );
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
@@ -171,13 +180,15 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
         }
       }
     },
-    [filteredCommands, activeIndex, onClose]
+    [filteredCommands, activeIndex, onClose],
   );
 
   // Scroll active item into view
   useEffect(() => {
     if (listRef.current && filteredCommands[activeIndex]) {
-      const activeElement = listRef.current.children[activeIndex] as HTMLElement;
+      const activeElement = listRef.current.children[
+        activeIndex
+      ] as HTMLElement;
       if (activeElement) {
         activeElement.scrollIntoView({ block: "nearest" });
       }

@@ -248,6 +248,42 @@ if ! stellar contract invoke \
 fi
 log_success "Campaign registered in registry"
 
+# ── Attestation: compute and publish WASM hashes ─────────────────────────
+log_info "Computing WASM deployment attestation..."
+COMMIT_SHA=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+
+CROWDFUND_HASH=$(sha256sum target/wasm32-unknown-unknown/release/crowdfund.wasm | awk '{print $1}')
+REGISTRY_HASH=$(sha256sum target/wasm32-unknown-unknown/release/registry.wasm | awk '{print $1}')
+
+log_success "Crowdfund WASM SHA-256: $CROWDFUND_HASH"
+log_success "Registry WASM SHA-256: $REGISTRY_HASH"
+log_success "Source commit: $COMMIT_SHA"
+
+# Save attestation JSON for CI artifact / release
+ATTESTATION_FILE="deployment-attestation-$(date -u +%Y%m%dT%H%M%SZ).json"
+log_info "Saving attestation to $ATTESTATION_FILE..."
+
+cat > "$ATTESTATION_FILE" << ATTESTATION_EOF
+{
+  "contract_id": "$CONTRACT_ID",
+  "registry_id": "$REGISTRY_ID",
+  "network": "$NETWORK",
+  "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "source_commit": "$COMMIT_SHA",
+  "source_commit_short": "$COMMIT_SHORT",
+  "wasm_hashes": {
+    "crowdfund": "$CROWDFUND_HASH",
+    "registry": "$REGISTRY_HASH"
+  },
+  "build_command": "cargo build --release --target wasm32-unknown-unknown",
+  "builder_version": "$(rustc --version 2>/dev/null || echo 'unknown')",
+  "verification_url": "https://github.com/Fund-My-Cause/Fund-My-Cause/actions?query=branch:main+workflow:Reproducible+WASM+Build"
+}
+ATTESTATION_EOF
+
+log_success "Attestation saved to $ATTESTATION_FILE"
+
 # Save contract ID to .env.local
 ENV_FILE="apps/interface/.env.local"
 log_info "Saving configuration to $ENV_FILE..."
@@ -258,6 +294,8 @@ log_info "Saving configuration to $ENV_FILE..."
   echo "NEXT_PUBLIC_CONTRACT_ID=$CONTRACT_ID"
   echo "NEXT_PUBLIC_REGISTRY_ID=$REGISTRY_ID"
   echo "NEXT_PUBLIC_NETWORK=$NETWORK"
+  echo "NEXT_PUBLIC_VERIFIED_CONTRACT_HASH=$CROWDFUND_HASH"
+  echo "NEXT_PUBLIC_SOURCE_COMMIT=$COMMIT_SHA"
 } > "$ENV_FILE" || {
   log_error "Failed to write configuration to $ENV_FILE"
   exit 1
@@ -278,6 +316,8 @@ echo -e "${BLUE}║${NC} Deadline:           ${GREEN}$DEADLINE${NC}"
 echo -e "${BLUE}║${NC} Crowdfund ID:       ${GREEN}$CONTRACT_ID${NC}"
 echo -e "${BLUE}║${NC} Registry ID:        ${GREEN}$REGISTRY_ID${NC}"
 echo -e "${BLUE}║${NC} Config File:        ${GREEN}$ENV_FILE${NC}"
+echo -e "${BLUE}║${NC} WASM Hash (cf):     ${GREEN}$CROWDFUND_HASH${NC}"
+echo -e "${BLUE}║${NC} Source Commit:      ${GREEN}$COMMIT_SHORT${NC}"
 echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 log_success "Ready to use! Environment variables have been saved."

@@ -2,7 +2,7 @@
 
 import React from "react";
 import { Loader2, Wallet, AlertTriangle } from "lucide-react";
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "@/hooks/useWallet";
 import { NETWORK_NAME } from "@/lib/constants";
 
 interface WalletGuardProps {
@@ -10,8 +10,18 @@ interface WalletGuardProps {
   message?: string;
 }
 
-export function WalletGuard({ children, message = "Connect your wallet to continue." }: WalletGuardProps) {
-  const { address, connect, isConnecting, isAutoConnecting, networkMismatch, walletNetwork } = useWallet();
+export function WalletGuard({
+  children,
+  message = "Connect your wallet to continue.",
+}: WalletGuardProps) {
+  const {
+    address,
+    connect,
+    isConnecting,
+    isAutoConnecting,
+    networkMismatch,
+    walletNetwork,
+  } = useWallet();
 
   if (isAutoConnecting) {
     return (
@@ -30,7 +40,11 @@ export function WalletGuard({ children, message = "Connect your wallet to contin
           disabled={isConnecting}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-6 py-3 rounded-xl font-medium transition disabled:opacity-50 text-white"
         >
-          {isConnecting ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
+          {isConnecting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Wallet size={16} />
+          )}
           Connect Wallet
         </button>
       </div>
@@ -51,12 +65,11 @@ export function WalletGuard({ children, message = "Connect your wallet to contin
             <p className="text-sm leading-relaxed">
               Your wallet is connected to{" "}
               <strong>{walletNetwork ?? "an unknown network"}</strong>, but this
-              app requires{" "}
-              <strong>{NETWORK_NAME}</strong>.
+              app requires <strong>{NETWORK_NAME}</strong>.
             </p>
             <p className="text-sm mt-2 leading-relaxed">
-              Please switch your wallet to{" "}
-              <strong>{NETWORK_NAME}</strong> to continue.
+              Please switch your wallet to <strong>{NETWORK_NAME}</strong> to
+              continue.
             </p>
           </div>
         </div>

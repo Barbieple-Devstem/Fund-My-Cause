@@ -107,5 +107,12 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      # ── Registry access-control tests (issue #833) ────────────────────────
+      # cargo test --workspace already runs these, but this explicit step
+      # makes failures in the registry access-control suite immediately
+      # identifiable in the CI log.
+      - name: Run registry access-control integration tests
+        run: cargo test -p registry --test access_control -- --nocapture
+
       - name: Run fuzz tests
         run: cargo test --test fuzz_tests -- --nocapture

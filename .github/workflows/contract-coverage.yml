@@ -1,0 +1,156 @@
+name: Contract Coverage
+
+# Issue #717 — Measures Rust smart-contract test coverage using cargo-llvm-cov.
+# Reports coverage as a job summary on every PR and enforces a minimum threshold.
+# Badge value is written to a step output so downstream jobs can update shields.io
+# or a coverage badge service.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'contracts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/contract-coverage.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'contracts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/contract-coverage.yml'
+
+# Minimum line-coverage percentage required to pass.
+# Ratchet this value upward as coverage improves.
+env:
+  COVERAGE_THRESHOLD: '80'
+
+jobs:
+  coverage:
+    name: Measure contract coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Install the exact toolchain pinned in rust-toolchain.toml (includes llvm-tools)
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.86.0'
+          components: llvm-tools-preview
+
+      # Cache Cargo registry, git deps, and build artefacts
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-coverage-${{ hashFiles('Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-coverage-
+
+      # Install cargo-llvm-cov
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+
+      # Run tests and collect coverage.
+      # Excludes: benchmarks, wasm target code, generated test snapshots.
+      # --ignore-filename-regex excludes test helper / snapshot files.
+      - name: Run coverage
+        run: |
+          cargo llvm-cov \
+            --workspace \
+            --exclude benchmarks \
+            --ignore-filename-regex '(test_snapshots|benches|fuzz_tests)' \
+            --lcov \
+            --output-path lcov.info \
+            -- --exclude-should-panic
+
+      # Generate a human-readable summary table
+      - name: Generate coverage summary
+        id: cov
+        run: |
+          cargo llvm-cov report \
+            --lcov-input lcov.info \
+            --summary-only 2>/dev/null || \
+          cargo llvm-cov \
+            --workspace \
+            --exclude benchmarks \
+            --ignore-filename-regex '(test_snapshots|benches|fuzz_tests)' \
+            --summary-only 2>&1 | tee coverage-summary.txt
+
+          # Extract the overall line coverage percentage from cargo-llvm-cov output
+          LINE_COV=$(cargo llvm-cov \
+            --workspace \
+            --exclude benchmarks \
+            --ignore-filename-regex '(test_snapshots|benches|fuzz_tests)' \
+            --summary-only 2>&1 \
+            | grep -E 'TOTAL' \
+            | awk '{print $NF}' \
+            | tr -d '%' \
+            | head -1)
+
+          echo "line_coverage=${LINE_COV:-0}" >> "$GITHUB_OUTPUT"
+          echo "Line coverage: ${LINE_COV:-0}%"
+
+      # Post a rich job summary
+      - name: Post coverage to job summary
+        if: always()
+        run: |
+          LINE_COV="${{ steps.cov.outputs.line_coverage }}"
+          THRESHOLD="${{ env.COVERAGE_THRESHOLD }}"
+
+          if [ -f coverage-summary.txt ]; then
+            COV_TABLE=$(cat coverage-summary.txt)
+          else
+            COV_TABLE="(coverage summary unavailable)"
+          fi
+
+          {
+            echo "## Contract Coverage Report"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|---|---|"
+            echo "| Line coverage | **${LINE_COV}%** |"
+            echo "| Threshold | ${THRESHOLD}% |"
+            if awk "BEGIN {exit !(${LINE_COV:-0} >= ${THRESHOLD})}"; then
+              echo "| Status | ✅ PASSED |"
+            else
+              echo "| Status | ❌ FAILED |"
+            fi
+            echo ""
+            echo "### Full report"
+            echo ""
+            echo '```'
+            echo "$COV_TABLE"
+            echo '```'
+            echo ""
+            echo "> Threshold is configured in \`.github/workflows/contract-coverage.yml\` → \`COVERAGE_THRESHOLD\`."
+            echo "> Ratchet the value upward as coverage improves."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Enforce the minimum threshold — fail the job if below
+      - name: Enforce coverage threshold
+        run: |
+          LINE_COV="${{ steps.cov.outputs.line_coverage }}"
+          THRESHOLD="${{ env.COVERAGE_THRESHOLD }}"
+          echo "Coverage: ${LINE_COV}% (threshold: ${THRESHOLD}%)"
+          if ! awk "BEGIN {exit !(${LINE_COV:-0} >= ${THRESHOLD})}"; then
+            echo "ERROR: Contract coverage ${LINE_COV}% is below the required ${THRESHOLD}%."
+            exit 1
+          fi
+          echo "Coverage check passed."
+
+      # Upload the LCOV report as a build artefact for external badge services
+      - name: Upload LCOV report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contract-lcov
+          path: lcov.info
+          retention-days: 30

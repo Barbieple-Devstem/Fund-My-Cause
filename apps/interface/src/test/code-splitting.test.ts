@@ -16,8 +16,8 @@ describe('Code Splitting', () => {
     const lazyComponentsPath = path.join(process.cwd(), 'src/lib/lazy-components.ts');
     const content = fs.readFileSync(lazyComponentsPath, 'utf-8');
     
-    expect(content).toContain("import('@/app/dashboard/page')");
-    expect(content).toContain("import('@/app/create/page')");
+    expect(content).toContain("import('@/app/[locale]/dashboard/page')");
+    expect(content).toContain("import('@/app/[locale]/create/page')");
   });
 
   it('should configure loading states for lazy components', () => {

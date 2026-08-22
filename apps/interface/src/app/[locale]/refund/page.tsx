@@ -6,7 +6,7 @@ import { Navbar } from "@/components/layout/Navbar";
 import { WalletGuard } from "@/components/WalletGuard";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "@/hooks/useWallet";
 import { buildRefundTx, submitSignedTx } from "@/lib/soroban";
 
 // ── Confirmation dialog ───────────────────────────────────────────────────────

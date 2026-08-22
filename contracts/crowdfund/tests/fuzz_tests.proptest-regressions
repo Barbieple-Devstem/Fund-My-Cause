@@ -6,3 +6,6 @@
 # everyone who runs the test benefits from these saved cases.
 cc f7f0c709dbe7c672301ce326b47f5267aae82aa89f5e307091bc75633e2f3204 # shrinks to total_contribution = 1, additional_amount = 1
 cc 0862f0b4d02d4d07a25e589d9f261d169a98cf9b973ed77d68d000416b3c5eb1 # shrinks to amount = 85070591730234615865843651857942052864
+cc 2be363447cc0ee7880a549e5aaeac6b188b1493316824f490e39357b694e9ae2 # shrinks to (a1, a2, a3) = (1, 1, 1)
+cc 44a5693a61aaac064023dd644f5e62e2253ba3a095eb11ab4f811c28d732fbc7 # shrinks to (c1_amt, c2_amt, c3_amt) = (1, 6317, 9549), goal = 10000
+cc 9f27a662dd1ac516c4a828f7a71e78fae86805d75d2dcc34163831b7530b7409 # shrinks to (c1_amt, c2_amt, c3_amt) = (488, 4836, 6340), goal = 10000

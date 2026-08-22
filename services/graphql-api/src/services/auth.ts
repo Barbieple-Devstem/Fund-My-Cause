@@ -7,7 +7,33 @@ export class AuthService {
   private jwtSecret: string;
   private tokenExpiry: string;
 
-  constructor(jwtSecret: string = process.env.JWT_SECRET || "your-secret-key", tokenExpiry: string = "24h") {
+  /**
+   * Validate JWT secret meets security requirements
+   * @throws Error if secret is invalid
+   */
+  static validateJwtSecret(secret: string | undefined): void {
+    const knownDefaults = [
+      "your-secret-key",
+      "your-secret-key-change-in-production",
+      "dev-secret-key-change-in-production",
+    ];
+
+    if (!secret || secret.trim() === "") {
+      throw new Error("JWT_SECRET environment variable is required and must not be empty");
+    }
+
+    // Check for known defaults before length check
+    if (knownDefaults.includes(secret)) {
+      throw new Error("JWT_SECRET appears to be a default/example value and must be changed");
+    }
+
+    if (secret.length < 32) {
+      throw new Error("JWT_SECRET must be at least 32 characters for secure operation");
+    }
+  }
+
+  constructor(jwtSecret: string, tokenExpiry: string = "24h") {
+    AuthService.validateJwtSecret(jwtSecret);
     this.jwtSecret = jwtSecret;
     this.tokenExpiry = tokenExpiry;
   }
@@ -24,7 +50,7 @@ export class AuthService {
         },
         this.jwtSecret,
         {
-          expiresIn: this.tokenExpiry,
+          expiresIn: this.tokenExpiry as jwt.SignOptions["expiresIn"],
           algorithm: "HS256",
         }
       );

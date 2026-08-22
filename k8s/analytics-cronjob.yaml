@@ -1,0 +1,121 @@
+# Analytics aggregation CronJob — Issue #714
+#
+# Runs the analytics rollup job on a schedule.
+# Idempotent — safe to re-run or trigger manually.
+# Failures are captured by the failedJobsHistoryLimit and can be
+# surfaced to alerting via a Prometheus PrometheusRule (see below).
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: analytics-aggregation
+  namespace: fund-my-cause
+  labels:
+    app: analytics-aggregation
+    component: job
+spec:
+  # Run every hour at :05 to avoid top-of-hour contention
+  schedule: "5 * * * *"
+  # Prevent overlapping runs — skip if previous is still running
+  concurrencyPolicy: Forbid
+  # Keep last 3 successful and 3 failed job records for debugging
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      # Retry up to 2 times before marking as failed
+      backoffLimit: 2
+      # Hard timeout: kill the job if it runs longer than 10 minutes
+      activeDeadlineSeconds: 600
+      template:
+        metadata:
+          labels:
+            app: analytics-aggregation
+            component: job
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: analytics-job
+              image: ghcr.io/fund-my-cause/analytics-job:latest
+              imagePullPolicy: Always
+              env:
+                - name: NODE_ENV
+                  value: "production"
+                - name: LOG_LEVEL
+                  value: "info"
+                # Inject contract and network config from the shared ConfigMap
+                - name: NEXT_PUBLIC_CROWDFUND_CONTRACT_ID
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fund-my-cause-config
+                      key: CROWDFUND_CONTRACT_ID
+                      optional: true
+                - name: NEXT_PUBLIC_REGISTRY_CONTRACT_ID
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fund-my-cause-config
+                      key: REGISTRY_CONTRACT_ID
+                      optional: true
+                - name: NEXT_PUBLIC_SOROBAN_RPC_URL
+                  valueFrom:
+                    configMapKeyRef:
+                      name: fund-my-cause-config
+                      key: SOROBAN_RPC_URL
+                      optional: true
+              resources:
+                requests:
+                  cpu: "100m"
+                  memory: "128Mi"
+                limits:
+                  cpu: "500m"
+                  memory: "256Mi"
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                runAsUser: 1000
+                capabilities:
+                  drop: ["ALL"]
+---
+# PrometheusRule: alert when the analytics job fails.
+# Requires kube-prometheus-stack or compatible Prometheus Operator.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: analytics-aggregation-alerts
+  namespace: fund-my-cause
+  labels:
+    app: analytics-aggregation
+    prometheus: kube-prometheus
+    role: alert-rules
+spec:
+  groups:
+    - name: analytics-job
+      interval: 5m
+      rules:
+        - alert: AnalyticsJobFailed
+          expr: |
+            kube_job_status_failed{namespace="fund-my-cause", job_name=~"analytics-aggregation.*"} > 0
+          for: 5m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "Analytics aggregation job failed"
+            description: >
+              The analytics aggregation CronJob {{ $labels.job_name }} in namespace
+              {{ $labels.namespace }} has failed. Check pod logs for details.
+              Re-run: kubectl create job --from=cronjob/analytics-aggregation manual-run -n fund-my-cause
+
+        - alert: AnalyticsJobMissed
+          expr: |
+            (time() - kube_cronjob_status_last_schedule_time{namespace="fund-my-cause", cronjob="analytics-aggregation"}) > 7200
+          for: 10m
+          labels:
+            severity: warning
+            team: backend
+          annotations:
+            summary: "Analytics aggregation job has not run in over 2 hours"
+            description: >
+              The analytics aggregation CronJob has not been scheduled in over 2 hours.
+              Verify the CronJob is active and the namespace is healthy.

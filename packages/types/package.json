@@ -29,13 +29,23 @@
     "./comment": {
       "import": "./src/comment.ts",
       "types": "./src/comment.ts"
+    },
+    "./graphql": {
+      "import": "./src/graphql.ts",
+      "types": "./src/graphql.ts"
+    },
+    "./validation": {
+      "import": "./src/validation.ts",
+      "types": "./src/validation.ts"
     }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "echo 'types package - no lint config yet'"
+    "lint": "echo 'types package - no lint config yet'",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^1.1.0"
   }
 }

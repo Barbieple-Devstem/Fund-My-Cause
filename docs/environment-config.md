@@ -20,26 +20,40 @@ Fund-My-Cause supports three environments with distinct configurations:
 
 ## Configuration Variables
 
-### Required Variables
+### Required Variables (single source of truth)
 
-All environments must define:
+The canonical list of required variables lives in [`scripts/check-env-parity.js`](../scripts/check-env-parity.js) → `REQUIRED_VARS`. Every `.env.*` file must define all of these keys or the env-parity CI check will fail.
 
-```bash
-NEXT_PUBLIC_SOROBAN_RPC_URL       # Soroban RPC endpoint
-NEXT_PUBLIC_NETWORK_PASSPHRASE    # Stellar network passphrase
-NEXT_PUBLIC_HORIZON_URL           # Horizon REST API endpoint
-```
+| Variable | Description | Example |
+|---|---|---|
+| `NEXT_PUBLIC_CROWDFUND_CONTRACT_ID` | Crowdfund contract address | `CABC...XYZ` |
+| `NEXT_PUBLIC_REGISTRY_CONTRACT_ID` | Registry contract address | `CDEF...ABC` |
+| `NEXT_PUBLIC_SOROBAN_RPC_URL` | Soroban RPC endpoint | `https://soroban-testnet.stellar.org` |
+| `NEXT_PUBLIC_NETWORK_PASSPHRASE` | Stellar network passphrase | `Test SDF Network ; September 2015` |
+| `NEXT_PUBLIC_HORIZON_URL` | Horizon REST API endpoint | `https://horizon-testnet.stellar.org` |
+
+> **Adding a new required variable?** Add it to `REQUIRED_VARS` in `scripts/check-env-parity.js` **and** to all `.env.*` files in `apps/interface/`. The CI workflow `.github/workflows/env-parity.yml` will fail on any PR that adds a key in one file without updating the others.
 
 ### Optional Variables
 
 ```bash
-NEXT_PUBLIC_CROWDFUND_CONTRACT_ID # Crowdfund contract address
-NEXT_PUBLIC_REGISTRY_CONTRACT_ID  # Registry contract address
 NEXT_PUBLIC_PINATA_API_KEY        # IPFS upload key
 NEXT_PUBLIC_PINATA_SECRET_KEY     # IPFS upload secret
-NEXT_PUBLIC_ANALYTICS_ENABLED     # Enable/disable analytics
+NEXT_PUBLIC_ANALYTICS_ENABLED     # Enable/disable analytics (true/false)
 NEXT_PUBLIC_ANALYTICS_ID          # Analytics tracking ID
+NEXT_PUBLIC_IMAGE_CDN_URL         # CDN origin for responsive images
+NEXT_PUBLIC_FEATURED_CAMPAIGNS    # Comma-separated featured campaign IDs
 ```
+
+### Env Parity Check
+
+Run locally before opening a PR:
+
+```bash
+node scripts/check-env-parity.js
+```
+
+The check validates that every key in `REQUIRED_VARS` appears in all `.env.*` files and reports any undocumented `NEXT_PUBLIC_*` extras as warnings.
 
 ## Quick Start
 

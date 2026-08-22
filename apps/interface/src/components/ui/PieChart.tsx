@@ -2,7 +2,7 @@
 
 import React from "react";
 import { CampaignData } from "@/types/soroban";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme } from "@/hooks/useTheme";
 
 interface PieChartProps {
   campaigns: CampaignData[];
@@ -47,7 +47,10 @@ export function PieChart({ campaigns }: PieChartProps) {
   if (campaigns.length === 0) return null;
 
   const statusGroups = campaigns.reduce(
-    (acc, c) => { acc[c.status] = (acc[c.status] || 0) + 1; return acc; },
+    (acc, c) => {
+      acc[c.status] = (acc[c.status] || 0) + 1;
+      return acc;
+    },
     {} as Record<string, number>,
   );
 
@@ -63,12 +66,20 @@ export function PieChart({ campaigns }: PieChartProps) {
   let currentOffset = 0;
 
   return (
-    <div className={`${palette.background} border ${palette.border} rounded-2xl p-5`}>
-      <h3 className={`text-sm font-semibold ${palette.title} mb-4`}>Campaign Status Distribution</h3>
+    <div
+      className={`${palette.background} border ${palette.border} rounded-2xl p-5`}
+    >
+      <h3 className={`text-sm font-semibold ${palette.title} mb-4`}>
+        Campaign Status Distribution
+      </h3>
 
       <div className="flex items-center gap-8">
         {/* Pie Chart */}
-        <div className="relative" role="img" aria-label={`Pie chart: ${data.map((d) => `${d.status} ${d.count}`).join(", ")}`}>
+        <div
+          className="relative"
+          role="img"
+          aria-label={`Pie chart: ${data.map((d) => `${d.status} ${d.count}`).join(", ")}`}
+        >
           <svg width="140" height="140" viewBox="0 0 140 140">
             {data.map((item) => {
               const strokeDasharray = (item.percentage / 100) * circumference;
@@ -93,7 +104,9 @@ export function PieChart({ campaigns }: PieChartProps) {
 
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <p className={`text-2xl font-bold ${palette.centerTotal}`}>{total}</p>
+              <p className={`text-2xl font-bold ${palette.centerTotal}`}>
+                {total}
+              </p>
               <p className={`text-xs ${palette.centerLabel}`}>Total</p>
             </div>
           </div>
@@ -102,14 +115,21 @@ export function PieChart({ campaigns }: PieChartProps) {
         {/* Legend */}
         <div className="flex-1 space-y-2">
           {data.map((item) => (
-            <div key={item.status} className="flex items-center justify-between">
+            <div
+              key={item.status}
+              className="flex items-center justify-between"
+            >
               <div className="flex items-center gap-2">
                 <div
                   className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: STATUS_COLORS[item.status] ?? "#6b7280" }}
+                  style={{
+                    backgroundColor: STATUS_COLORS[item.status] ?? "#6b7280",
+                  }}
                   aria-hidden="true"
                 />
-                <span className={`text-sm ${palette.label}`}>{item.status}</span>
+                <span className={`text-sm ${palette.label}`}>
+                  {item.status}
+                </span>
               </div>
               <span className={`text-sm font-medium ${palette.count}`}>
                 {item.count} ({item.percentage.toFixed(1)}%)

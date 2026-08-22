@@ -4,7 +4,8 @@ import React from "react";
 import type { Campaign } from "@/types/campaign";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatXlm } from "@/lib/price";
-import { X, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { formatCampaignDateShort } from "@/lib/campaignDateFormatting";
+import { TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ComparisonTableProps {
@@ -50,7 +51,8 @@ export function ComparisonTable({ campaigns, onRemove }: ComparisonTableProps) {
           Successful: "bg-[var(--color-brand)]/20 text-[var(--color-brand)]",
           Refunded: "bg-[var(--color-warning)]/20 text-[var(--color-warning)]",
           Cancelled: "bg-[var(--color-danger)]/20 text-[var(--color-danger)]",
-          Paused: "bg-[var(--color-text-muted)]/20 text-[var(--color-text-muted)]",
+          Paused:
+            "bg-[var(--color-text-muted)]/20 text-[var(--color-text-muted)]",
         };
         return (
           <span
@@ -110,7 +112,9 @@ export function ComparisonTable({ campaigns, onRemove }: ComparisonTableProps) {
         );
         return (
           <div>
-            <span className="text-sm">{d.toLocaleDateString()}</span>
+            <span className="text-sm">
+              {formatCampaignDateShort(c.deadline)}
+            </span>
             <br />
             <span
               className={cn(
@@ -171,10 +175,7 @@ export function ComparisonTable({ campaigns, onRemove }: ComparisonTableProps) {
               Metric
             </th>
             {campaigns.map((c) => (
-              <th
-                key={c.id}
-                className="px-5 py-4 text-left min-w-[180px]"
-              >
+              <th key={c.id} className="px-5 py-4 text-left min-w-[180px]">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-semibold text-[var(--color-text-primary)] text-base">

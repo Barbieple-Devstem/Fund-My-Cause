@@ -1,0 +1,39 @@
+# KEDA ScaledObject for advanced event-based scaling
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: fund-my-cause-api-scaledobject
+  namespace: default
+  labels:
+    app: fund-my-cause-api
+    component: autoscaling
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: fund-my-cause-api
+  minReplicaCount: 2
+  maxReplicaCount: 10
+  pollingInterval: 30
+  cooldownPeriod: 300
+  triggers:
+    # Scale based on Prometheus metrics
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.monitoring.svc:9090
+        metricName: http_requests_total
+        query: |
+          sum(rate(http_requests_total{app="fund-my-cause-api"}[2m]))
+        threshold: "100"
+    # Scale based on queue length (Redis)
+    - type: redis
+      metadata:
+        address: redis.default.svc:6379
+        listName: api-queue
+        listLength: "50"
+    # Scale based on database connections
+    - type: postgresql
+      metadata:
+        connectionString: postgresql://fundmycause:fundmycause123@postgres.default.svc:5432/fundmycause
+        query: "SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'active'"
+        targetQueryValue: "50"

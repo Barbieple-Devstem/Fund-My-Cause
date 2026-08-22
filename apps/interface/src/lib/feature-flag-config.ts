@@ -1,183 +1,108 @@
 /**
  * Feature Flag Configuration
- * 
- * Defines all feature flags used in the application
+ *
+ * Defines the feature flags still in flight. A flag belongs here only while its
+ * outcome is undecided — that is, while it is partially rolled out or scoped to
+ * a target group.
+ *
+ * Flags that reached 100% rollout (or were switched off permanently) are
+ * removed rather than left pinned: a flag that can only ever return one value
+ * is dead configuration, and the branch it used to guard should be inlined at
+ * the same time. See docs/feature-flags.md for the retirement checklist.
  */
 
-import { FeatureFlag } from './feature-flags';
+import { FeatureFlag } from "./feature-flags";
 
 /**
  * Feature flag definitions
  */
 export const FEATURE_FLAGS: Record<string, FeatureFlag> = {
-  // Campaign Features
-  CAMPAIGN_CATEGORIES: {
-    name: 'campaign_categories',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable campaign categories feature',
-      releaseDate: '2026-04-27',
-    },
-  },
-
-  CAMPAIGN_UPDATES: {
-    name: 'campaign_updates',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable campaign updates feature',
-      releaseDate: '2026-04-27',
-    },
-  },
-
-  CAMPAIGN_IMAGE_UPLOAD: {
-    name: 'campaign_image_upload',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable campaign image upload feature',
-      releaseDate: '2026-04-27',
-    },
-  },
-
   // Contribution Features
   RECURRING_CONTRIBUTIONS: {
-    name: 'recurring_contributions',
+    name: "recurring_contributions",
     enabled: true,
     rolloutPercentage: 50,
     metadata: {
-      description: 'Enable recurring contribution feature',
-      releaseDate: '2026-05-01',
+      description: "Enable recurring contribution feature",
+      releaseDate: "2026-05-01",
     },
   },
 
   CONTRIBUTION_MATCHING: {
-    name: 'contribution_matching',
+    name: "contribution_matching",
     enabled: true,
     rolloutPercentage: 25,
     metadata: {
-      description: 'Enable sponsor matching feature',
-      releaseDate: '2026-05-15',
+      description: "Enable sponsor matching feature",
+      releaseDate: "2026-05-15",
     },
   },
 
   ANONYMOUS_CONTRIBUTIONS: {
-    name: 'anonymous_contributions',
+    name: "anonymous_contributions",
     enabled: true,
     rolloutPercentage: 75,
     metadata: {
-      description: 'Enable anonymous contribution option',
-      releaseDate: '2026-04-27',
+      description: "Enable anonymous contribution option",
+      releaseDate: "2026-04-27",
     },
   },
 
   // User Features
   USER_PROFILES: {
-    name: 'user_profiles',
+    name: "user_profiles",
     enabled: true,
     rolloutPercentage: 50,
     metadata: {
-      description: 'Enable user profile pages',
-      releaseDate: '2026-05-01',
-    },
-  },
-
-  SOCIAL_SHARING: {
-    name: 'social_sharing',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable social media sharing',
-      releaseDate: '2026-04-27',
+      description: "Enable user profile pages",
+      releaseDate: "2026-05-01",
     },
   },
 
   // Admin Features
-  CAMPAIGN_ANALYTICS: {
-    name: 'campaign_analytics',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable campaign analytics dashboard',
-      releaseDate: '2026-04-27',
-    },
-  },
-
   ADVANCED_FILTERS: {
-    name: 'advanced_filters',
+    name: "advanced_filters",
     enabled: true,
     rolloutPercentage: 50,
     metadata: {
-      description: 'Enable advanced campaign filters',
-      releaseDate: '2026-05-01',
+      description: "Enable advanced campaign filters",
+      releaseDate: "2026-05-01",
     },
   },
 
   // Experimental Features
   AI_RECOMMENDATIONS: {
-    name: 'ai_recommendations',
+    name: "ai_recommendations",
     enabled: true,
     rolloutPercentage: 10,
     metadata: {
-      description: 'Enable AI-powered campaign recommendations',
-      releaseDate: '2026-06-01',
+      description: "Enable AI-powered campaign recommendations",
+      releaseDate: "2026-06-01",
       experimental: true,
     },
   },
 
   BLOCKCHAIN_VERIFICATION: {
-    name: 'blockchain_verification',
+    name: "blockchain_verification",
     enabled: true,
     rolloutPercentage: 5,
-    targetGroups: ['beta_testers'],
+    targetGroups: ["beta_testers"],
     metadata: {
-      description: 'Enable blockchain verification badge',
-      releaseDate: '2026-06-15',
+      description: "Enable blockchain verification badge",
+      releaseDate: "2026-06-15",
       experimental: true,
     },
   },
 
-  // Performance Features
-  LAZY_LOADING: {
-    name: 'lazy_loading',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable lazy loading for campaign lists',
-      releaseDate: '2026-04-27',
-    },
-  },
-
-  IMAGE_OPTIMIZATION: {
-    name: 'image_optimization',
-    enabled: true,
-    rolloutPercentage: 100,
-    metadata: {
-      description: 'Enable image optimization',
-      releaseDate: '2026-04-27',
-    },
-  },
-
   // Maintenance Features
-  MAINTENANCE_MODE: {
-    name: 'maintenance_mode',
-    enabled: false,
-    rolloutPercentage: 0,
-    metadata: {
-      description: 'Enable maintenance mode',
-      releaseDate: '2026-04-27',
-    },
-  },
-
   BETA_FEATURES: {
-    name: 'beta_features',
+    name: "beta_features",
     enabled: true,
     rolloutPercentage: 0,
-    targetGroups: ['beta_testers', 'internal'],
+    targetGroups: ["beta_testers", "internal"],
     metadata: {
-      description: 'Enable beta features for testers',
-      releaseDate: '2026-04-27',
+      description: "Enable beta features for testers",
+      releaseDate: "2026-04-27",
     },
   },
 };
@@ -208,6 +133,6 @@ export function getEnabledFeatureFlags(): FeatureFlag[] {
  */
 export function getExperimentalFeatureFlags(): FeatureFlag[] {
   return Object.values(FEATURE_FLAGS).filter(
-    (flag) => flag.metadata?.experimental === true
+    (flag) => flag.metadata?.experimental === true,
   );
 }

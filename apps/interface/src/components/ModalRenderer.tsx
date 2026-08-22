@@ -1,26 +1,17 @@
 "use client";
 
-import { ReactNode } from "react";
-import { useModal } from "@/hooks/useModal";
+import React from "react";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useModalSlice } from "@/hooks/useUiSlice";
+import type { ModalConfig } from "@/store/useModalStore";
 
-const sizes: Record<string, string> = {
+const sizes: Record<NonNullable<ModalConfig["size"]>, string> = {
   sm: "max-w-sm",
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-xl",
 };
-
-interface ModalConfig {
-  id: string;
-  title?: string;
-  content: ReactNode;
-  footer?: ReactNode;
-  size?: "sm" | "md" | "lg" | "xl";
-  closeOnBackdropClick?: boolean;
-  onClose?: () => void;
-}
 
 function ModalItem({
   modal,
@@ -40,7 +31,7 @@ function ModalItem({
     <div
       className={cn(
         "fixed inset-0 z-50 flex items-center justify-center",
-        "animate-in fade-in duration-200"
+        "animate-in fade-in duration-200",
       )}
       style={{ zIndex: 50 + index }}
       role="presentation"
@@ -48,11 +39,9 @@ function ModalItem({
       <div
         className={cn(
           "absolute inset-0 bg-black/50 transition-opacity duration-200",
-          isTop ? "opacity-100" : "opacity-0 pointer-events-none"
+          isTop ? "opacity-100" : "opacity-0 pointer-events-none",
         )}
-        onClick={() =>
-          modal.closeOnBackdropClick !== false && onClose()
-        }
+        onClick={() => modal.closeOnBackdropClick !== false && onClose()}
         aria-hidden="true"
       />
       <div
@@ -61,7 +50,7 @@ function ModalItem({
           "border border-[var(--color-border)]",
           "transition-all duration-200",
           "animate-in zoom-in-95 fade-in duration-200",
-          sizes[modal.size ?? "md"]
+          sizes[modal.size ?? "md"],
         )}
         style={{
           transform: `translateY(-${offset}px) scale(${1 - (total - 1 - index) * 0.02})`,
@@ -100,21 +89,23 @@ function ModalItem({
   );
 }
 
-export function ModalRenderer({ children }: { children: ReactNode }) {
-  const { stack } = useModal();
+/**
+ * Renders whatever useModal()'s openModal() has pushed onto the stack.
+ * Mount this once near the app root — Zustand's store is a singleton so no
+ * Provider wrapping is needed.
+ */
+export function ModalRenderer() {
+  const { stack, closeModal } = useModalSlice();
 
   return (
     <>
-      {children}
       {stack.map((modal, index) => (
         <ModalItem
           key={modal.id}
           modal={modal}
           index={index}
           total={stack.length}
-          onClose={() => {
-            modal.onClose?.();
-          }}
+          onClose={() => closeModal(modal.id)}
         />
       ))}
     </>

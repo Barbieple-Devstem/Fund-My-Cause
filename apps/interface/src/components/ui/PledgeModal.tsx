@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { X } from "lucide-react";
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "@/hooks/useWallet";
 import { TransactionStatus, TxStatus } from "@/components/ui/TransactionStatus";
 import { useToast } from "@/components/ui/Toast";
 import { ReceiptModal } from "@/components/ui/ReceiptModal";
@@ -11,6 +11,8 @@ import { useAccountExists } from "@/hooks/useAccountExists";
 import { useTranslations } from "next-intl";
 import { computePledgeSuggestions } from "@/lib/pledgeSuggestions";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
+import { Input } from "@fund-my-cause/components";
+import { FORM_FIELD_CLS } from "@/lib/formStyles";
 
 const XLM_TO_STROOPS = 10_000_000n;
 const PLEDGE_DEBOUNCE_MS = 2000;
@@ -153,6 +155,20 @@ export function PledgeModal({
   const isProcessing = txStatus !== "idle" || pendingTx || isSigning;
   isProcessingRef.current = isProcessing;
 
+  const unfundedWarningId = "pledge-unfunded-warning";
+  const minimumNoteId = "pledge-minimum-note";
+  const showUnfundedWarning = Boolean(
+    address && !accountLoading && !accountExists,
+  );
+  const showMinimumNote = minContribution > XLM_TO_STROOPS;
+  const amountDescribedBy =
+    [
+      showUnfundedWarning ? unfundedWarningId : null,
+      showMinimumNote ? minimumNoteId : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined;
+
   return (
     // Backdrop: closes modal on click. Keyboard dismissal (Escape) is handled by the focus trap inside the dialog.
     <div
@@ -191,16 +207,21 @@ export function PledgeModal({
         ) : (
           <>
             <div className="space-y-1">
-              {address && !accountLoading && !accountExists && (
-                <p className="text-xs text-yellow-400" role="alert">
+              {showUnfundedWarning && (
+                <p
+                  id={unfundedWarningId}
+                  className="text-xs text-yellow-400"
+                  role="alert"
+                >
                   {t("unfundedWarning")}
                 </p>
               )}
-              <label htmlFor="pledge-amount" className="sr-only">
-                {t("amountLabel", { min: minXlm })}
-              </label>
-              <input
+              <Input
+                unstyled
                 id="pledge-amount"
+                label={t("amountLabel", { min: minXlm })}
+                labelClassName="sr-only"
+                fieldClassName={FORM_FIELD_CLS}
                 type="number"
                 inputMode="decimal"
                 placeholder={t("amountPlaceholder", { min: minXlm })}
@@ -211,17 +232,20 @@ export function PledgeModal({
                   setAmount(e.target.value)
                 }
                 disabled={isProcessing}
-                aria-label={t("amountLabel", { min: minXlm })}
                 className="ds-input w-full px-4 py-3 disabled:opacity-50 text-base"
               />
-              {minContribution > XLM_TO_STROOPS && (
-                <p className="text-xs text-gray-500">
+              {showMinimumNote && (
+                <p id={minimumNoteId} className="text-xs text-gray-500">
                   {t("minimumNote", { min: minXlm })}
                 </p>
               )}
               {/* ── Suggestion chips ─────────────────────────────────────── */}
               {suggestions.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-1" role="group" aria-label="Suggested amounts">
+                <div
+                  className="flex flex-wrap gap-2 pt-1"
+                  role="group"
+                  aria-label="Suggested amounts"
+                >
                   {suggestions.map((s) => {
                     const xlmValue = (Number(s.amountStroops) / 1e7).toString();
                     return (
@@ -235,7 +259,11 @@ export function PledgeModal({
                             ? "bg-indigo-600 border-indigo-500 text-white hover:bg-indigo-500"
                             : "bg-gray-800 border-gray-700 text-gray-300 hover:border-indigo-500 hover:text-white"
                         } disabled:opacity-40`}
-                        aria-label={s.completesGoal ? `${s.label} — completes goal` : s.label}
+                        aria-label={
+                          s.completesGoal
+                            ? `${s.label} — completes goal`
+                            : s.label
+                        }
                       >
                         {s.label}
                       </button>

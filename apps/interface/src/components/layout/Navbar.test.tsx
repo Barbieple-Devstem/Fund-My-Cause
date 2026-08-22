@@ -2,11 +2,11 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { Navbar } from "./Navbar";
 
-jest.mock("@/context/WalletContext", () => ({
+jest.mock("@/hooks/useWallet", () => ({
   useWallet: jest.fn(),
 }));
 
-jest.mock("@/context/ThemeContext", () => ({
+jest.mock("@/hooks/useTheme", () => ({
   useTheme: () => ({ theme: "dark", toggleTheme: jest.fn() }),
 }));
 
@@ -14,7 +14,7 @@ jest.mock("@/lib/constants", () => ({
   NETWORK_NAME: "Testnet",
 }));
 
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "@/hooks/useWallet";
 
 const mockUseWallet = useWallet as jest.Mock;
 

@@ -46,11 +46,76 @@ Fund-My-Cause is built on three core security principles:
 
 **Key assumption**: The Stellar network and Soroban runtime are secure. Vulnerabilities in Stellar/Soroban core are out of scope and should be reported to [Stellar's bug bounty program](https://www.stellar.org/bug-bounty-program).
 
-### 1.3 Threat Model Scope
+### 1.3 Backend Data Flows
+
+### 1.3.1 Indexer Service
+
+The indexer service streams on-chain events from the Soroban RPC endpoint, transforms them, and persists them to a PostgreSQL database. Data flows involve:
+
+1. **RPC Stream**: Long-lived connection to Soroban RPC (`soroban-testnet.stellar.org`), receiving contract events (`initialize`, `contribute`, `withdraw`, `refund`)
+2. **Event Ingestion**: Events parsed, validated, and written to `raw_events` table; campaigns/contributions/refunds materialized into relational tables
+3. **REST API**: Exposes `/events`, `/stats`, `/health`, `/ready` endpoints for frontend and monitoring consumption
+4. **GraphQL API (embedded)**: Provides `/graphql` endpoint with query complexity analysis for campaign data queries
+
+### 1.3.2 GraphQL API Service
+
+The GraphQL API acts as a caching and aggregation layer between the frontend and the Soroban blockchain:
+
+1. **Soroban RPC Calls**: Fetches campaign and user data via JSON-RPC to Soroban nodes
+2. **Redis Cache**: Caches resolved GraphQL queries (campaign lists, stats, user profiles) with TTL-based expiration
+3. **WebSocket Subscriptions**: Real-time updates via `graphql-ws` for campaign status changes, new contributions, milestone events
+4. **JWT Authentication**: Stateless token verification for authenticated mutations; signature-based wallet challenge
+5. **Rate Limiting**: Token-bucket rate limits per IP and per authenticated user via Redis-backed rate-limiter-flexible
+
+### 1.3.3 Data Flow Diagram
+
+```
+                  ┌──────────────────────────────────────────────────────┐
+                  │                   Stellar Network                    │
+                  │  ┌────────────────────────────────────────────────┐  │
+                  │  │           Soroban Smart Contracts              │  │
+                  │  │  (crowdfund, registry, achievements)           │  │
+                  │  └────────────────────────────────────────────────┘  │
+                  └──────────────────────┬───────────────────────────────┘
+                                         │
+                    ┌────────────────────┼────────────────────┐
+                    │                    │                    │
+                    ▼                    ▼                    ▼
+        ┌───────────────────┐ ┌───────────────────┐ ┌───────────────────┐
+        │   Indexer Service │ │  GraphQL API      │ │  Monitoring       │
+        │   (Express/REST)  │ │  (Apollo/WS/Redis)│ │  Service          │
+        │                   │ │                   │ │                   │
+        │ - Event streaming │ │ - Cached queries  │ │ - Health checks   │
+        │ - DB persistence  │ │ - Subscriptions   │ │ - Alert routing   │
+        │ - REST endpoints  │ │ - Auth (JWT)      │ │ - Metrics export  │
+        └────────┬──────────┘ └────────┬──────────┘ └───────────────────┘
+                 │                     │
+                 ▼                     ▼
+        ┌───────────────────┐ ┌───────────────────┐
+        │   PostgreSQL DB   │ │   Redis Cache      │
+        │ - raw_events      │ │ - campaign cache   │
+        │ - campaigns       │ │ - rate limit state │
+        │ - contributions   │ │ - session data     │
+        │ - refunds         │ └───────────────────┘
+        └───────────────────┘
+                 ▲
+                 │
+        ┌───────────────────┐
+        │  Next.js Frontend │
+        │ - SSR pages       │
+        │ - Client queries  │
+        │ - Wallet connect  │
+        └───────────────────┘
+```
+
+### 1.3.4 Threat Model Scope
 
 **In Scope:**
 - Smart contract logic (crowdfund, registry)
 - Frontend application (Next.js interface)
+- **Indexer service (event ingestion, REST/GraphQL API, database)**
+- **GraphQL API service (caching, subscriptions, authentication, rate limiting)**
+- **PostgreSQL database and Redis cache**
 - CI/CD pipelines and deployment processes
 - Wallet integration and transaction signing
 - Data validation and input sanitization
@@ -231,6 +296,57 @@ Fund-My-Cause is built on three core security principles:
 - No private user data is stored off-chain.
 - No authentication is required to view campaigns (intentional).
 
+### 2.6 Backend Service Threats (STRIDE)
+
+#### Spoofing
+
+| Threat | Component | Severity | Mitigation |
+|--------|-----------|----------|------------|
+| RPC endpoint spoofing | Indexer, GraphQL API | High | RPC URL configured via environment variable; pinned at deployment; TLS certificate verification on outbound connections |
+| JWT token forgery | GraphQL API | High | Token signed with server-side secret; short-lived tokens (1h); signature verification on every request |
+| Database connection spoofing | Indexer | High | PostgreSQL connection uses SSL/TLS; `pg_hba.conf` restricted to service IPs; credentials from secrets manager |
+| Redis connection spoofing | GraphQL API | Medium | Redis bound to localhost in single-deployment; AUTH password required in production |
+
+#### Tampering
+
+| Threat | Component | Severity | Mitigation |
+|--------|-----------|----------|------------|
+| Event data manipulation in transit | Indexer | Medium | Events sourced directly from Soroban RPC (TLS); replayed against on-chain state for verification |
+| Cache poisoning via crafted queries | GraphQL API | Medium | Query complexity limits; depth limits on GraphQL; cache keys include full query+variables |
+| GraphQL query injection | GraphQL API | High | Input validation on all arguments; parameterized queries to PostgreSQL; no raw string interpolation in resolvers |
+
+#### Repudiation
+
+| Threat | Component | Severity | Mitigation |
+|--------|-----------|----------|------------|
+| Missing audit trail for API mutations | GraphQL API | Medium | All mutations logged with timestamp, user address, and payload hash; logs shipped to centralized logging (ELK) |
+| No event processing accountability | Indexer | Medium | Raw events persisted with idempotency keys (`tx_hash + event_type`); processing status tracked per event |
+
+#### Information Disclosure
+
+| Threat | Component | Severity | Mitigation |
+|--------|-----------|----------|------------|
+| GraphQL introspection enabled in production | GraphQL API | Medium | Introspection disabled when `NODE_ENV=production`; schema not exposed to untrusted clients |
+| Verbose error messages leaking internals | Indexer, GraphQL API | Medium | Production error responses return generic messages; stack traces logged server-side only |
+| Database schema enumeration via API | Indexer | Medium | REST API returns only whitelisted fields; no raw SQL exposure; ORM-style query construction |
+
+#### Denial of Service
+
+| Threat | Component | Severity | Mitigation |
+|--------|-----------|----------|------------|
+| RPC request flooding | Indexer | High | Fixed polling interval with backpressure; bounded event queue; circuit breaker on RPC connection |
+| GraphQL query depth/complexity attacks | GraphQL API | High | Query complexity scoring; depth limit (max 7 levels); rate limiting per IP and per user token |
+| Cache stampede | GraphQL API | Medium | Revalidating cache with jittered TTL; stale-while-revalidate pattern; Redis connection pooling |
+| Database connection exhaustion | Indexer | High | Connection pool with maximum limit (20); query timeout (30s); health check drains pool on startup |
+
+#### Elevation of Privilege
+
+| Threat | Component | Severity | Mitigation |
+|--------|-----------|----------|------------|
+| Unauthenticated mutation access | GraphQL API | Critical | All mutations require valid JWT; wallet address in token must match mutation parameters; no admin bypass |
+| Database superuser access via service | Indexer | Critical | Database user has least-privilege grants (SELECT/INSERT on app tables only); no DDL permissions at runtime |
+| Redis command injection | GraphQL API | Medium | Redis commands parameterized via ioredis; `rename-command` for dangerous commands in redis.conf |
+
 ---
 
 ## 3. Mitigation Strategies
@@ -263,7 +379,19 @@ Fund-My-Cause is built on three core security principles:
 | Unauthorized signing | Wallet approval, transaction display | Wallet design |
 | Private key theft | Hardware wallet support, user education | User responsibility |
 
-### 3.4 Deployment Security
+### 3.4 Backend Service Security
+
+| Threat | Mitigation | Verification |
+|--------|-----------|--------------|
+| RPC spoofing | HTTPS/TLS, env-pinned URLs | Deployment review, network policy |
+| JWT forgery | Strong secret, short expiry, signature check | Auth tests, secret rotation |
+| Cache poisoning | Full-query cache keys, TTL limits | Cache invalidation tests |
+| DoS via complex queries | Complexity/depth limits, rate limiting | Load tests, chaos tests |
+| DB injection | Parameterized queries, least-privilege DB user | SQL audit, permissions review |
+| Event manipulation | Idempotency keys, re-verify on-chain | Event replay tests |
+| Missing audit logs | Structured logging, ELK shipping | Log review, SIEM alerts |
+
+### 3.5 Deployment Security
 
 | Threat | Mitigation | Verification |
 |--------|-----------|--------------|
@@ -279,6 +407,7 @@ Fund-My-Cause is built on three core security principles:
 
 - [ ] All unit tests pass: `cargo test --workspace`
 - [ ] All integration tests pass: `npm run test` (frontend)
+- [ ] Backend service tests pass: `npm test` (indexer, graphql-api)
 - [ ] No security warnings from `cargo audit`
 - [ ] No security warnings from `npm audit`
 - [ ] Code review completed by at least 2 team members
@@ -287,6 +416,10 @@ Fund-My-Cause is built on three core security principles:
 - [ ] Secrets are stored in GitHub Secrets, not in code
 - [ ] Deployment script is reviewed and tested
 - [ ] Rollback plan is documented
+- [ ] Bundle size budgets are verified (see [Bundle Budgets](./bundle-budgets.md))
+- [ ] Rate limiter configuration reviewed and tested
+- [ ] Database migration script tested on staging
+- [ ] Redis connection string uses TLS in production
 
 ### 4.2 Post-Deployment Checklist
 
@@ -457,14 +590,34 @@ npm run build
 
 ---
 
-## 7. Revision History
+## 7. Open Mitigations & Follow-Up Issues
+
+The following mitigations are tracked as separate issues and should be addressed in future sprints:
+
+| ID | Threat | Mitigation | Priority | Status |
+|----|--------|-----------|----------|--------|
+| #TBD-1 | Indexer RPC connection has no backup endpoint | Add secondary RPC URL fallback | Medium | Open |
+| #TBD-2 | GraphQL API lacks request body size limit for subscriptions | Enforce `maxPayload` on WebSocket connections | Medium | Open |
+| #TBD-3 | PostgreSQL credentials stored in plaintext env var | Migrate to secrets manager (Vault / AWS Secrets Manager) | High | Open |
+| #TBD-4 | No automated DB backup integrity verification | Add backup restore test to CI | Medium | Open |
+| #TBD-5 | Redis exposed on `0.0.0.0` in development docker-compose | Bind to localhost; add `requirepass` | High | Open |
+| #TBD-6 | JWT secret uses hardcoded fallback in dev | Enforce JWT_SECRET env var in all environments | High | Open |
+| #TBD-7 | No TLS termination at the GraphQL API layer | Terminate TLS at reverse proxy (nginx/Cloudflare) | High | Open |
+| #TBD-8 | Rate-limiter missing per-endpoint granularity | Add per-route rate limits for expensive queries | Low | Open |
+| #TBD-9 | No intrusion detection on backend services | Deploy Falco / WAF rules for API traffic | Medium | Open |
+| #TBD-10 | Event ingestion has no downstream schema validation | Add JSON Schema validation before DB insert | Medium | Open |
+
+---
+
+## 8. Revision History
 
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-06-01 | Initial security model and threat analysis |
+| 1.1 | 2026-06-29 | Added backend data flows (indexer, GraphQL API), STRIDE threat analysis for backend services, open mitigations tracking |
 
 ---
 
-**Last Updated**: 2026-06-01  
-**Next Review**: 2026-09-01  
+**Last Updated**: 2026-06-29  
+**Next Review**: 2026-09-29  
 **Maintained By**: Security Team

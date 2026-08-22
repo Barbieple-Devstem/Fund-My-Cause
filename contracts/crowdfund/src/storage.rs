@@ -3,6 +3,10 @@
 /// This module provides storage keys and helper utilities for managing contract state.
 use soroban_sdk::Symbol;
 
+/// Re-export `DataKey` so it can be imported via `crate::storage::DataKey`
+/// (the enum itself is defined in the `types` module).
+pub use crate::types::DataKey;
+
 /// Contract version for upgrades and compatibility tracking
 pub const CONTRACT_VERSION: u32 = 6;
 
@@ -67,7 +71,7 @@ pub const KEY_ARCHIVED: Symbol = soroban_sdk::symbol_short!("ARCHIVED");
 
 // ── Issue #436: Campaign Milestones ───────────────────────────────────────────
 /// Storage key for milestones list
-pub const KEY_MILESTONES: Symbol = soroban_sdk::symbol_short!("MILESTONES");
+pub const KEY_MILESTONES: Symbol = soroban_sdk::symbol_short!("MILESTONE");
 /// Storage key for milestone verification status
 pub const KEY_MILESTONE_STATUS: Symbol = soroban_sdk::symbol_short!("MLSTATUS");
 /// Storage key for next milestone release amount
@@ -126,6 +130,65 @@ pub const KEY_REENTRANCY_LOCK: Symbol = soroban_sdk::symbol_short!("REENTLK");
 // ── Issue #704: Withdrawal streaming ─────────────────────────────────────────
 /// Storage key for optional streaming/scheduled-release config
 pub const KEY_STREAM: Symbol = soroban_sdk::symbol_short!("STREAM");
+
+// ── Issue #694: Soft-cap / stretch-goal ──────────────────────────────────────
+/// Storage key for the campaign soft cap (minimum viable funding target)
+pub const KEY_SOFT_CAP: Symbol = soroban_sdk::symbol_short!("SOFTCAP");
+/// Storage key for the campaign stretch goal (over-funding target)
+pub const KEY_STRETCH_GOAL: Symbol = soroban_sdk::symbol_short!("STRETCH");
+
+// ── Issue #695: Released-amount tracking ─────────────────────────────────────
+/// Storage key for the total amount already released to the creator via milestones
+pub const KEY_RELEASED: Symbol = soroban_sdk::symbol_short!("RELEASED");
+
+// ── Issue #696: Pause timelock ───────────────────────────────────────────────
+/// Storage key for the timelock duration (seconds) required before unpausing
+pub const KEY_PAUSE_TIMELOCK: Symbol = soroban_sdk::symbol_short!("PTLOCK");
+/// Storage key for the earliest timestamp at which the contract may be unpaused
+pub const KEY_UNPAUSE_AFTER: Symbol = soroban_sdk::symbol_short!("UNPAFTER");
+
+// ── Gross contribution tracking ──────────────────────────────────────────────
+/// Storage key for the gross total contributed (before any fee deductions)
+pub const KEY_GROSS_TOTAL: Symbol = soroban_sdk::symbol_short!("GROSST");
+
+// ── IPFS metadata ─────────────────────────────────────────────────────────────
+/// Storage key for the campaign's off-chain IPFS content identifier (CID)
+pub const KEY_IPFS_CID: Symbol = soroban_sdk::symbol_short!("IPFSCID");
+
+// ── Yield / treasury ─────────────────────────────────────────────────────────
+/// Storage key for the yield-generation configuration
+pub const KEY_YIELD_CONFIG: Symbol = soroban_sdk::symbol_short!("YLDCFG");
+/// Storage key for the total yield accrued
+pub const KEY_YIELD_TOTAL: Symbol = soroban_sdk::symbol_short!("YLDTOT");
+
+// ── Issue #929: Magic Number Constants ───────────────────────────────────────
+/// Basis points denominator (10,000 basis points = 100%).
+/// Used in fee calculations: fee = amount * fee_bps / BASIS_POINTS_MAX
+pub const BASIS_POINTS_MAX: i128 = 10_000;
+
+/// Maximum message length (characters) for contribution messages.
+/// Validated when storing contribution messages to prevent unbounded storage.
+pub const MAX_MESSAGE_LENGTH: usize = 256;
+
+/// TTL extension value for persistent storage entries (in ledger entries).
+/// Used to extend time-to-live for frequently accessed per-contributor data.
+/// Value represents 100 ledger entries worth of extension.
+pub const TTL_PERSISTENT_ENTRY: u32 = 100;
+
+/// TTL extension value for instance storage (short-term, in ledger entries).
+/// Used for frequent writes to campaign-wide state (e.g., totals, counts).
+/// Value represents 2 days of Soroban ledger entries (~17,280 entries).
+pub const TTL_INSTANCE_EXTEND_MIN: u32 = 17280;
+
+/// TTL extension value for instance storage (long-term, in ledger entries).
+/// Used to ensure campaign data survives well beyond typical campaign lifetime.
+/// Value represents ~6 days of Soroban ledger entries (~518,400 entries).
+pub const TTL_INSTANCE_EXTEND_MAX: u32 = 518400;
+
+/// Maximum batch size for refund operations.
+/// Limits the number of contributors processed in a single `refund_batch` call
+/// to prevent exceeding transaction resource limits and ensure predictable gas costs.
+pub const MAX_BATCH_REFUND_SIZE: u32 = 25;
 
 use soroban_sdk::{Address, Symbol as SorobanSymbol};
 

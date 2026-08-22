@@ -3,32 +3,60 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./src/index.ts",
+      "types": "./src/index.ts"
     },
     "./button": {
-      "import": "./dist/Button.js",
-      "types": "./dist/Button.d.ts"
+      "import": "./src/Button.entry.ts",
+      "types": "./src/Button.entry.ts"
+    },
+    "./form-field": {
+      "import": "./src/FormField.entry.ts",
+      "types": "./src/FormField.entry.ts"
     },
     "./input": {
-      "import": "./dist/Input.js",
-      "types": "./dist/Input.d.ts"
+      "import": "./src/Input.entry.ts",
+      "types": "./src/Input.entry.ts"
+    },
+    "./select": {
+      "import": "./src/Select.entry.ts",
+      "types": "./src/Select.entry.ts"
+    },
+    "./textarea": {
+      "import": "./src/Textarea.entry.ts",
+      "types": "./src/Textarea.entry.ts"
     },
     "./modal": {
-      "import": "./dist/Modal.js",
-      "types": "./dist/Modal.d.ts"
+      "import": "./src/Modal.entry.ts",
+      "types": "./src/Modal.entry.ts"
     },
     "./card": {
-      "import": "./dist/Card.js",
-      "types": "./dist/Card.d.ts"
+      "import": "./src/Card.entry.ts",
+      "types": "./src/Card.entry.ts"
     },
     "./progress-bar": {
-      "import": "./dist/ProgressBar.js",
-      "types": "./dist/ProgressBar.d.ts"
+      "import": "./src/ProgressBar.entry.ts",
+      "types": "./src/ProgressBar.entry.ts"
+    },
+    "./campaign-header": {
+      "import": "./src/CampaignHeader.entry.ts",
+      "types": "./src/CampaignHeader.entry.ts"
+    },
+    "./campaign-progress": {
+      "import": "./src/CampaignProgress.entry.ts",
+      "types": "./src/CampaignProgress.entry.ts"
+    },
+    "./campaign-actions": {
+      "import": "./src/CampaignActions.entry.ts",
+      "types": "./src/CampaignActions.entry.ts"
+    },
+    "./examples": {
+      "import": "./src/examples/index.ts",
+      "types": "./src/examples/index.ts"
     }
   },
   "scripts": {

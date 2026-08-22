@@ -1,3 +1,5 @@
+export { CAMPAIGN_STATUS_VALUES } from "@fund-my-cause/types";
+
 export type {
   CampaignStatus,
   CampaignInfo,

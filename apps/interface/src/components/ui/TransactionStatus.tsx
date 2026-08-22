@@ -69,8 +69,10 @@ export function TransactionStatus({
     <div
       className="space-y-4 p-4 rounded-[var(--radius-xl)] animate-pulse-none"
       style={{ background: "var(--color-surface-elevated)" }}
-      aria-live="polite"
+      role="status"
+      aria-live="assertive"
       aria-atomic="true"
+      aria-label={`Transaction status: ${status === "success" ? "completed successfully" : status === "error" ? "failed" : "in progress"}`}
     >
       {/* Steps */}
       <ol

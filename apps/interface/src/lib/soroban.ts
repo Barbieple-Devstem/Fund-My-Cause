@@ -13,6 +13,7 @@ import {
   xdr,
 } from "@stellar/stellar-sdk";
 import { isValidContractId } from "@/lib/validation";
+import { CAMPAIGN_STATUS_VALUES } from "@/types/soroban";
 import type {
   CampaignStatus,
   CampaignInfo,
@@ -44,14 +45,6 @@ const CONTRACT_IDS: string[] = (
   .split(",")
   .map((value) => value.trim())
   .filter(Boolean);
-
-const VALID_STATUSES = [
-  "Active",
-  "Successful",
-  "Refunded",
-  "Cancelled",
-  "Paused",
-] as const;
 
 function toRecord(value: unknown): Record<string, unknown> {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -107,7 +100,7 @@ function ledgerTimestampToIso(ts: bigint): string {
 function normalizeStatus(value: unknown): CampaignStatus {
   if (
     typeof value === "string" &&
-    VALID_STATUSES.includes(value as CampaignStatus)
+    CAMPAIGN_STATUS_VALUES.includes(value as CampaignStatus)
   ) {
     return value as CampaignStatus;
   }
@@ -117,13 +110,13 @@ function normalizeStatus(value: unknown): CampaignStatus {
     const tagged = record.tag;
     if (
       typeof tagged === "string" &&
-      VALID_STATUSES.includes(tagged as CampaignStatus)
+      CAMPAIGN_STATUS_VALUES.includes(tagged as CampaignStatus)
     ) {
       return tagged as CampaignStatus;
     }
 
     for (const key of Object.keys(record)) {
-      if (VALID_STATUSES.includes(key as CampaignStatus)) {
+      if (CAMPAIGN_STATUS_VALUES.includes(key as CampaignStatus)) {
         return key as CampaignStatus;
       }
     }
@@ -132,7 +125,11 @@ function normalizeStatus(value: unknown): CampaignStatus {
   return "Active" as CampaignStatus;
 }
 
-async function simulateView(contractId: string, method: string, args: xdr.ScVal[] = []) {
+async function simulateView(
+  contractId: string,
+  method: string,
+  args: xdr.ScVal[] = [],
+) {
   const rpc = new SorobanRpc.Server(RPC_URL);
   const contract = new Contract(contractId);
   const account = new Account(Keypair.random().publicKey(), "0");
@@ -405,7 +402,11 @@ async function buildSimpleContractTx(
 export const buildWithdrawTx = (caller: string, contractId: string) =>
   buildSimpleContractTx(caller, contractId, "withdraw");
 
-export const buildCancelTx = (caller: string, contractId: string, reason?: string) =>
+export const buildCancelTx = (
+  caller: string,
+  contractId: string,
+  reason?: string,
+) =>
   buildSimpleContractTx(
     caller,
     contractId,
@@ -508,8 +509,10 @@ export async function simulateTx(unsignedXdr: string): Promise<SimulateResult> {
 function parseSimulationError(raw: string): string {
   // Contract errors often look like: "HostError: Value(ContractError(N))\n..."
   const contractMatch = raw.match(/ContractError\((\d+)\)/);
-  if (contractMatch) return `Contract error code ${contractMatch[1]}. Please check your inputs.`;
-  if (raw.includes("below minimum")) return "Amount is below the campaign's minimum contribution.";
+  if (contractMatch)
+    return `Contract error code ${contractMatch[1]}. Please check your inputs.`;
+  if (raw.includes("below minimum"))
+    return "Amount is below the campaign's minimum contribution.";
   if (raw.includes("deadline")) return "This campaign's deadline has passed.";
   if (raw.includes("Cancelled")) return "This campaign has been cancelled.";
   // Fallback: trim to first line so we don't dump a wall of XDR at the user
@@ -520,9 +523,9 @@ function parseSimulationError(raw: string): string {
 
 export interface ContributionRecord {
   txHash: string;
-  contributor: string;   // source account of the invoking transaction
-  amountXlm: number;     // parsed from the invoke_host_function operation
-  timestamp: string;     // ISO string
+  contributor: string; // source account of the invoking transaction
+  amountXlm: number; // parsed from the invoke_host_function operation
+  timestamp: string; // ISO string
 }
 
 /**

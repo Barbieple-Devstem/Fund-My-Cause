@@ -3,36 +3,55 @@
 //! A lightweight Soroban contract that maintains a deduplicated, paginated list
 //! of all deployed [`CrowdfundContract`] campaign addresses on the Stellar network.
 //!
-//! ## Overview
+//! ## Access Control
 //!
-//! The registry acts as an on-chain directory. When a new campaign contract is
-//! deployed, its address is registered here so that frontends and indexers can
-//! discover all campaigns without relying on off-chain databases.
-//!
-//! ## Usage
-//!
-//! ```ignore
-//! // Register a newly deployed campaign
-//! registry_client.register(&campaign_contract_address);
-//!
-//! // List the first 20 campaigns
-//! let page = registry_client.list(&0, &20);
-//!
-//! // List the next 20
-//! let page2 = registry_client.list(&20, &20);
-//! ```
+//! | Function | Authorization required |
+//! |---|---|
+//! | `initialize` | `admin.require_auth()` — one-time setup |
+//! | `register` | `campaign_id.require_auth()` — campaign signs its own registration |
+//! | `register_with_category` | `campaign_id.require_auth()` |
+//! | `register_with_status` | `campaign_id.require_auth()` |
+//! | `update_status` | stored admin `require_auth()` |
+//! | `list` / `list_by_status` / `get_campaigns_by_category` | public read — no auth |
 //!
 //! ## Storage
 //!
 //! All campaign addresses are stored in a single instance-storage entry under
 //! the `CMPLIST` key as a `Vec<Address>`. Deduplication is enforced on write.
+//! The admin address is stored under `ADMIN` and set once during `initialize`.
+//!
+//! ## Module layout
+//!
+//! The contract's public entry points (below) are thin delegating wrappers —
+//! this file owns the single `#[contractimpl]` block (Soroban generates one
+//! `RegistryContractClient` per contract, so the callable surface must stay
+//! in one place), plus the storage keys and small helpers shared by both:
+//! - [`admin`] — every function that mutates registry state: the two
+//!   admin-gated ones (`initialize`, `update_status`) and the three
+//!   campaign-self-authorized registration entry points.
+//! - [`lookup`] — the three public, read-only, unauthenticated queries.
 
 #![no_std]
 
+mod admin;
+mod errors;
+mod events;
+mod lookup;
+
+pub use errors::ContractError;
+pub use events::{EventInitialized, EventRegistered};
+
 use soroban_sdk::{contract, contractimpl, contracttype, symbol_short, Address, Env, Symbol, Vec};
 
+// ── Storage keys ──────────────────────────────────────────────────────────────
+
 /// Instance storage key for the list of registered campaign contract addresses.
-const KEY_CAMPAIGNS: Symbol = symbol_short!("CMPLIST");
+pub(crate) const KEY_CAMPAIGNS: Symbol = symbol_short!("CMPLIST");
+
+/// Instance storage key for the admin address set during `initialize`.
+pub(crate) const KEY_ADMIN: Symbol = symbol_short!("ADMIN");
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 /// Campaign status values mirrored from the crowdfund contract for filtering.
 ///
@@ -57,208 +76,117 @@ pub enum CampaignStatus {
 
 /// Storage key variants for indexed campaign lists.
 #[contracttype]
-enum RegDataKey {
+pub(crate) enum RegDataKey {
     /// Paginated list of campaign addresses for a given numeric category id.
     CategoryList(u32),
     /// List of campaign addresses for a given status (maps to CampaignStatus discriminant).
     StatusList(u32),
 }
 
+// ── Shared helpers ────────────────────────────────────────────────────────────
+
+/// Returns `Err(NotInitialized)` if `initialize` has not been called yet.
+pub(crate) fn require_initialized(env: &Env) -> Result<(), ContractError> {
+    if !env.storage().instance().has(&KEY_ADMIN) {
+        return Err(ContractError::NotInitialized);
+    }
+    Ok(())
+}
+
+/// Returns a sub-slice of `src` starting at `offset` with at most `limit` items.
+pub(crate) fn paginate(env: &Env, src: &Vec<Address>, offset: u32, limit: u32) -> Vec<Address> {
+    let total = src.len();
+    if offset >= total {
+        return Vec::new(env);
+    }
+    let end = offset.saturating_add(limit).min(total);
+    let mut out = Vec::new(env);
+    let mut i = offset;
+    while i < end {
+        if let Some(addr) = src.get(i) {
+            out.push_back(addr);
+        }
+        i += 1;
+    }
+    out
+}
+
+// ── Contract ──────────────────────────────────────────────────────────────────
+
 /// The Fund-My-Cause registry contract.
 ///
 /// Maintains a deduplicated, append-only list of all deployed campaign contract
 /// addresses. Provides paginated read access for frontends and indexers.
+/// Every state-mutating function enforces caller authentication via
+/// `require_auth()` and returns `Result<_, ContractError>`.
 #[contract]
 pub struct RegistryContract;
 
 #[contractimpl]
 impl RegistryContract {
+    // ── Admin / lifecycle ─────────────────────────────────────────────────────
+
+    /// Initialises the registry and sets the admin address.
+    ///
+    /// Must be called exactly once immediately after contract deployment.
+    /// Subsequent calls return [`ContractError::AlreadyInitialized`].
+    ///
+    /// # Authorization
+    ///
+    /// `admin.require_auth()` — the admin must sign the initialisation transaction.
+    ///
+    /// # Errors
+    ///
+    /// - [`ContractError::AlreadyInitialized`] if the contract has already been
+    ///   initialised.
+    pub fn initialize(env: Env, admin: Address) -> Result<(), ContractError> {
+        admin::initialize(env, admin)
+    }
+
+    // ── Registration entry-points ─────────────────────────────────────────────
+
     /// Registers a campaign contract address in the registry.
     ///
-    /// If the address is already registered, this is a no-op — no duplicate
-    /// entries are created and no event is emitted.
+    /// The campaign contract itself must authorise the call — this prevents any
+    /// third party from registering arbitrary addresses.
     ///
-    /// # Arguments
+    /// If the address is already registered the call succeeds without emitting a
+    /// duplicate event.
     ///
-    /// * `env` - The Soroban environment.
-    /// * `campaign_id` - The contract address of the deployed campaign to register.
+    /// # Authorization
     ///
-    /// # Side Effects
+    /// `campaign_id.require_auth()` — the campaign contract must sign.
     ///
-    /// - Appends `campaign_id` to the stored campaign list (if not already present).
-    /// - Publishes a `("registry", "registered")` event with `campaign_id` as the
-    ///   data payload.
+    /// # Errors
     ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// // Called immediately after deploying a new CrowdfundContract
-    /// registry_client.register(&new_campaign_address);
-    /// ```
-    pub fn register(env: Env, campaign_id: Address) {
-        let mut campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !campaigns.contains(&campaign_id) {
-            campaigns.push_back(campaign_id.clone());
-            env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id);
-        }
+    /// - [`ContractError::NotInitialized`] if `initialize` has not been called.
+    /// - [`ContractError::Unauthorized`] if `campaign_id` did not sign.
+    ///   (Soroban surfaces this as a host-level auth failure before the error is
+    ///   returned, but the guard is explicit for documentation purposes.)
+    pub fn register(env: Env, campaign_id: Address) -> Result<(), ContractError> {
+        admin::register(env, campaign_id)
     }
 
-    /// Registers a campaign contract address together with its numeric category id.
+    /// Registers a campaign together with its numeric category id.
     ///
     /// Performs all the same deduplication and bookkeeping as [`register`], and
-    /// additionally maintains a per-category index so that callers can later
-    /// retrieve campaigns filtered by category via [`get_campaigns_by_category`].
+    /// additionally maintains a per-category index so callers can retrieve
+    /// campaigns filtered by category via [`get_campaigns_by_category`].
     ///
-    /// # Arguments
+    /// # Authorization
     ///
-    /// * `env` - The Soroban environment.
-    /// * `campaign_id` - The contract address of the deployed campaign.
-    /// * `category_id` - Numeric category identifier (see [`RegDataKey`]).
+    /// `campaign_id.require_auth()` — the campaign contract must sign.
     ///
-    /// # Side Effects
+    /// # Errors
     ///
-    /// - Appends `campaign_id` to the global campaign list (if not already present).
-    /// - Appends `campaign_id` to the category-specific list (if not already present).
-    /// - Publishes `("registry", "registered")` when a globally new campaign is added.
-    pub fn register_with_category(env: Env, campaign_id: Address, category_id: u32) {
-        // ── Global list (same logic as register()) ────────────────────────────
-        let mut campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !campaigns.contains(&campaign_id) {
-            campaigns.push_back(campaign_id.clone());
-            env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id.clone());
-        }
-
-        // ── Category-specific list ────────────────────────────────────────────
-        let cat_key = RegDataKey::CategoryList(category_id);
-        let mut cat_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&cat_key)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !cat_list.contains(&campaign_id) {
-            cat_list.push_back(campaign_id);
-            env.storage().instance().set(&cat_key, &cat_list);
-        }
-    }
-
-    /// Returns a paginated slice of campaign addresses filtered by category.
-    ///
-    /// Only campaigns registered via [`register_with_category`] appear in category
-    /// results.  Pagination is zero-indexed, identical to [`list`].
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - The Soroban environment.
-    /// * `category_id` - Numeric category to filter by (see [`RegDataKey`]).
-    /// * `offset` - Zero-based index of the first result to return.
-    /// * `limit` - Maximum number of results to return.  Passing `0` returns empty.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Address>` of up to `limit` campaign addresses in the given category,
-    /// or an empty `Vec` if no campaigns match.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// // Fetch first 10 Technology campaigns (category_id = 1)
-    /// let tech = registry_client.get_campaigns_by_category(&1, &0, &10);
-    /// ```
-    pub fn get_campaigns_by_category(
+    /// - [`ContractError::NotInitialized`] if `initialize` has not been called.
+    /// - [`ContractError::Unauthorized`] if `campaign_id` did not sign.
+    pub fn register_with_category(
         env: Env,
+        campaign_id: Address,
         category_id: u32,
-        offset: u32,
-        limit: u32,
-    ) -> Vec<Address> {
-        if limit == 0 {
-            return Vec::new(&env);
-        }
-
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&RegDataKey::CategoryList(category_id))
-            .unwrap_or_else(|| Vec::new(&env));
-
-        let total = campaigns.len();
-        if offset >= total {
-            return Vec::new(&env);
-        }
-
-        let end = offset.saturating_add(limit).min(total);
-        let mut out = Vec::new(&env);
-
-        let mut i = offset;
-        while i < end {
-            if let Some(addr) = campaigns.get(i) {
-                out.push_back(addr);
-            }
-            i += 1;
-        }
-
-        out
-    }
-
-    /// Returns a paginated slice of registered campaign contract addresses.
-    ///
-    /// Pagination is zero-indexed: pass `offset = 0, limit = 20` for the first
-    /// page, `offset = 20, limit = 20` for the second, and so on.
-    ///
-    /// # Arguments
-    ///
-    /// * `env` - The Soroban environment.
-    /// * `offset` - Zero-based index of the first item to return.
-    /// * `limit` - Maximum number of items to return. Passing `0` returns an
-    ///   empty list immediately.
-    ///
-    /// # Returns
-    ///
-    /// A `Vec<Address>` containing up to `limit` campaign addresses starting at
-    /// `offset`. Returns an empty `Vec` if `limit` is `0`, `offset` is beyond
-    /// the end of the list, or no campaigns have been registered yet.
-    pub fn list(env: Env, offset: u32, limit: u32) -> Vec<Address> {
-        if limit == 0 {
-            return Vec::new(&env);
-        }
-
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        let total = campaigns.len();
-        if offset >= total {
-            return Vec::new(&env);
-        }
-
-        let end = offset.saturating_add(limit).min(total);
-        let mut out = Vec::new(&env);
-
-        let mut i = offset;
-        while i < end {
-            if let Some(addr) = campaigns.get(i) {
-                out.push_back(addr);
-            }
-            i += 1;
-        }
-
-        out
+    ) -> Result<(), ContractError> {
+        admin::register_with_category(env, campaign_id, category_id)
     }
 
     /// Registers a campaign with a status tag for status-based filtering.
@@ -267,317 +195,76 @@ impl RegistryContract {
     /// adds the campaign to the per-status index so it appears in
     /// [`list_by_status`] results.
     ///
-    /// # Arguments
-    /// * `campaign_id` - Deployed campaign contract address.
-    /// * `status` - Initial status of the campaign.
-    pub fn register_with_status(env: Env, campaign_id: Address, status: CampaignStatus) {
-        let mut campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&KEY_CAMPAIGNS)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !campaigns.contains(&campaign_id) {
-            campaigns.push_back(campaign_id.clone());
-            env.storage().instance().set(&KEY_CAMPAIGNS, &campaigns);
-            env.events()
-                .publish(("registry", "registered"), campaign_id.clone());
-        }
-
-        let status_key = RegDataKey::StatusList(status as u32);
-        let mut status_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&status_key)
-            .unwrap_or_else(|| Vec::new(&env));
-
-        if !status_list.contains(&campaign_id) {
-            status_list.push_back(campaign_id);
-            env.storage().instance().set(&status_key, &status_list);
-        }
+    /// # Authorization
+    ///
+    /// `campaign_id.require_auth()` — the campaign contract must sign.
+    ///
+    /// # Errors
+    ///
+    /// - [`ContractError::NotInitialized`] if `initialize` has not been called.
+    /// - [`ContractError::Unauthorized`] if `campaign_id` did not sign.
+    pub fn register_with_status(
+        env: Env,
+        campaign_id: Address,
+        status: CampaignStatus,
+    ) -> Result<(), ContractError> {
+        admin::register_with_status(env, campaign_id, status)
     }
 
     /// Updates the status tag for a registered campaign.
     ///
     /// Removes `campaign_id` from its old status list and adds it to the new one.
-    /// This is a no-op if the campaign is not yet registered.
-    pub fn update_status(env: Env, campaign_id: Address, old_status: CampaignStatus, new_status: CampaignStatus) {
-        // Remove from old status list
-        let old_key = RegDataKey::StatusList(old_status as u32);
-        let mut old_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&old_key)
-            .unwrap_or_else(|| Vec::new(&env));
-        let mut new_old = Vec::new(&env);
-        for i in 0..old_list.len() {
-            let addr = old_list.get(i).unwrap();
-            if addr != campaign_id {
-                new_old.push_back(addr);
-            }
-        }
-        env.storage().instance().set(&old_key, &new_old);
+    ///
+    /// # Authorization
+    ///
+    /// Only the stored admin address may call this function.
+    /// `admin.require_auth()` is enforced.
+    ///
+    /// # Errors
+    ///
+    /// - [`ContractError::NotInitialized`] if `initialize` has not been called.
+    /// - [`ContractError::Unauthorized`] if the caller is not the admin.
+    /// - [`ContractError::NotFound`] if `campaign_id` is not in the global registry.
+    pub fn update_status(
+        env: Env,
+        campaign_id: Address,
+        old_status: CampaignStatus,
+        new_status: CampaignStatus,
+    ) -> Result<(), ContractError> {
+        admin::update_status(env, campaign_id, old_status, new_status)
+    }
 
-        // Add to new status list
-        let new_key = RegDataKey::StatusList(new_status as u32);
-        let mut new_list: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&new_key)
-            .unwrap_or_else(|| Vec::new(&env));
-        if !new_list.contains(&campaign_id) {
-            new_list.push_back(campaign_id);
-            env.storage().instance().set(&new_key, &new_list);
-        }
+    // ── Read-only queries (no auth required) ──────────────────────────────────
+
+    /// Returns a paginated slice of registered campaign contract addresses.
+    ///
+    /// Pagination is zero-indexed: pass `offset = 0, limit = 20` for the first
+    /// page, `offset = 20, limit = 20` for the second, and so on.
+    pub fn list(env: Env, offset: u32, limit: u32) -> Vec<Address> {
+        lookup::list(env, offset, limit)
     }
 
     /// Returns a paginated slice of campaigns filtered by status.
     ///
     /// Only campaigns registered via [`register_with_status`] appear here.
-    /// Pagination is identical to [`list`]: zero-indexed, empty on out-of-range offset.
+    pub fn list_by_status(
+        env: Env,
+        status: CampaignStatus,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<Address> {
+        lookup::list_by_status(env, status, offset, limit)
+    }
+
+    /// Returns a paginated slice of campaign addresses filtered by category.
     ///
-    /// # Arguments
-    /// * `status` - Status to filter by.
-    /// * `offset` - Zero-based start index.
-    /// * `limit` - Maximum results (0 returns empty).
-    pub fn list_by_status(env: Env, status: CampaignStatus, offset: u32, limit: u32) -> Vec<Address> {
-        if limit == 0 {
-            return Vec::new(&env);
-        }
-
-        let campaigns: Vec<Address> = env
-            .storage()
-            .instance()
-            .get(&RegDataKey::StatusList(status as u32))
-            .unwrap_or_else(|| Vec::new(&env));
-
-        let total = campaigns.len();
-        if offset >= total {
-            return Vec::new(&env);
-        }
-
-        let end = offset.saturating_add(limit).min(total);
-        let mut out = Vec::new(&env);
-        let mut i = offset;
-        while i < end {
-            if let Some(addr) = campaigns.get(i) {
-                out.push_back(addr);
-            }
-            i += 1;
-        }
-        out
-    }
-}
-
-#[cfg(test)]
-#[allow(deprecated)]
-mod tests {
-    use super::*;
-    use soroban_sdk::{testutils::Address as _, Address};
-
-    #[test]
-    fn test_register_with_category_and_filter() {
-        let env = Env::default();
-
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let charity1 = Address::generate(&env);
-        let charity2 = Address::generate(&env);
-        let tech1 = Address::generate(&env);
-
-        // category_id 0 = Charity, 1 = Technology
-        client.register_with_category(&charity1, &0);
-        client.register_with_category(&charity2, &0);
-        client.register_with_category(&tech1, &1);
-
-        // All campaigns appear in global list
-        let all = client.list(&0, &10);
-        assert_eq!(all.len(), 3);
-
-        // Charity filter returns only charity campaigns
-        let charities = client.get_campaigns_by_category(&0, &0, &10);
-        assert_eq!(charities.len(), 2);
-
-        // Tech filter returns only tech campaign
-        let techs = client.get_campaigns_by_category(&1, &0, &10);
-        assert_eq!(techs.len(), 1);
-        assert_eq!(techs.get(0).unwrap(), tech1);
-
-        // Unknown category returns empty
-        let empty = client.get_campaigns_by_category(&99, &0, &10);
-        assert_eq!(empty.len(), 0);
-    }
-
-    #[test]
-    fn test_register_with_category_deduplicates() {
-        let env = Env::default();
-
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let campaign = Address::generate(&env);
-
-        client.register_with_category(&campaign, &0);
-        client.register_with_category(&campaign, &0); // duplicate — ignored
-
-        let charities = client.get_campaigns_by_category(&0, &0, &10);
-        assert_eq!(charities.len(), 1);
-
-        let all = client.list(&0, &10);
-        assert_eq!(all.len(), 1);
-    }
-
-    #[test]
-    fn test_get_campaigns_by_category_pagination() {
-        let env = Env::default();
-
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let a = Address::generate(&env);
-        let b = Address::generate(&env);
-        let c = Address::generate(&env);
-
-        // Register 3 creative campaigns (category_id = 2)
-        client.register_with_category(&a, &2);
-        client.register_with_category(&b, &2);
-        client.register_with_category(&c, &2);
-
-        let page1 = client.get_campaigns_by_category(&2, &0, &2);
-        assert_eq!(page1.len(), 2);
-
-        let page2 = client.get_campaigns_by_category(&2, &2, &2);
-        assert_eq!(page2.len(), 1);
-
-        // limit = 0 returns empty
-        let empty = client.get_campaigns_by_category(&2, &0, &0);
-        assert_eq!(empty.len(), 0);
-
-        // offset beyond end returns empty
-        let beyond = client.get_campaigns_by_category(&2, &10, &5);
-        assert_eq!(beyond.len(), 0);
-    }
-
-    #[test]
-    fn register_deduplicates_and_lists_with_pagination() {
-        let env = Env::default();
-
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let a = Address::generate(&env);
-        let b = Address::generate(&env);
-        let c = Address::generate(&env);
-
-        client.register(&a);
-        client.register(&b);
-        client.register(&a); // duplicate — should be ignored
-        client.register(&c);
-
-        // Total unique registrations: 3
-        let page1 = client.list(&0, &2);
-        assert_eq!(page1.len(), 2);
-
-        let page2 = client.list(&2, &2);
-        assert_eq!(page2.len(), 1);
-
-        // Empty page beyond end
-        let page3 = client.list(&10, &5);
-        assert_eq!(page3.len(), 0);
-
-        // limit = 0 returns empty
-        let empty = client.list(&0, &0);
-        assert_eq!(empty.len(), 0);
-    }
-
-    // ── Issue #701: Status filtering tests ───────────────────────────────────
-
-    #[test]
-    fn test_register_with_status_and_filter() {
-        let env = Env::default();
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let active1 = Address::generate(&env);
-        let active2 = Address::generate(&env);
-        let successful1 = Address::generate(&env);
-        let failed1 = Address::generate(&env);
-
-        client.register_with_status(&active1, &CampaignStatus::Active);
-        client.register_with_status(&active2, &CampaignStatus::Active);
-        client.register_with_status(&successful1, &CampaignStatus::Successful);
-        client.register_with_status(&failed1, &CampaignStatus::Failed);
-
-        // All appear in global list
-        assert_eq!(client.list(&0, &10).len(), 4);
-
-        // Status filters return correct subsets
-        let actives = client.list_by_status(&CampaignStatus::Active, &0, &10);
-        assert_eq!(actives.len(), 2);
-
-        let successes = client.list_by_status(&CampaignStatus::Successful, &0, &10);
-        assert_eq!(successes.len(), 1);
-        assert_eq!(successes.get(0).unwrap(), successful1);
-
-        let failures = client.list_by_status(&CampaignStatus::Failed, &0, &10);
-        assert_eq!(failures.len(), 1);
-
-        // Cancelled returns empty (none registered with that status)
-        let cancelled = client.list_by_status(&CampaignStatus::Cancelled, &0, &10);
-        assert_eq!(cancelled.len(), 0);
-    }
-
-    #[test]
-    fn test_list_by_status_pagination_boundary_conditions() {
-        let env = Env::default();
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        for _ in 0..5 {
-            client.register_with_status(&Address::generate(&env), &CampaignStatus::Active);
-        }
-
-        // Normal first page
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &3).len(), 3);
-        // Last page (partial)
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &3, &3).len(), 2);
-        // Offset at exact end — empty
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &5, &3).len(), 0);
-        // Offset beyond end — empty
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &10, &3).len(), 0);
-        // limit = 0 — always empty
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &0).len(), 0);
-    }
-
-    #[test]
-    fn test_update_status_moves_campaign_between_buckets() {
-        let env = Env::default();
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let campaign = Address::generate(&env);
-        client.register_with_status(&campaign, &CampaignStatus::Active);
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
-        assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 0);
-
-        // Campaign finishes successfully
-        client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful);
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 0);
-        assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 1);
-    }
-
-    #[test]
-    fn test_register_with_status_deduplicates() {
-        let env = Env::default();
-        let registry_id = env.register_contract(None, RegistryContract);
-        let client = RegistryContractClient::new(&env, &registry_id);
-
-        let campaign = Address::generate(&env);
-        client.register_with_status(&campaign, &CampaignStatus::Active);
-        client.register_with_status(&campaign, &CampaignStatus::Active); // duplicate
-
-        assert_eq!(client.list(&0, &10).len(), 1);
-        assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 1);
+    /// Only campaigns registered via [`register_with_category`] appear here.
+    pub fn get_campaigns_by_category(
+        env: Env,
+        category_id: u32,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<Address> {
+        lookup::get_campaigns_by_category(env, category_id, offset, limit)
     }
 }

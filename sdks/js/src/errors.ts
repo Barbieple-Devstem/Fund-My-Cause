@@ -1,6 +1,29 @@
-/** Thrown when the Soroban contract returns a `ContractError(n)`. */
+/**
+ * Thrown when the Soroban contract returns a `ContractError(n)`.
+ *
+ * Distinguishes contract-level rejections — a failed precondition the caller
+ * can act on — from network, wallet, and submission failures, which surface as
+ * a plain `Error`. Narrow with `instanceof` before reading {@link
+ * FmcContractError.code}.
+ *
+ * @example
+ * ```ts
+ * try {
+ *   await client.contribute({ ... });
+ * } catch (e) {
+ *   if (e instanceof FmcContractError) {
+ *     console.error(`Contract error ${e.code}: ${e.message}`);
+ *   }
+ * }
+ * ```
+ */
 export class FmcContractError extends Error {
   constructor(
+    /**
+     * The contract's numeric error code, matching the `ContractError`
+     * discriminant. Stable across releases, so it is safe to branch on — see
+     * `docs/api/errors.md` for the full table.
+     */
     public readonly code: number,
     message: string,
   ) {

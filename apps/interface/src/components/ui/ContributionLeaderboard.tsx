@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { fetchContributorList, type ContributorEntry } from "@/lib/soroban";
+import { QUERY_KEYS } from "@/lib/queryKeys";
 import { formatXLM, formatAddress } from "@/lib/format";
 import {
   Trophy,
@@ -89,7 +90,7 @@ export function ContributionLeaderboard({
   }, [contractId]);
 
   const { data: rows = [], isLoading } = useQuery<LeaderboardRow[]>({
-    queryKey: ["leaderboard", contractId, page, pageSize],
+    queryKey: QUERY_KEYS.leaderboard(contractId, page, pageSize),
     queryFn: async () => {
       const entries = await fetchContributorList(contractId, page, pageSize);
       const sorted = [...entries].sort((a, b) =>
@@ -115,7 +116,6 @@ export function ContributionLeaderboard({
         };
       });
     },
-    staleTime: 30_000,
   });
 
   // Persist current ranks after data loads, on subsequent loads (not first)

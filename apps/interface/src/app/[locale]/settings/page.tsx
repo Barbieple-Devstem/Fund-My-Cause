@@ -4,7 +4,7 @@ import React from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { useNotificationPreferences } from "@/context/NotificationPreferencesContext";
 import { useCurrency, FIAT_CURRENCIES } from "@/context/CurrencyContext";
-import type { NotificationType } from "@/context/NotificationContext";
+import type { NotificationType } from "@/store/useNotificationStore";
 
 const CATEGORIES: {
   type: NotificationType;

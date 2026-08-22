@@ -1,0 +1,112 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Donation Mutation Load Test
+# Target: GraphQL recordContribution mutation on the graphql-api service
+#
+# Usage:
+#   cd /workspaces/Fund-My-Cause/performance
+#   artillery run donation-mutation-load-test.yml \
+#     --output results/donation-mutation-$(date +%Y%m%d-%H%M%S).json
+#
+# Environment variables (override via .env or shell):
+#   GRAPHQL_URL        — default: http://localhost:4000
+#   AUTH_TOKEN         — JWT bearer token (required for authenticated mutations)
+#   CAMPAIGN_ID        — Soroban contract address of an active test campaign
+#   CONTRIBUTOR_ADDR   — Stellar address used as contributor
+#
+# See performance/README.md for full setup and run instructions.
+# ─────────────────────────────────────────────────────────────────────────────
+
+config:
+  target: "{{ $env.GRAPHQL_URL || 'http://localhost:4000' }}"
+  processor: "./donation-mutation-helpers.js"
+
+  # ── Phase profile (matches donation-mutation-targets.md) ──────────────────
+  phases:
+    - name: "Warm-up"
+      duration: 30
+      arrivalRate: 5
+    - name: "Ramp"
+      duration: 60
+      arrivalRate: 5
+      rampTo: 25
+    - name: "Sustained"
+      duration: 90
+      arrivalRate: 25
+    - name: "Peak"
+      duration: 60
+      arrivalRate: 50
+    - name: "Cool-down"
+      duration: 30
+      arrivalRate: 0
+
+  # ── Pass / fail thresholds (from donation-mutation-targets.md) ────────────
+  ensure:
+    p95: 1500       # ms — p95 response time ≤ 1 500 ms
+    p99: 3000       # ms — p99 response time ≤ 3 000 ms
+    maxErrorRate: 1 # %  — HTTP + GraphQL errors ≤ 1 %
+
+  # ── Global defaults ────────────────────────────────────────────────────────
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+      # Forward a consistent trace ID so server logs can be correlated.
+      # Each VU injects its own per-request trace ID via beforeRequest().
+      X-Load-Test: "donation-mutation-artillery"
+
+  # ── Plugins ───────────────────────────────────────────────────────────────
+  plugins:
+    metrics-by-endpoint:
+      stripQueryString: true
+
+  # ── Variables available to all scenarios ─────────────────────────────────
+  variables:
+    # These are fallback values; real values should come from the .env file
+    # or shell env vars (CAMPAIGN_ID, CONTRIBUTOR_ADDR, AUTH_TOKEN).
+    campaignId: "{{ $env.CAMPAIGN_ID || 'PLACEHOLDER_CAMPAIGN_CONTRACT_ID' }}"
+    contributorAddr: "{{ $env.CONTRIBUTOR_ADDR || 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN' }}"
+    authToken: "{{ $env.AUTH_TOKEN || '' }}"
+
+scenarios:
+  # ── Primary scenario: recordContribution mutation (100% weight) ────────────
+  # The mutation is the sole focus of this load test.  Mixed read traffic is
+  # covered by the existing services/graphql-api/load-test.yml.
+  - name: "recordContribution mutation"
+    weight: 100
+    flow:
+      # Step 0: inject per-request trace ID and auth header via beforeRequest
+      - function: "setRequestHeaders"
+
+      # Step 1: POST the recordContribution GraphQL mutation
+      - post:
+          url: "/graphql"
+          json:
+            query: |
+              mutation RecordContribution($input: RecordContributionInput!) {
+                recordContribution(input: $input) {
+                  id
+                  campaignId
+                  contributor
+                  amount
+                  timestamp
+                  transactionHash
+                }
+              }
+            variables:
+              input:
+                campaignId: "{{ campaignId }}"
+                contributor: "{{ contributorAddr }}"
+                # Use a realistic amount: 100 XLM = 1_000_000_000 stroops
+                amount: "1000000000"
+                # generateTxHash() injects a unique hash per request via
+                # beforeRequest so each call looks like a distinct on-chain tx.
+                transactionHash: "{{ txHash }}"
+          capture:
+            # Capture GraphQL errors for the afterResponse hook to count
+            - json: "$.errors"
+              as: "gqlErrors"
+            - json: "$.data.recordContribution.id"
+              as: "contributionId"
+
+      # Step 2: record GraphQL-level errors (HTTP 200 but errors[] non-null)
+      - function: "checkGraphQLErrors"

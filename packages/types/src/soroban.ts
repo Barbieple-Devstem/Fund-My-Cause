@@ -1,4 +1,19 @@
-export type CampaignStatus = "Active" | "Successful" | "Refunded" | "Cancelled" | "Paused";
+/**
+ * Canonical campaign status values, mirroring the crowdfund contract's
+ * `Status` enum (contracts/crowdfund/src/types.rs) exactly — including
+ * casing. Exported as a runtime array (not just a type) so consumers can
+ * validate untrusted data against it instead of hand-copying the list.
+ */
+export const CAMPAIGN_STATUS_VALUES = [
+  "Active",
+  "Successful",
+  "Refunded",
+  "Cancelled",
+  "Paused",
+  "Archived",
+] as const;
+
+export type CampaignStatus = (typeof CAMPAIGN_STATUS_VALUES)[number];
 
 export interface PlatformConfig {
   address: string;

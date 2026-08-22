@@ -1,8 +1,19 @@
+/**
+ * Covers the validation surface still re-exported from CreateCampaignWizard for
+ * backwards compatibility after the per-step split. The exhaustive per-step
+ * cases live in ./wizard/validators.test.ts.
+ */
+
 import {
   INITIAL,
   validateAllSteps,
   validateStep,
 } from "./CreateCampaignWizard";
+
+/** 30 days out — deadlines must be between 1 hour and 1 year in the future. */
+const DEADLINE = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .split("T")[0]!;
 
 describe("CreateCampaignWizard validation", () => {
   it("requires a valid contract ID on the first step", () => {
@@ -18,7 +29,7 @@ describe("CreateCampaignWizard validation", () => {
       title: "Test",
       description: "Desc",
       goal: "100",
-      deadline: "2099-01-01",
+      deadline: DEADLINE,
       minContribution: "1",
     };
     expect(validateStep(0, data)).toBe("Contract ID is invalid.");
@@ -50,9 +61,9 @@ describe("CreateCampaignWizard validation", () => {
       token: "C" + "A".repeat(55),
       title: "Test Campaign",
       description: "A short description.",
-      category: "technology",
+      category: "health",
       goal: "100",
-      deadline,
+      deadline: DEADLINE,
       minContribution: "1",
       videoUrl: "https://example.com/video.mp4",
       feeAddress: "G123",

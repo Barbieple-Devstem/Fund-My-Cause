@@ -8,6 +8,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **#893 REST endpoint audit** — `services/graphql-api/docs/rest-endpoints.md` documents
+  every REST route in `services/graphql-api` (`GET /health`, `GET /status`, `GET /metrics`,
+  `POST /graphql`) with a caller cross-reference against `apps/interface` and `sdks/js`.
+  All routes are confirmed active with zero deprecated callers.  The frontend migrated fully
+  to GraphQL for *data* operations; the three non-GraphQL routes are operational/infra
+  endpoints with no GraphQL equivalents and no candidates for removal.
+- **#894 Indexer database index migration** — `services/indexer/src/migrations/` adds a
+  structured migration system for the in-memory EventStore:
+  - `001_add_event_indexes.ts` — adds secondary `contractIndex` and `typeIndex` Maps that
+    eliminate full-table scans on `queryByContract` and `queryByType` (O(n) → O(k log k),
+    where k = matching events).  Includes `up()`, `down()` (rollback), and `verify()`.
+  - `run-migrations.ts` — migration runner that applies or rolls back all migrations in
+    order.  Idempotent; safe to run on restart.
+  - `EventStore` extended with `enableIndexes()`, `disableIndexes()`, `verifyIndexes()`,
+    and the `IndexedEventStore` interface; secondary indexes maintained on every `addEvents`
+    call (O(1) amortised overhead per event).
+  - Migrations applied automatically at indexer startup via `runMigrations(store, 'up')`.
+- **#895 Centralised structured logging** — all backend services now emit structured logs
+  consistent with `docs/logging-conventions.md`:
+  - `services/monitoring-service/src/logger.ts` — pino logger with `service: monitoring-service`
+    binding and `requestLogger(traceId)` helper (mirrors `graphql-api` and `indexer` loggers).
+  - All `console.log` / `console.error` calls removed from `incident-response.ts`,
+    `pagerduty-integration.ts`, `alert-transport.ts`, and `index.ts`; replaced with
+    structured `logger.info` / `logger.error` / `logger.warn` / `logger.debug` calls.
+  - `backend/recommendations/service.py` — structlog added with `merge_contextvars` processor
+    chain, `TraceIDMiddleware` registered on the FastAPI app, and `log.info` / `log.debug`
+    calls on recommendation request/cache-hit/cache-miss paths.  Mirrors the canonical
+    implementation in `backend/fraud_detection/pipeline.py`.
+  - `structlog==24.1.0` added to `backend/recommendations/requirements.txt`.
+- **#896 Indexer event handler split** — `services/indexer/src/handlers/` introduces a
+  domain-driven dispatch layer:
+  - `types.ts` — `EventHandler` shared interface (`eventType: string`, `handle(events, repo)`).
+  - `campaign.handler.ts` — handles `campaign` events with domain-specific log fields
+    (creator, title, goal, deadline).
+  - `donation.handler.ts` — handles `donation` events and the legacy `Contribute` alias
+    (backward compat with original Soroban contract event names); logs per-batch total amount.
+  - `achievement.handler.ts` — handles `achievement` events (badge, points, achievement_type).
+  - `dispatcher.ts` — `EventDispatcher` groups a mixed batch by type, routes each group to
+    the matching handler, and falls back to the repository for unknown types (zero event loss).
+    Alias routing registered at construction time via `static aliases` on handler classes.
+  - `index.ts` barrel re-exports all handlers and the dispatcher.
+  - `services/indexer/src/index.ts` updated: ingestion loop now calls `dispatcher.dispatch(events)`
+    instead of `eventRepository.addEvents(events)`.
+  - Unit tests: `campaign.handler.test.ts`, `donation.handler.test.ts`,
+    `achievement.handler.test.ts`, `dispatcher.test.ts` (mixed batch, alias routing,
+    fallback, empty batch, end-state equivalence with pre-refactor behavior).
+
+### Removed
+- **#893** No REST endpoints removed — all existing routes have active callers.
+  (See `services/graphql-api/docs/rest-endpoints.md` for the full audit record.)
+
+### Added
+- Seed/fixture generators for local testing and development (#731)
+  - `scripts/seed-testnet.sh` — Unix/Linux/Mac script to deploy sample campaigns to testnet covering all lifecycle states (active, funded, failed, refunding)
+  - `scripts/seed-testnet.ps1` — Windows PowerShell version of seed script with identical functionality
+  - `scripts/generate-fixtures.ts` — TypeScript fixture generator creating realistic JSON test data for E2E and component tests
+  - `fixtures/README.md` — comprehensive documentation for using fixtures and seed scripts, including campaign states, usage examples, and troubleshooting
+  - `docs/LOCAL_DEVELOPMENT_QUICKSTART.md` — quick start guide for local development with step-by-step setup instructions
+  - `npm run fixtures:generate` — command to generate test fixtures JSON
+  - `npm run seed:testnet` — command to seed testnet with sample campaigns (Unix/Linux/Mac)
+  - Automatic `.env.local` generation with deployed contract IDs
+  - `fixtures/seed-data.json` generation with deployment metadata and contract addresses
+  - Campaign templates covering 10 different states: new, mid-progress, near goal, fully funded, failed, refunding, paused, near deadline, early stage, and low progress
+  - Support for 5-50 campaigns with `--num-campaigns` option for load testing
+  - Verbose mode for detailed deployment logging
+  - Backup creation for `.env.local` before overwriting
 - `docs/api/` — structured API reference for both contracts: `crowdfund.md`,
   `registry.md`, `types.md`, `errors.md`, `events.md`, each cross-linked.
 - `docs/tutorials/` — six step-by-step guides: getting started, campaign

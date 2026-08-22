@@ -15,6 +15,9 @@ export default [
       globals: {
         console: "readonly",
         process: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        fetch: "readonly",
       },
     },
     plugins: {
@@ -22,7 +25,7 @@ export default [
     },
     rules: {
       ...tsPlugin.configs.recommended.rules,
-      "@typescript-eslint/explicit-function-return-types": "warn",
+      "@typescript-eslint/explicit-function-return-type": "warn",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
     },
   },

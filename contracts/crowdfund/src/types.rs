@@ -39,7 +39,11 @@ pub struct CampaignStats {
     pub gross_raised: i128,
     /// Campaign funding goal in stroops
     pub goal: i128,
-    /// Progress as basis points (0-10000, where 10000 = 100%)
+    /// Soft cap — minimum viable funding target (0 = not set, uses goal)
+    pub soft_cap: i128,
+    /// Stretch goal — over-funding target tracked separately (0 = not set)
+    pub stretch_goal: i128,
+    /// Progress as basis points (0-10000, where 10000 = 100%) relative to soft_cap (or goal if soft_cap=0)
     pub progress_bps: u32,
     /// Number of unique contributors
     pub contributor_count: u32,
@@ -369,8 +373,14 @@ pub enum DataKey {
     ContributorIndex(u32),
     /// Yield accounting info for a specific contributor
     YieldInfo(Address),
+    /// Whether an address is on the campaign allow-list (#697)
+    AllowList(Address),
+    /// Whether an address is on the campaign deny-list (#697)
+    DenyList(Address),
     /// Governance proposal by nonce
     GovernanceProposal(u32),
+    /// Records whether a governor (by address) has voted on a proposal (by nonce)
+    GovernanceVote(u32, Address),
     /// Emergency pause approval by governor address
     EmergencyPauseApproval(Address),
     /// Running emergency pause approval count
@@ -1553,12 +1563,14 @@ pub struct EventQfContribution {
     pub contributor_count: u32,
 }
 
-// ── Issue #703: Event schema versioning ──────────────────────────────────────
+// ── Issue #703 / #924: Event schema versioning ───────────────────────────────
 
-/// Current event schema version.  Bump this when the shape of any emitted
-/// event payload changes in a backwards-incompatible way so that indexers can
-/// adapt without guessing.
-pub const EVENT_SCHEMA_VERSION: u32 = 1;
+/// Current event schema version. Re-exported from `common`'s shared event
+/// convention (see `contracts/common/src/events.rs`) so all three contracts
+/// start from the same version number. Bump this when the shape of any
+/// emitted event payload changes in a backwards-incompatible way so that
+/// indexers can adapt without guessing.
+pub use common::EVENT_SCHEMA_VERSION;
 
 // ── Issue #704: Withdrawal streaming ─────────────────────────────────────────
 
@@ -1589,4 +1601,156 @@ pub struct EventStreamClaimed {
     pub amount: i128,
     pub remaining: i128,
     pub schema_version: u32,
+}
+
+// ── Issue #694: Soft-cap / stretch-goal ──────────────────────────────────────
+
+/// Emitted when soft-cap or stretch-goal is configured.
+///
+/// Event topic: `("campaign", "caps_configured")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventCapsConfigured {
+    /// Soft cap amount in stroops (0 = not set)
+    pub soft_cap: i128,
+    /// Stretch goal amount in stroops (0 = not set)
+    pub stretch_goal: i128,
+}
+
+// ── Issue #696: Pause timelock ───────────────────────────────────────────────
+
+/// Emitted when the campaign is paused with a timelock.
+///
+/// Event topic: `("campaign", "paused_with_timelock")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventPausedWithTimelock {
+    pub timestamp: u64,
+    /// Earliest time the campaign can be unpaused
+    pub unpause_after: u64,
+}
+
+// ── Issue #697: Allow/deny list ──────────────────────────────────────────────
+
+/// Emitted when an address is added to the allow list.
+///
+/// Event topic: `("campaign", "allowlisted")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventAllowlisted {
+    pub address: Address,
+}
+
+/// Emitted when an address is removed from the allow list.
+///
+/// Event topic: `("campaign", "allowlist_removed")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventAllowlistRemoved {
+    pub address: Address,
+}
+
+/// Emitted when an address is added to the deny list.
+///
+/// Event topic: `("campaign", "denylisted")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventDenylisted {
+    pub address: Address,
+}
+
+/// Emitted when an address is removed from the deny list.
+///
+/// Event topic: `("campaign", "denylist_removed")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventDenylistRemoved {
+    pub address: Address,
+}
+
+// ── Issue #418: Contributor rewards ──────────────────────────────────────────
+
+/// Configuration for contributor reward-token distribution.
+///
+/// When enabled, contributors can claim `reward_token` proportional to their
+/// contribution (`contribution * reward_per_unit / 1_000_000`).
+#[derive(Clone, PartialEq, Debug)]
+#[contracttype]
+pub struct RewardConfig {
+    /// The token minted/transferred as a reward
+    pub reward_token: Address,
+    /// Reward units granted per 1_000_000 stroops contributed
+    pub reward_per_unit: i128,
+    /// Whether reward distribution is currently active
+    pub enabled: bool,
+}
+
+/// Emitted when contributor rewards are configured.
+///
+/// Event topic: `("campaign", "rewards_configured")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventRewardsConfigured {
+    pub reward_token: Address,
+    pub reward_per_unit: i128,
+}
+
+/// Emitted when rewards are distributed to a contributor.
+///
+/// Event topic: `("campaign", "rewards_distributed")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventRewardsDistributed {
+    pub contributor: Address,
+    pub contribution_amount: i128,
+    pub reward_amount: i128,
+}
+
+// ── Issue #416: Campaign search index ────────────────────────────────────────
+
+/// A searchable index entry describing a campaign's discoverable metadata.
+#[derive(Clone, PartialEq, Debug)]
+#[contracttype]
+pub struct SearchIndexEntry {
+    pub title: String,
+    pub description: String,
+    pub category: Category,
+    pub visibility: Visibility,
+    pub created_at: u64,
+    pub status: Status,
+}
+
+/// Emitted when a campaign is (re)indexed.
+///
+/// Event topic: `("campaign", "indexed")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventCampaignIndexed {
+    pub title: String,
+    pub category: Category,
+    pub visibility: Visibility,
+}
+
+/// Emitted when a campaign is cloned into a new campaign.
+///
+/// Event topic: `("campaign", "cloned")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventCampaignCloned {
+    pub original_creator: Address,
+    pub new_creator: Address,
+    pub new_goal: i128,
+    pub new_deadline: u64,
+}
+
+// ── Issue #699: IPFS metadata ────────────────────────────────────────────────
+
+/// Emitted when the campaign's off-chain IPFS CID is updated.
+///
+/// Event topic: `("campaign", "ipfs_cid_updated")`
+#[derive(Clone)]
+#[contracttype]
+pub struct EventIpfsCidUpdated {
+    pub cid: String,
+    pub timestamp: u64,
 }

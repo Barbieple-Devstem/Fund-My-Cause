@@ -27,7 +27,9 @@ export function ReceiptModal({
   explorerUrl = (hash) => `https://testnet.stellarexpert.com/tx/${hash}`,
 }: ReceiptModalProps) {
   const receiptRef = React.useRef<HTMLDivElement>(null);
-  const dialogRef = useFocusTrap(true, { onEscape: onClose }) as React.RefObject<HTMLDivElement>;
+  const dialogRef = useFocusTrap(true, {
+    onEscape: onClose,
+  }) as React.RefObject<HTMLDivElement>;
 
   const downloadPDF = async () => {
     if (!receiptRef.current) return;
@@ -81,15 +83,22 @@ export function ReceiptModal({
         <div className="mb-6 flex items-start justify-between">
           <div className="flex items-center gap-3">
             <CheckCircle className="h-8 w-8 text-green-500" />
-            <h2 id="receipt-modal-title" className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2
+              id="receipt-modal-title"
+              className="text-xl font-bold text-gray-900 dark:text-white"
+            >
               Contribution Receipt
             </h2>
           </div>
           <button
             onClick={onClose}
+            aria-label="Close receipt"
             className="rounded-lg p-1 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
-            <X className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <X
+              className="h-5 w-5 text-gray-600 dark:text-gray-400"
+              aria-hidden="true"
+            />
           </button>
         </div>
 
@@ -108,7 +117,9 @@ export function ReceiptModal({
           <div className="h-px bg-gray-200 dark:bg-gray-700" />
 
           <div className="space-y-1">
-            <p className="text-sm text-gray-600 dark:text-gray-400">Amount Contributed</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Amount Contributed
+            </p>
             <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
               {receipt.amount.toFixed(2)} XLM
             </p>
@@ -141,7 +152,9 @@ export function ReceiptModal({
           <div className="h-px bg-gray-200 dark:bg-gray-700" />
 
           <div className="space-y-1">
-            <p className="text-xs text-gray-600 dark:text-gray-400">Transaction Hash</p>
+            <p className="text-xs text-gray-600 dark:text-gray-400">
+              Transaction Hash
+            </p>
             <p className="break-all font-mono text-xs text-gray-900 dark:text-white">
               {receipt.txHash}
             </p>
@@ -155,9 +168,10 @@ export function ReceiptModal({
             href={explorerUrl(receipt.txHash)}
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="View on Block Explorer (opens in new tab)"
             className="flex items-center justify-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2 font-medium text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300 dark:hover:bg-indigo-900"
           >
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
             View on Block Explorer
           </a>
 

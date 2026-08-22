@@ -147,26 +147,41 @@ export const typeDefs = gql`
   type Query {
     # Campaign queries
     campaign(id: ID!): Campaign
+    # List campaigns with cursor-based pagination.
+    #
+    # Cursor pagination arguments:
+    #   first  - maximum number of items to return (default 20, max 100).
+    #   after  - opaque cursor from a previous response's pageInfo.endCursor;
+    #            when supplied, results start *after* that item.
+    #
+    # Legacy offset arguments (kept for backwards compatibility):
+    #   pagination.limit / pagination.offset
+    # When both cursor and offset arguments are present, cursor arguments take precedence.
     campaigns(
       filter: CampaignFilter
+      # Cursor-based: return at most this many items (max 100).
+      first: Int
+      # Cursor-based: start after this opaque cursor.
+      after: String
+      # Legacy offset pagination - superseded by first/after.
       pagination: PaginationInput
       sort: CampaignSort
     ): CampaignConnection!
     activeCampaigns(limit: Int = 20): [Campaign!]!
     trendingCampaigns(limit: Int = 10): [Campaign!]!
     searchCampaigns(query: String!, limit: Int = 20): [Campaign!]!
-    
+
     # Campaign detail
     campaignDetail(id: ID!): CampaignDetail
-    
+
     # Contribution queries
     contribution(id: ID!): Contribution
     contributions(campaignId: ID, contributor: String): [Contribution!]!
-    
+
     # User queries
     user(address: String!): User
     userContributions(address: String!, limit: Int = 50): [Contribution!]!
-    
+
     # Statistics
     stats: Statistics!
   }
@@ -204,11 +219,11 @@ export const typeDefs = gql`
     # Campaign subscriptions
     campaignUpdated(id: ID!): CampaignUpdate!
     campaignStatusChanged(id: ID!): Campaign!
-    
+
     # Contribution subscriptions
     newContribution(campaignId: ID!): Contribution!
     campaignProgressChanged(id: ID!): CampaignProgress!
-    
+
     # Milestone subscriptions
     milestoneReached(campaignId: ID!): Milestone!
   }
@@ -226,12 +241,16 @@ export const typeDefs = gql`
   # Mutation root (for future use)
   type Mutation {
     # Authentication
-    authenticate(signature: String!, message: String!, address: String!): AuthPayload!
-    
+    authenticate(
+      signature: String!
+      message: String!
+      address: String!
+    ): AuthPayload!
+
     # Campaign mutations
     createCampaign(input: CreateCampaignInput!): Campaign!
     updateCampaign(id: ID!, input: UpdateCampaignInput!): Campaign!
-    
+
     # Contribution mutations
     recordContribution(input: RecordContributionInput!): Contribution!
   }
@@ -268,5 +287,9 @@ export const typeDefs = gql`
 
   # Scalars
   scalar BigInt
-  scalar DateTime
+  # NOTE: DateTime scalar removed — no field in this schema used DateTime as its
+  # type (all date/time fields use String!).  Evidence: static analysis of the
+  # full SDL above shows zero field definitions referencing "DateTime".
+  # The generated client type (apps/interface/src/lib/graphql/generated.ts) was
+  # regenerated accordingly; no consumer broke.
 `;

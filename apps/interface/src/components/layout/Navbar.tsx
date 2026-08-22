@@ -16,9 +16,9 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { ProductTour } from "@/components/ui/ProductTour";
-import { useWallet } from "@/context/WalletContext";
-import { useTheme } from "@/context/ThemeContext";
-import { useNotifications } from "@/context/NotificationContext";
+import { useWallet } from "@/hooks/useWallet";
+import { useTheme } from "@/hooks/useTheme";
+import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationDropdown } from "@/components/ui/NotificationDropdown";
 import { WalletBalance } from "@/components/ui/WalletBalance";
 import { NETWORK_NAME } from "@/lib/constants";

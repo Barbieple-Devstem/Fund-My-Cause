@@ -12,8 +12,7 @@ import {
   deleteSavedSearch,
   checkSavedSearchAlerts,
 } from "@/services/savedSearch.service";
-import { useNotifications } from "@/context/NotificationContext";
-import { loadPreferences } from "@/services/search.service";
+import { useNotifications } from "@/hooks/useNotifications";
 
 /** Interval between alert-polling cycles (ms). */
 const POLL_INTERVAL_MS = 60_000;
@@ -34,7 +33,8 @@ export function useSavedSearches(campaigns: Campaign[], walletAddress: string) {
 
   // Poll for new campaign matches and fire notifications
   useEffect(() => {
-    if (!walletAddress || savedSearches.length === 0 || campaigns.length === 0) return;
+    if (!walletAddress || savedSearches.length === 0 || campaigns.length === 0)
+      return;
 
     const check = () => {
       // checkSavedSearchAlerts mutates seenIds in place; we must spread to
@@ -63,15 +63,23 @@ export function useSavedSearches(campaigns: Campaign[], walletAddress: string) {
 
   const saveSearch = useCallback(
     (name: string, filters: SearchFilters) => {
-      const entry = createSavedSearch(name, filters, walletAddress || "anonymous", campaigns);
+      const entry = createSavedSearch(
+        name,
+        filters,
+        walletAddress || "anonymous",
+        campaigns,
+      );
       setSavedSearches((prev) => [entry, ...prev]);
     },
     [campaigns, walletAddress],
   );
 
-  const editSearch = useCallback((id: string, patch: Partial<Pick<SavedSearch, "name" | "filters">>) => {
-    setSavedSearches((prev) => updateSavedSearch(prev, id, patch));
-  }, []);
+  const editSearch = useCallback(
+    (id: string, patch: Partial<Pick<SavedSearch, "name" | "filters">>) => {
+      setSavedSearches((prev) => updateSavedSearch(prev, id, patch));
+    },
+    [],
+  );
 
   const removeSearch = useCallback((id: string) => {
     setSavedSearches((prev) => deleteSavedSearch(prev, id));

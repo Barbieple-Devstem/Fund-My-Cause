@@ -2,13 +2,16 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { BarChart2, Calendar, Download, TrendingUp, ArrowLeft, Loader2 } from "lucide-react";
+import { useQueries } from "@tanstack/react-query";
+import { BarChart2, ArrowLeft, Loader2 } from "lucide-react";
 import { Navbar } from "@/components/layout/Navbar";
 import { WalletGuard } from "@/components/WalletGuard";
 import { AnalyticsDashboard } from "@/components/ui/AnalyticsDashboard";
-import { useWallet } from "@/context/WalletContext";
-import { useCampaign } from "@/hooks/useCampaign";
-import type { CampaignData } from "@/lib/soroban";
+import { useWallet } from "@/hooks/useWallet";
+import { fetchCampaignView } from "@/lib/soroban";
+import { isValidContractId } from "@/lib/validation";
+import { QUERY_KEYS } from "@/lib/queryKeys";
+import type { CampaignData, CampaignInfo, CampaignStats } from "@/lib/soroban";
 
 const REGISTRY_KEY = "fmc:campaigns";
 
@@ -40,27 +43,52 @@ export default function AnalyticsPage() {
   }, [address]);
 
   // Fetch all campaign data
-  const campaignsData = contractIds.map((contractId: string) => useCampaign(contractId));
-  
+  const campaignQueries = useQueries({
+    queries: contractIds.map((contractId) => ({
+      queryKey: QUERY_KEYS.campaign(contractId),
+      queryFn: () => fetchCampaignView(contractId),
+      enabled: isValidContractId(contractId),
+      retry: false,
+    })),
+  });
+  const campaignsData = campaignQueries.map((query) => ({
+    info: query.data?.info ?? null,
+    stats: query.data?.stats ?? null,
+    loading: query.isLoading,
+  }));
+
   const campaigns = useMemo(() => {
     return campaignsData
-      .filter(({ info, stats }: { info: any; stats: any }) => info && stats)
-      .map(({ info, stats }: { info: any; stats: any }) => ({
-        contractId: info.contractId,
-        title: info.title,
-        description: info.description,
-        raised: Number(stats.totalRaised) / 10_000_000,
-        goal: Number(stats.goal) / 10_000_000,
-        deadline: new Date(Number(info.deadline) * 1000).toISOString(),
-        creator: info.creator,
-        socialLinks: info.socialLinks || [],
-        contributorCount: stats.contributorCount,
-        averageContribution: Number(stats.averageContribution) / 10_000_000,
-        status: info.status,
-      } as CampaignData));
+      .filter(
+        (
+          entry,
+        ): entry is {
+          info: CampaignInfo;
+          stats: CampaignStats;
+          loading: boolean;
+        } => !!entry.info && !!entry.stats,
+      )
+      .map(
+        ({ info, stats }) =>
+          ({
+            contractId: info.contractId,
+            title: info.title,
+            description: info.description,
+            raised: Number(stats.totalRaised) / 10_000_000,
+            goal: Number(stats.goal) / 10_000_000,
+            deadline: new Date(Number(info.deadline) * 1000).toISOString(),
+            creator: info.creator,
+            socialLinks: info.socialLinks || [],
+            contributorCount: stats.contributorCount,
+            averageContribution: Number(stats.averageContribution) / 10_000_000,
+            status: info.status,
+          }) as CampaignData,
+      );
   }, [campaignsData]);
 
-  const loading = campaignsData.some(({ loading }: { loading: boolean }) => loading);
+  const loading = campaignsData.some(
+    ({ loading }: { loading: boolean }) => loading,
+  );
 
   return (
     <main className="min-h-screen bg-gray-950 text-white">
@@ -86,7 +114,7 @@ export default function AnalyticsPage() {
                   Track performance metrics and insights for your campaigns
                 </p>
               </div>
-              
+
               {/* Time range selector */}
               <div className="flex items-center gap-2 bg-gray-900 rounded-xl p-1 border border-gray-800">
                 {[

@@ -4,8 +4,12 @@ import Link from "next/link";
 import { useState } from "react";
 import { Navbar } from "@/components/layout/Navbar";
 import { CampaignCard } from "@/components/ui/CampaignCard";
+import { VirtualizedGrid } from "@/components/ui/VirtualizedGrid";
 import { PledgeModal } from "@/components/ui/PledgeModal";
-import { EmptyState, NoCampaignsIllustration } from "@/components/ui/EmptyState";
+import {
+  EmptyState,
+  NoCampaignsIllustration,
+} from "@/components/ui/EmptyState";
 import { getCategoryBySlug, loadCampaignMeta } from "@/lib/categories";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
 import { ArrowLeft } from "lucide-react";
@@ -49,20 +53,27 @@ export default function CategoryPageClient({ slug }: { slug: string }) {
             description={`Be the first to launch a ${category.label} campaign.`}
             action={{
               label: "Create a Campaign",
-              onClick: () => { window.location.href = "/create"; },
+              onClick: () => {
+                window.location.href = "/create";
+              },
             }}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {campaigns.map((campaign, i) => (
+          <VirtualizedGrid
+            items={campaigns}
+            getKey={(campaign) => campaign.id}
+            rowHeight={480}
+            gap={24}
+            minColumnWidth={340}
+            aria-label={`${category.label} campaigns`}
+            renderItem={(campaign, i) => (
               <CampaignCard
-                key={campaign.id}
                 campaign={campaign}
                 onPledge={(id) => setPledge(id)}
                 index={i}
               />
-            ))}
-          </div>
+            )}
+          />
         )}
       </div>
 

@@ -2,12 +2,21 @@
 
 import React, { useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Trash2, Coins, Trophy, Clock, Info, Megaphone } from "lucide-react";
 import {
-  useNotifications,
+  Bell,
+  Check,
+  Trash2,
+  Coins,
+  Trophy,
+  Clock,
+  Info,
+  Megaphone,
+} from "lucide-react";
+import { useNotifications } from "@/hooks/useNotifications";
+import type {
   Notification,
   NotificationType,
-} from "@/context/NotificationContext";
+} from "@/store/useNotificationStore";
 import { useNotificationPreferences } from "@/context/NotificationPreferencesContext";
 
 function typeIcon(type: NotificationType) {

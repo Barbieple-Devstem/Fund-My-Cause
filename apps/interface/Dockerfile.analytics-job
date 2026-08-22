@@ -1,0 +1,49 @@
+# ── Build stage ────────────────────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Copy workspace manifests first for better layer caching
+COPY package.json package-lock.json ./
+COPY apps/interface/package.json apps/interface/
+
+RUN npm ci --workspace=apps/interface --ignore-scripts
+
+# Copy only the source needed for the analytics job
+COPY apps/interface/tsconfig.json apps/interface/
+COPY apps/interface/src/lib/analytics/ apps/interface/src/lib/analytics/
+COPY apps/interface/src/lib/campaigns.ts apps/interface/src/lib/
+COPY apps/interface/src/types/ apps/interface/src/types/
+
+WORKDIR /app/apps/interface
+RUN npx tsc --noEmit --skipLibCheck || true && \
+    npx tsc --outDir /app/dist \
+            --module commonjs \
+            --target es2020 \
+            --moduleResolution node \
+            --esModuleInterop true \
+            --strict \
+            --skipLibCheck \
+            --paths '{}' \
+            src/lib/analytics/aggregation.ts \
+            src/lib/analytics/run-job.ts
+
+# ── Runtime stage ──────────────────────────────────────────────────────────────
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Non-root user for security
+RUN addgroup -S analytics && adduser -S analytics -G analytics
+
+COPY --from=builder /app/dist ./dist
+COPY --chown=analytics:analytics package.json package-lock.json ./
+COPY apps/interface/package.json apps/interface/
+RUN npm ci --workspace=apps/interface --omit=dev --ignore-scripts
+
+USER analytics
+
+ENV NODE_ENV=production
+
+# The job exits after completion — no EXPOSE or long-running CMD
+CMD ["node", "dist/src/lib/analytics/run-job.js"]

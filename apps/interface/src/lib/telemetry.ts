@@ -1,20 +1,19 @@
 import {
   NodeSDK,
-  tracing,
-  api,
   context,
   trace,
   metrics,
   SpanStatusCode,
-} from '@opentelemetry/sdk-node';
-import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
-import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http';
-import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
-import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-node';
-import { MeterProvider, PeriodicExportingMetricReader as MetricsReader } from '@opentelemetry/sdk-metrics';
-import { Resource } from '@opentelemetry/resources';
-import { SemanticResourceAttributes } from '@opentelemetry/semantic-conventions';
+} from "@opentelemetry/sdk-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
+import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { Resource } from "@opentelemetry/resources";
+import { SemanticResourceAttributes } from "@opentelemetry/semantic-conventions";
+import { logger } from "@/lib/logger";
+
+const telemetryLogger = logger.child("telemetry");
 
 // Global tracer and meter
 let globalTracer: trace.Tracer | null = null;
@@ -29,11 +28,12 @@ interface TelemetryConfig {
 }
 
 const defaultConfig: TelemetryConfig = {
-  serviceName: 'fund-my-cause-interface',
-  environment: process.env.NODE_ENV || 'development',
-  version: process.env.APP_VERSION || '1.0.0',
-  otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://localhost:4318',
-  samplingRate: parseFloat(process.env.OTEL_SAMPLER_PROBABILITY || '0.1'),
+  serviceName: "fund-my-cause-interface",
+  environment: process.env.NODE_ENV || "development",
+  version: process.env.APP_VERSION || "1.0.0",
+  otlpEndpoint:
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT || "http://localhost:4318",
+  samplingRate: parseFloat(process.env.OTEL_SAMPLER_PROBABILITY || "0.1"),
 };
 
 /**
@@ -48,22 +48,22 @@ export function initTelemetry(config: Partial<TelemetryConfig> = {}): void {
       [SemanticResourceAttributes.SERVICE_NAME]: finalConfig.serviceName,
       [SemanticResourceAttributes.SERVICE_VERSION]: finalConfig.version,
       environment: finalConfig.environment,
-      region: process.env.AWS_REGION || 'unknown',
-      platform: process.env.VERCEL_ENV || 'unknown',
+      region: process.env.AWS_REGION || "unknown",
+      platform: process.env.VERCEL_ENV || "unknown",
     }),
   );
 
   const traceExporter = new OTLPTraceExporter({
     url: `${finalConfig.otlpEndpoint}/v1/traces`,
     headers: {
-      Authorization: `Bearer ${process.env.OTEL_AUTH_TOKEN || ''}`,
+      Authorization: `Bearer ${process.env.OTEL_AUTH_TOKEN || ""}`,
     },
   });
 
   const metricExporter = new OTLPMetricExporter({
     url: `${finalConfig.otlpEndpoint}/v1/metrics`,
     headers: {
-      Authorization: `Bearer ${process.env.OTEL_AUTH_TOKEN || ''}`,
+      Authorization: `Bearer ${process.env.OTEL_AUTH_TOKEN || ""}`,
     },
   });
 
@@ -81,15 +81,18 @@ export function initTelemetry(config: Partial<TelemetryConfig> = {}): void {
 
   try {
     sdk.start();
-    console.log('OpenTelemetry SDK initialized successfully');
-    
+    telemetryLogger.info("OpenTelemetry SDK initialized successfully");
+
     globalTracer = trace.getTracer(
       finalConfig.serviceName,
       finalConfig.version,
     );
-    globalMeter = metrics.getMeter(finalConfig.serviceName, finalConfig.version);
+    globalMeter = metrics.getMeter(
+      finalConfig.serviceName,
+      finalConfig.version,
+    );
   } catch (error) {
-    console.error('Failed to initialize OpenTelemetry SDK:', error);
+    telemetryLogger.error("Failed to initialize OpenTelemetry SDK", { error });
   }
 }
 
@@ -98,7 +101,7 @@ export function initTelemetry(config: Partial<TelemetryConfig> = {}): void {
  */
 export function getTracer(): trace.Tracer {
   if (!globalTracer) {
-    throw new Error('Tracer not initialized. Call initTelemetry() first');
+    throw new Error("Tracer not initialized. Call initTelemetry() first");
   }
   return globalTracer;
 }
@@ -108,7 +111,7 @@ export function getTracer(): trace.Tracer {
  */
 export function getMeter(): metrics.Meter {
   if (!globalMeter) {
-    throw new Error('Meter not initialized. Call initTelemetry() first');
+    throw new Error("Meter not initialized. Call initTelemetry() first");
   }
   return globalMeter;
 }
@@ -131,7 +134,9 @@ export async function withSpan<T>(
       }
       return await fn();
     } catch (error) {
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      span.recordException(
+        error instanceof Error ? error : new Error(String(error)),
+      );
       span.setStatus({ code: SpanStatusCode.ERROR });
       throw error;
     } finally {
@@ -150,7 +155,7 @@ export function withSpanSync<T>(
 ): T {
   const tracer = getTracer();
   const span = tracer.startSpan(name);
-  
+
   return context.with(trace.setSpan(context.active(), span), () => {
     try {
       if (attributes) {
@@ -160,7 +165,9 @@ export function withSpanSync<T>(
       }
       return fn();
     } catch (error) {
-      span.recordException(error instanceof Error ? error : new Error(String(error)));
+      span.recordException(
+        error instanceof Error ? error : new Error(String(error)),
+      );
       span.setStatus({ code: SpanStatusCode.ERROR });
       throw error;
     } finally {
@@ -183,9 +190,9 @@ export class BusinessMetrics {
    * Record campaign creation
    */
   recordCampaignCreated(campaignId: string, targetAmount: number): void {
-    const counter = this.meter.createCounter('campaign_total_created', {
-      description: 'Total campaigns created',
-      unit: '1',
+    const counter = this.meter.createCounter("campaign_total_created", {
+      description: "Total campaigns created",
+      unit: "1",
     });
     counter.add(1, {
       campaign_id: campaignId,
@@ -197,9 +204,9 @@ export class BusinessMetrics {
    * Record donation
    */
   recordDonation(campaignId: string, amount: number, currency: string): void {
-    const counter = this.meter.createCounter('campaign_donations_total', {
-      description: 'Total donations by campaign',
-      unit: 'USD',
+    const counter = this.meter.createCounter("campaign_donations_total", {
+      description: "Total donations by campaign",
+      unit: "USD",
     });
     counter.add(amount, {
       campaign_id: campaignId,
@@ -211,9 +218,9 @@ export class BusinessMetrics {
    * Record campaign success
    */
   recordCampaignSuccess(campaignId: string): void {
-    const counter = this.meter.createCounter('campaign_success_total', {
-      description: 'Successfully funded campaigns',
-      unit: '1',
+    const counter = this.meter.createCounter("campaign_success_total", {
+      description: "Successfully funded campaigns",
+      unit: "1",
     });
     counter.add(1, { campaign_id: campaignId });
   }
@@ -222,9 +229,9 @@ export class BusinessMetrics {
    * Record user signup
    */
   recordUserSignup(): void {
-    const counter = this.meter.createCounter('new_user_signups_total', {
-      description: 'New user registrations',
-      unit: '1',
+    const counter = this.meter.createCounter("new_user_signups_total", {
+      description: "New user registrations",
+      unit: "1",
     });
     counter.add(1);
   }
@@ -233,9 +240,9 @@ export class BusinessMetrics {
    * Record TVL change
    */
   recordTVLChange(tvlAmount: number): void {
-    const gauge = this.meter.createUpDownCounter('tvl_total', {
-      description: 'Total Value Locked',
-      unit: 'USD',
+    const gauge = this.meter.createUpDownCounter("tvl_total", {
+      description: "Total Value Locked",
+      unit: "USD",
     });
     gauge.add(tvlAmount);
   }
@@ -243,18 +250,28 @@ export class BusinessMetrics {
   /**
    * Record blockchain transaction
    */
-  recordBlockchainTransaction(success: boolean, gasUsed: number, gasPrice: number): void {
+  recordBlockchainTransaction(
+    success: boolean,
+    gasUsed: number,
+    gasPrice: number,
+  ): void {
     if (success) {
-      const counter = this.meter.createCounter('blockchain_transactions_total', {
-        description: 'Successful blockchain transactions',
-        unit: '1',
-      });
+      const counter = this.meter.createCounter(
+        "blockchain_transactions_total",
+        {
+          description: "Successful blockchain transactions",
+          unit: "1",
+        },
+      );
       counter.add(1, { gas_used: gasUsed, gas_price: gasPrice });
     } else {
-      const counter = this.meter.createCounter('blockchain_transaction_failures_total', {
-        description: 'Failed blockchain transactions',
-        unit: '1',
-      });
+      const counter = this.meter.createCounter(
+        "blockchain_transaction_failures_total",
+        {
+          description: "Failed blockchain transactions",
+          unit: "1",
+        },
+      );
       counter.add(1);
     }
   }
@@ -264,10 +281,13 @@ export class BusinessMetrics {
    */
   recordSmartContractCall(success: boolean, functionName: string): void {
     if (!success) {
-      const counter = this.meter.createCounter('smart_contract_calls_failed_total', {
-        description: 'Failed smart contract calls',
-        unit: '1',
-      });
+      const counter = this.meter.createCounter(
+        "smart_contract_calls_failed_total",
+        {
+          description: "Failed smart contract calls",
+          unit: "1",
+        },
+      );
       counter.add(1, { function_name: functionName });
     }
   }
@@ -292,9 +312,9 @@ export class PerformanceMetrics {
     statusCode: number,
     durationSeconds: number,
   ): void {
-    const requestCounter = this.meter.createCounter('http_requests_total', {
-      description: 'Total HTTP requests',
-      unit: '1',
+    const requestCounter = this.meter.createCounter("http_requests_total", {
+      description: "Total HTTP requests",
+      unit: "1",
     });
     requestCounter.add(1, {
       method,
@@ -302,10 +322,13 @@ export class PerformanceMetrics {
       status: statusCode,
     });
 
-    const durationHistogram = this.meter.createHistogram('http_request_duration_seconds', {
-      description: 'HTTP request duration',
-      unit: 's',
-    });
+    const durationHistogram = this.meter.createHistogram(
+      "http_request_duration_seconds",
+      {
+        description: "HTTP request duration",
+        unit: "s",
+      },
+    );
     durationHistogram.record(durationSeconds, {
       method,
       path,
@@ -313,9 +336,9 @@ export class PerformanceMetrics {
     });
 
     if (statusCode >= 400) {
-      const errorCounter = this.meter.createCounter('http_errors_total', {
-        description: 'Total HTTP errors',
-        unit: '1',
+      const errorCounter = this.meter.createCounter("http_errors_total", {
+        description: "Total HTTP errors",
+        unit: "1",
       });
       errorCounter.add(1, {
         method,
@@ -328,10 +351,14 @@ export class PerformanceMetrics {
   /**
    * Record database query
    */
-  recordDatabaseQuery(duration: number, operation: string, success: boolean): void {
-    const histogram = this.meter.createHistogram('db_query_duration_seconds', {
-      description: 'Database query duration',
-      unit: 's',
+  recordDatabaseQuery(
+    duration: number,
+    operation: string,
+    success: boolean,
+  ): void {
+    const histogram = this.meter.createHistogram("db_query_duration_seconds", {
+      description: "Database query duration",
+      unit: "s",
     });
     histogram.record(duration, {
       operation,
@@ -342,17 +369,21 @@ export class PerformanceMetrics {
   /**
    * Record cache operation
    */
-  recordCacheOperation(hit: boolean, operation: string, duration: number): void {
+  recordCacheOperation(
+    hit: boolean,
+    operation: string,
+    _duration: number,
+  ): void {
     if (hit) {
-      const counter = this.meter.createCounter('cache_hits_total', {
-        description: 'Cache hits',
-        unit: '1',
+      const counter = this.meter.createCounter("cache_hits_total", {
+        description: "Cache hits",
+        unit: "1",
       });
       counter.add(1, { operation });
     } else {
-      const counter = this.meter.createCounter('cache_misses_total', {
-        description: 'Cache misses',
-        unit: '1',
+      const counter = this.meter.createCounter("cache_misses_total", {
+        description: "Cache misses",
+        unit: "1",
       });
       counter.add(1, { operation });
     }
@@ -362,10 +393,13 @@ export class PerformanceMetrics {
    * Record API latency
    */
   recordAPILatency(endpoint: string, duration: number, service: string): void {
-    const histogram = this.meter.createHistogram('api_request_duration_seconds', {
-      description: 'API request latency',
-      unit: 's',
-    });
+    const histogram = this.meter.createHistogram(
+      "api_request_duration_seconds",
+      {
+        description: "API request latency",
+        unit: "s",
+      },
+    );
     histogram.record(duration, {
       endpoint,
       service,
@@ -387,9 +421,9 @@ export class CostMetrics {
    * Record compute cost
    */
   recordComputeCost(amount: number, region: string): void {
-    const counter = this.meter.createCounter('cost_compute_total', {
-      description: 'Total compute costs',
-      unit: 'USD',
+    const counter = this.meter.createCounter("cost_compute_total", {
+      description: "Total compute costs",
+      unit: "USD",
     });
     counter.add(amount, { region });
   }
@@ -398,9 +432,9 @@ export class CostMetrics {
    * Record storage cost
    */
   recordStorageCost(amount: number, storageType: string): void {
-    const counter = this.meter.createCounter('cost_storage_total', {
-      description: 'Total storage costs',
-      unit: 'USD',
+    const counter = this.meter.createCounter("cost_storage_total", {
+      description: "Total storage costs",
+      unit: "USD",
     });
     counter.add(amount, { storage_type: storageType });
   }
@@ -409,9 +443,9 @@ export class CostMetrics {
    * Record bandwidth cost
    */
   recordBandwidthCost(amount: number): void {
-    const counter = this.meter.createCounter('cost_bandwidth_total', {
-      description: 'Total bandwidth costs',
-      unit: 'USD',
+    const counter = this.meter.createCounter("cost_bandwidth_total", {
+      description: "Total bandwidth costs",
+      unit: "USD",
     });
     counter.add(amount);
   }

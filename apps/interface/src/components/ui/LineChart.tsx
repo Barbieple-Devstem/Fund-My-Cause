@@ -2,7 +2,7 @@
 
 import React from "react";
 import { CampaignData } from "@/types/soroban";
-import { useTheme } from "@/context/ThemeContext";
+import { useTheme } from "@/hooks/useTheme";
 
 interface LineChartProps {
   campaigns: CampaignData[];
@@ -51,11 +51,20 @@ export function LineChart({ campaigns }: LineChartProps) {
   const gradientId = `line-gradient-${theme}`;
 
   return (
-    <div className={`${palette.background} border ${palette.border} rounded-2xl p-5`}>
-      <h3 className={`text-sm font-semibold ${palette.title} mb-4`}>Funding Progress Over Time</h3>
+    <div
+      className={`${palette.background} border ${palette.border} rounded-2xl p-5`}
+    >
+      <h3 className={`text-sm font-semibold ${palette.title} mb-4`}>
+        Funding Progress Over Time
+      </h3>
 
       <div className="relative h-48 w-full">
-        <svg viewBox="0 0 400 150" className="w-full h-full" role="img" aria-label="Funding progress line chart">
+        <svg
+          viewBox="0 0 400 150"
+          className="w-full h-full"
+          role="img"
+          aria-label="Funding progress line chart"
+        >
           <defs>
             <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor={palette.lineStart} />
@@ -129,12 +138,17 @@ export function LineChart({ campaigns }: LineChartProps) {
       <div className="mt-4 flex flex-wrap gap-4">
         {dataPoints.slice(0, 5).map((d, i) => (
           <div key={i} className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: palette.dotFill }} />
+            <div
+              className="w-3 h-3 rounded-full"
+              style={{ backgroundColor: palette.dotFill }}
+            />
             <span className={`text-xs ${palette.legend}`}>{d.label}</span>
           </div>
         ))}
         {dataPoints.length > 5 && (
-          <span className={`text-xs ${palette.legend} opacity-60`}>+{dataPoints.length - 5} more</span>
+          <span className={`text-xs ${palette.legend} opacity-60`}>
+            +{dataPoints.length - 5} more
+          </span>
         )}
       </div>
     </div>

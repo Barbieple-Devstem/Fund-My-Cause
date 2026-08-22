@@ -3,7 +3,7 @@
 import React from "react";
 import { CheckCircle2, Circle, Lock, Unlock } from "lucide-react";
 import type { Milestone } from "@/types/milestone";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications } from "@/hooks/useNotifications";
 
 interface Props {
   milestones: Milestone[];
@@ -38,8 +38,7 @@ const STATE_STYLES: Record<MilestoneState, string> = {
     "border-indigo-400 bg-indigo-50 dark:bg-indigo-900/25 dark:border-indigo-600",
   active:
     "border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-600",
-  unfunded:
-    "border-gray-200 bg-white dark:bg-gray-800/50 dark:border-gray-700",
+  unfunded: "border-gray-200 bg-white dark:bg-gray-800/50 dark:border-gray-700",
 };
 
 const STATE_LABEL: Record<MilestoneState, string> = {
@@ -50,9 +49,12 @@ const STATE_LABEL: Record<MilestoneState, string> = {
 };
 
 const STATE_LABEL_STYLES: Record<MilestoneState, string> = {
-  released: "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/40",
-  funded: "text-indigo-700 bg-indigo-100 dark:text-indigo-300 dark:bg-indigo-900/40",
-  active: "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/40",
+  released:
+    "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/40",
+  funded:
+    "text-indigo-700 bg-indigo-100 dark:text-indigo-300 dark:bg-indigo-900/40",
+  active:
+    "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/40",
   unfunded: "text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800",
 };
 
@@ -120,7 +122,8 @@ export function MilestoneDisplay({ milestones, currentAmount }: Props) {
   if (milestones.length === 0) return null;
 
   // Overall progress toward the final milestone
-  const finalTarget = sortedMilestones[sortedMilestones.length - 1]?.amount ?? 1;
+  const finalTarget =
+    sortedMilestones[sortedMilestones.length - 1]?.amount ?? 1;
   const overallPct = Math.min((currentAmount / finalTarget) * 100, 100);
 
   return (
@@ -188,10 +191,7 @@ export function MilestoneDisplay({ milestones, currentAmount }: Props) {
       </div>
 
       {/* ── Milestone cards ──────────────────────────────────────────────── */}
-      <ol
-        aria-label="Milestone list"
-        className="mt-8 space-y-3 list-none"
-      >
+      <ol aria-label="Milestone list" className="mt-8 space-y-3 list-none">
         {sortedMilestones.map((milestone, index) => {
           const state = getMilestoneState(
             milestone,
@@ -248,7 +248,11 @@ export function MilestoneDisplay({ milestones, currentAmount }: Props) {
                       </div>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {progressPct.toFixed(1)}% of target ·{" "}
-                        {(milestone.amount - Math.min(currentAmount, milestone.amount)).toLocaleString()} XLM remaining
+                        {(
+                          milestone.amount -
+                          Math.min(currentAmount, milestone.amount)
+                        ).toLocaleString()}{" "}
+                        XLM remaining
                       </p>
                     </div>
                   )}

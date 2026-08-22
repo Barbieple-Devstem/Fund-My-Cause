@@ -1,0 +1,68 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Fund-My-Cause/Fund-My-Cause/main/apps/interface/bundle-budgets.schema.json",
+  "budgets": [
+    {
+      "route": "/",
+      "label": "Landing page",
+      "maxJavascriptKB": 250,
+      "maxCssKB": 80,
+      "maxTotalKB": 330
+    },
+    {
+      "route": "/campaigns",
+      "label": "Campaign listing",
+      "maxJavascriptKB": 300,
+      "maxCssKB": 90,
+      "maxTotalKB": 390
+    },
+    {
+      "route": "/campaigns/[id]",
+      "label": "Campaign detail",
+      "maxJavascriptKB": 400,
+      "maxCssKB": 100,
+      "maxTotalKB": 500
+    },
+    {
+      "route": "/create",
+      "label": "Create campaign",
+      "maxJavascriptKB": 350,
+      "maxCssKB": 90,
+      "maxTotalKB": 440
+    },
+    {
+      "route": "/dashboard",
+      "label": "Dashboard",
+      "maxJavascriptKB": 350,
+      "maxCssKB": 90,
+      "maxTotalKB": 440
+    },
+    {
+      "route": "/bookmarks",
+      "label": "Bookmarks",
+      "maxJavascriptKB": 200,
+      "maxCssKB": 70,
+      "maxTotalKB": 270
+    },
+    {
+      "route": "/settings",
+      "label": "Settings",
+      "maxJavascriptKB": 200,
+      "maxCssKB": 70,
+      "maxTotalKB": 270
+    },
+    {
+      "route": "/embed/**",
+      "label": "Embed widget",
+      "maxJavascriptKB": 100,
+      "maxCssKB": 30,
+      "maxTotalKB": 130
+    },
+    {
+      "route": "shared",
+      "label": "Shared / framework chunk",
+      "maxJavascriptKB": 180,
+      "maxCssKB": 50,
+      "maxTotalKB": 230
+    }
+  ]
+}

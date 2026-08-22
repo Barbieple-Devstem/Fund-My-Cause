@@ -1,0 +1,20 @@
+config:
+  target: "http://localhost:4000"
+  phases:
+    - duration: 10
+      arrivalRate: 5
+      name: "CI smoke test"
+
+scenarios:
+  - name: "Health check"
+    flow:
+      - post:
+          url: "/graphql"
+          json:
+            query: |
+              query {
+                campaigns(limit: 5) {
+                  id
+                  title
+                }
+              }

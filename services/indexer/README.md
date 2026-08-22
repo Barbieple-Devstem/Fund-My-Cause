@@ -101,15 +101,78 @@ Get overall service statistics.
 ## Architecture
 
 - **RPC Client**: Connects to Soroban RPC and streams contract events
-- **Event Store**: In-memory event storage (can be replaced with PostgreSQL)
+- **Event Store**: In-memory event storage, the single live data-access layer for this service
 - **Health Checker**: Tracks service health and metrics
-- **Express Server**: REST API for querying indexed data
+- **Express Server**: REST API (`/events`, `/stats`, `/health`, `/ready`) for querying indexed data
+
+## Connection Pool Configuration
+
+The indexer uses in-memory storage (via `EventStore`) rather than a SQL or NoSQL database, so there is no traditional connection pool to configure. Instead, `src/store-config.ts` exposes the analogous resource-capacity levers that bound memory and outbound RPC concurrency.
+
+### Settings
+
+| Environment variable | Default | Description |
+|---|---|---|
+| `STORE_MAX_EVENT_CAPACITY` | `100000` | Maximum events held in memory. Acts as the pool-size equivalent — bounds total RAM usage. Oldest events are evicted when the limit is reached. |
+| `STORE_EVENT_BATCH_SIZE` | `500` | Maximum events processed per ingestion batch. Analogous to a pool acquire timeout: limits per-cycle work. |
+| `STORE_STALE_LEDGER_THRESHOLD_MS` | `60000` | Milliseconds since the last ingested event before health is reported as degraded. |
+| `RPC_REQUEST_TIMEOUT_MS` | `30000` | Timeout in ms for each Soroban RPC request. Matches the recommended Soroban RPC timeout. |
+| `RPC_MAX_CONCURRENT_REQUESTS` | `5` | Maximum concurrent outbound RPC requests. Stellar testnet recommends ≤ 10 concurrent connections; 5 leaves headroom for other clients. |
+| `RPC_RETRY_ATTEMPTS` | `3` | Retry attempts on transient RPC failure before the request is considered failed. |
+
+### Design rationale
+
+These defaults are derived from observed testnet behaviour:
+
+- **Peak ingestion rate**: ~500 events/min on testnet → `STORE_MAX_EVENT_CAPACITY=100,000` keeps ~200 min of history in memory before eviction begins.
+- **`RPC_MAX_CONCURRENT_REQUESTS=5`**: prevents saturating the Stellar testnet RPC endpoint (recommended ceiling: 10 concurrent connections).
+- **`RPC_REQUEST_TIMEOUT_MS=30,000`**: aligns with the Soroban JSON-RPC documented timeout.
+
+All values are configurable via environment variables (see `.env.example`). The defaults are intentionally conservative; raise `STORE_MAX_EVENT_CAPACITY` if you need longer in-memory history and have sufficient RAM.
+
+### Future migration
+
+When a durable store (e.g. PostgreSQL, SQLite) is introduced, replace `src/store-config.ts` with real connection-pool settings such as:
+
+```typescript
+// Example future pg pool config
+{
+  max: 10,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+}
+```
+
+The `StoreConfig` interface is designed to make this migration visible: a grep for `StoreConfig` will find every place the capacity and concurrency settings are consumed.
+
+### Data-access decision (#837)
+
+This service previously carried two disconnected data-access implementations: this
+in-memory `EventStore` (wired into `src/index.ts` and actually running in production),
+and a fully separate Postgres/GraphQL/REST stack (`src/db/**`, `graphql-resolvers.ts`,
+`graphql-server.ts`, `rest-api.ts`, `ingestor.ts`) that was never imported by
+`src/index.ts` and never ran.
+
+That Postgres stack has been removed rather than wired up, because it was not a
+functioning alternative to recover:
+- It depended on `pg`, `graphql`, `dataloader`, and `express-graphql`, none of which
+  were ever declared in `package.json` — it never actually installed or type-checked.
+- `ingestor.ts` and `db/queryStats.test.ts` imported sibling modules via incorrect
+  relative paths, so even in isolation the code did not resolve.
+- The ingestion shape it expected (`initialize`/`contribute`/`withdraw`/`refund`
+  domain events) does not match what `rpc-client.ts` actually produces
+  (generic `IndexerEvent`s) — there was no working bridge between the two.
+
+The in-memory `EventStore` remains the single, intentional data-access
+implementation for now. Its known limitation is that indexed events do not survive a
+restart; replacing it with a durable store is tracked as future work and should be
+designed against the real event shape produced by `rpc-client.ts`, not resurrected
+from the deleted code above.
 
 ## Next Steps
 
-- [ ] Replace in-memory store with PostgreSQL
 - [ ] Add event type parsing and validation
 - [ ] Implement event indexing for campaign state (raised, contributors, etc.)
-- [ ] Add GraphQL API layer
+- [ ] Design a durable (e.g. persistent) event store that survives restarts
 - [ ] Implement event replay and backfill
 - [ ] Add alerting and monitoring

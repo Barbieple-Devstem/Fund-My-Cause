@@ -7,8 +7,11 @@ use soroban_sdk::{token, Address, Env};
 
 use crate::{
     errors::ContractError,
-    storage::{KEY_TOKEN, KEY_TOTAL},
-    types::{DataKey, EventRecurringCancelled, EventRecurringExecuted, EventRecurringSetup, RecurringPlan},
+    storage::{KEY_TOKEN, KEY_TOTAL, TTL_PERSISTENT_ENTRY},
+    types::{
+        DataKey, EventRecurringCancelled, EventRecurringExecuted, EventRecurringSetup,
+        RecurringPlan,
+    },
     validation::validate_recurring_plan,
 };
 
@@ -30,11 +33,18 @@ pub(crate) fn setup(
     };
     let key = DataKey::RecurringPlan(contributor.clone());
     env.storage().persistent().set(&key, &plan);
-    env.storage().persistent().extend_ttl(&key, 100, 100);
+    env.storage()
+        .persistent()
+        .extend_ttl(&key, TTL_PERSISTENT_ENTRY, TTL_PERSISTENT_ENTRY);
 
     env.events().publish(
         ("campaign", "recurring_setup"),
-        EventRecurringSetup { contributor, amount, interval, end_date },
+        EventRecurringSetup {
+            contributor,
+            amount,
+            interval,
+            end_date,
+        },
     );
     Ok(())
 }
@@ -56,7 +66,7 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
     env.storage().persistent().set(&key, &plan);
 
     let inst = env.storage().instance();
-    let token: Address = inst.get(&KEY_TOKEN).unwrap();
+    let token: Address = inst.get(&KEY_TOKEN).ok_or(ContractError::InvalidAddress)?;
     token::Client::new(env, &token).transfer(
         &contributor,
         &env.current_contract_address(),
@@ -67,15 +77,25 @@ pub(crate) fn execute(env: &Env, contributor: Address) -> Result<(), ContractErr
     let prev: i128 = env.storage().persistent().get(&contrib_key).unwrap_or(0);
     env.storage().persistent().set(
         &contrib_key,
-        &prev.checked_add(plan.amount).ok_or(ContractError::Overflow)?,
+        &prev
+            .checked_add(plan.amount)
+            .ok_or(ContractError::Overflow)?,
     );
 
-    let total: i128 = inst.get(&KEY_TOTAL).unwrap();
-    inst.set(&KEY_TOTAL, &total.checked_add(plan.amount).ok_or(ContractError::Overflow)?);
+    let total: i128 = inst.get(&KEY_TOTAL).ok_or(ContractError::InvalidInput)?;
+    inst.set(
+        &KEY_TOTAL,
+        &total
+            .checked_add(plan.amount)
+            .ok_or(ContractError::Overflow)?,
+    );
 
     env.events().publish(
         ("campaign", "recurring_executed"),
-        EventRecurringExecuted { contributor, amount: plan.amount },
+        EventRecurringExecuted {
+            contributor,
+            amount: plan.amount,
+        },
     );
     Ok(())
 }

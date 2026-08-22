@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fund-my-cause-api
+  namespace: default
+  labels:
+    app: fund-my-cause-api
+spec:
+  selector:
+    matchLabels:
+      app: fund-my-cause-api
+  endpoints:
+  - port: http
+    interval: 15s
+    path: /metrics
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      action: keep
+      regex: "http_requests_total|http_request_duration_seconds|node_cpu|node_memory"

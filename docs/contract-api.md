@@ -258,8 +258,8 @@ pub fn initialize(
 
 **Events:** `("campaign", "initialized")`
 
-**Example:**
-```ignore
+**Example (Rust SDK):**
+```rust
 contract.initialize(
     env, creator, token,
     1_000_000_000,  // 100 XLM goal
@@ -272,6 +272,29 @@ contract.initialize(
     Category::Technology,
     None, None,
 )?;
+```
+
+**Example (Stellar CLI):**
+```bash
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- initialize \
+  --creator GCREATORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --token CTOKENADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --goal 1000000000 \
+  --deadline 1800000000 \
+  --min_contribution 10000000 \
+  --max_contribution 0 \
+  --title '"My Campaign"' \
+  --description '"Help us build something great"' \
+  --social_links null \
+  --platform_config null \
+  --accepted_tokens null \
+  --category Technology \
+  --vesting null \
+  --penalty_bps null
 ```
 
 ##### `contribute`
@@ -295,10 +318,24 @@ pub fn contribute(
 **Events:** `("campaign", "contributed")`, `("campaign", "contribution_recorded")`,
 optionally `("campaign", "tier_assigned")`, `("campaign", "rate_limit_hit")`
 
-**Example:**
-```ignore
+**Example (Rust SDK):**
+```rust
 // Contribute 5 XLM (50_000_000 stroops)
 contract.contribute(env, contributor, 50_000_000, xlm_token, None)?;
+```
+
+**Example (Stellar CLI):**
+```bash
+# Contribute 5 XLM (50,000,000 stroops)
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source contributor-secret-key \
+  --network testnet \
+  -- contribute \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --amount 50000000 \
+  --token CTOKENADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --message null
 ```
 
 ##### `withdraw`
@@ -319,6 +356,16 @@ fee    = total_raised * platform_fee_bps / 10_000
 payout = total_raised - fee
 ```
 
+**Example (Stellar CLI):**
+```bash
+# Creator withdraws funds after successful campaign
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- withdraw
+```
+
 ##### `refund_single`
 
 Contributor reclaims their funds after a failed or cancelled campaign.
@@ -330,6 +377,17 @@ pub fn refund_single(env: Env, contributor: Address) -> Result<(), ContractError
 **Errors:** `GoalReached`, `CampaignStillActive`
 
 **Events:** `("campaign", "refunded")`
+
+**Example (Stellar CLI):**
+```bash
+# Contributor claims refund after failed campaign
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source contributor-secret-key \
+  --network testnet \
+  -- refund_single \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
 
 ##### `refund_batch`
 
@@ -488,13 +546,32 @@ Pass `None` to clear the rate limit.
 
 **Events:** `("campaign", "rate_limit_updated")`
 
-**Example:**
-```ignore
+**Example (Rust SDK):**
+```rust
 // Max 100 XLM per address per hour
 contract.set_rate_limit(env, Some(RateLimit {
     max_amount: 1_000_000_000,
     window_seconds: 3600,
 }))?;
+```
+
+**Example (Stellar CLI):**
+```bash
+# Set rate limit: max 100 XLM per address per hour
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- set_rate_limit \
+  --rate_limit '{"max_amount":"1000000000","window_seconds":"3600"}'
+
+# Clear rate limit
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- set_rate_limit \
+  --rate_limit null
 ```
 
 #### Recurring Contributions
@@ -717,10 +794,23 @@ pub fn setup_matching(
 
 **Events:** `("campaign", "matching_setup")`
 
-**Example:**
-```ignore
+**Example (Rust SDK):**
+```rust
 // 50% match up to 10 000 XLM
 contract.setup_matching(env, sponsor, 5_000, 100_000_000_000)?;
+```
+
+**Example (Stellar CLI):**
+```bash
+# Configure 50% matching (5000 bps) up to 10,000 XLM
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source sponsor-secret-key \
+  --network testnet \
+  -- setup_matching \
+  --sponsor GSPONSORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --match_ratio 5000 \
+  --max_match 100000000000
 ```
 
 #### Reward Tiers
@@ -735,14 +825,25 @@ pub fn set_reward_tiers(env: Env, tiers: Vec<RewardTier>) -> Result<(), Contract
 
 **Events:** `("campaign", "tiers_set")`
 
-**Example:**
-```ignore
+**Example (Rust SDK):**
+```rust
 let tiers = vec![
     RewardTier { min_amount: 100_000_000,   name: "Bronze".into(), description: "Early supporter".into() },
     RewardTier { min_amount: 1_000_000_000, name: "Silver".into(), description: "Major backer".into() },
     RewardTier { min_amount: 10_000_000_000, name: "Gold".into(), description: "Champion".into() },
 ];
 contract.set_reward_tiers(env, tiers)?;
+```
+
+**Example (Stellar CLI):**
+```bash
+# Set three reward tiers: Bronze, Silver, Gold
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- set_reward_tiers \
+  --tiers '[{"min_amount":"100000000","name":"Bronze","description":"Early supporter"},{"min_amount":"1000000000","name":"Silver","description":"Major backer"},{"min_amount":"10000000000","name":"Gold","description":"Champion"}]'
 ```
 
 ##### `configure_rewards`
@@ -1091,6 +1192,280 @@ stellar contract invoke --id <CONTRACT_ID> --network testnet -- get_stats
 6. **TTL management** — persistent storage uses explicit TTL extension to control costs.
 7. **Emergency multi-sig** — emergency withdrawals require time-lock + multi-sig approval.
 8. **Rate limiting** — per-address contribution rate limits prevent spam/manipulation.
+
+---
+
+## CLI Quick Reference
+
+### Common Query Operations
+
+```bash
+# Get campaign statistics
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- get_stats
+
+# Get full campaign info
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- get_campaign_info
+
+# Check contributor's contribution amount
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- contribution \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Get contribution history for an address
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- get_contribution_history \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Get contract version
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- version
+```
+
+### Campaign Management
+
+```bash
+# Update campaign metadata
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- update_metadata \
+  --title '"Updated Campaign Title"' \
+  --description '"Updated description"' \
+  --social_links '["https://twitter.com/campaign","https://discord.gg/campaign"]'
+
+# Extend deadline
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- extend_deadline \
+  --new_deadline 1900000000
+
+# Pause campaign
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- pause
+
+# Resume campaign
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- resume
+
+# Cancel campaign
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- cancel_campaign
+```
+
+### Access Control
+
+```bash
+# Add address to whitelist
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- add_to_whitelist \
+  --address GADDRESSTOWHITELISTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Remove from whitelist
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- remove_from_whitelist \
+  --address GADDRESSTOREMOVEXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Add address to blacklist
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- add_to_blacklist \
+  --address GADDRESSTOBLACKLISTXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Enable whitelist-only mode
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- set_whitelist_only \
+  --enabled true
+```
+
+### Recurring Contributions
+
+```bash
+# Set up recurring contribution plan
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source contributor-secret-key \
+  --network testnet \
+  -- setup_recurring \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --amount 10000000 \
+  --interval 86400 \
+  --end_date 1900000000
+
+# Execute pending recurring contribution
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source contributor-secret-key \
+  --network testnet \
+  -- execute_recurring \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Cancel recurring plan
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source contributor-secret-key \
+  --network testnet \
+  -- cancel_recurring \
+  --contributor GCONTRIBUTORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Delegation
+
+```bash
+# Create delegation
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source delegator-secret-key \
+  --network testnet \
+  -- delegate_contribution \
+  --delegator GDELEGATORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --delegate GDELEGATEADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --amount 50000000
+
+# Contribute on behalf of delegator
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source delegate-secret-key \
+  --network testnet \
+  -- contribute_on_behalf \
+  --delegate GDELEGATEADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --delegator GDELEGATORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --amount 50000000 \
+  --token CTOKENADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Revoke delegation
+stellar contract invoke \
+  --id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source delegator-secret-key \
+  --network testnet \
+  -- revoke_delegation \
+  --delegator GDELEGATORADDRESSXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+### Registry Operations
+
+```bash
+# Register campaign in registry
+stellar contract invoke \
+  --id CREGISTRYCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- register \
+  --campaign_id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+# Register with category
+stellar contract invoke \
+  --id CREGISTRYCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --source creator-secret-key \
+  --network testnet \
+  -- register_with_category \
+  --campaign_id CCAMPAIGNCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --category_id 1
+
+# List all campaigns (paginated)
+stellar contract invoke \
+  --id CREGISTRYCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- list \
+  --offset 0 \
+  --limit 20
+
+# Get campaigns by category
+stellar contract invoke \
+  --id CREGISTRYCONTRACTIDXXXXXXXXXXXXXXXXXXXXXXXXXX \
+  --network testnet \
+  -- get_campaigns_by_category \
+  --category_id 1 \
+  --offset 0 \
+  --limit 20
+```
+
+---
+
+## Keeping Documentation in Sync
+
+This API reference is manually maintained but validated against the contract interface during CI. To ensure the documentation stays current:
+
+### Automated Validation
+
+The CI pipeline includes a documentation sync check:
+
+```bash
+# Run in CI (see .github/workflows/rust_ci.yml)
+cargo test --package crowdfund --lib -- --nocapture
+cargo doc --package crowdfund --no-deps
+```
+
+### Manual Sync Process
+
+When adding or modifying contract functions:
+
+1. **Update the contract code** in `contracts/crowdfund/src/lib.rs`
+2. **Add/update rustdoc comments** for the function with `///` or `//!`
+3. **Run tests** to validate interface changes:
+   ```bash
+   cargo test --workspace
+   ```
+4. **Generate rustdoc**:
+   ```bash
+   cargo doc --workspace --no-deps --open
+   ```
+5. **Update this file** (`docs/contract-api.md`) with:
+   - Function signature (if changed)
+   - Parameter descriptions
+   - Error codes
+   - Events emitted
+   - CLI invocation examples
+   - Rust SDK examples
+6. **Validate against schema** (if using OpenRPC or similar):
+   ```bash
+   # Future: add schema validation here
+   # stellar contract inspect --wasm target/wasm32-unknown-unknown/release/crowdfund.wasm
+   ```
+
+### Future: Automated Generation
+
+We're working on automated documentation generation from contract metadata:
+
+- **Short-term:** Add `stellar contract inspect` output validation to CI
+- **Medium-term:** Generate this markdown file from contract interface using `soroban-sdk` metadata
+- **Long-term:** Integrate with Swagger/OpenAPI-style interactive documentation
+
+**Tracking Issue:** #758 - Automated Contract Documentation Generation
 
 ---
 

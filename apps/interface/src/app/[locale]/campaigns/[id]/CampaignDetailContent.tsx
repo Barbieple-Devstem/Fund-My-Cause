@@ -10,13 +10,14 @@ import { ShareButton } from "@/components/ui/ShareButton";
 import { ContributionLeaderboard } from "@/components/ui/ContributionLeaderboard";
 import { EmbedCodeGenerator } from "@/components/ui/EmbedCodeGenerator";
 import { useCampaign } from "@/hooks/useCampaign";
-import { useWallet } from "@/context/WalletContext";
+import { useWallet } from "@/hooks/useWallet";
 import { CampaignActions } from "./CampaignActions";
 import { formatXLM, formatAddress } from "@/lib/format";
 import { SimilarCampaigns } from "@/components/ui/SimilarCampaigns";
 import { VideoPlayer } from "@/components/ui/VideoPlayer";
 import { FAQAccordion } from "@/components/ui/FAQAccordion";
 import { TeamMemberCard } from "@/components/ui/TeamMemberCard";
+import { TeamManagement } from "@/components/campaign/TeamManagement";
 import { TrustSignals } from "@/components/ui/TrustSignals";
 import { ALL_CAMPAIGNS } from "@/lib/campaigns";
 import { Confetti } from "@/components/ui/Confetti";
@@ -94,8 +95,20 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
   // Read pause reason from localStorage (set by admin when pausing from dashboard)
   const pauseReason =
     typeof window !== "undefined"
-      ? localStorage.getItem(`fmc:pause_reason:${contractId}`) ?? undefined
+      ? (localStorage.getItem(`fmc:pause_reason:${contractId}`) ?? undefined)
       : undefined;
+
+  // Show celebration once for the creator when goal is met
+  useEffect(() => {
+    if (!info || !stats) return;
+    const goalMet = stats.totalRaised >= stats.goal;
+    const isCreator = !!address && address === info.creator;
+    if (goalMet && isCreator && !celebratedRef.current) {
+      celebratedRef.current = true;
+      setShowConfetti(true);
+      setShowSuccessModal(true);
+    }
+  }, [info, stats, address]);
 
   if (loading) {
     return (
@@ -131,16 +144,6 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
   const deadlinePassed = Number(info.deadline) * 1000 < Date.now();
   const goalMet = stats.totalRaised >= stats.goal;
   const totalRaisedXlm = Number(stats.totalRaised) / 1e7;
-  const isCreator = !!address && address === info.creator;
-
-  // Show celebration once for the creator when goal is met
-  useEffect(() => {
-    if (goalMet && isCreator && !celebratedRef.current) {
-      celebratedRef.current = true;
-      setShowConfetti(true);
-      setShowSuccessModal(true);
-    }
-  }, [goalMet, isCreator]);
 
   return (
     <>
@@ -151,7 +154,10 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
           campaignTitle={info.title}
           totalRaisedXlm={totalRaisedXlm}
           onClose={() => setShowSuccessModal(false)}
-          onShare={() => { setShowSuccessModal(false); setShowShareModal(true); }}
+          onShare={() => {
+            setShowSuccessModal(false);
+            setShowShareModal(true);
+          }}
           onWithdraw={() => setShowSuccessModal(false)}
           alreadyWithdrawn={info.status === "Successful"}
         />
@@ -230,7 +236,9 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
         {/* Video player — show if campaign has a videoUrl in mock data */}
         {(() => {
           const mockCampaign = ALL_CAMPAIGNS.find((c) => c.id === contractId);
-          return mockCampaign?.videoUrl ? <VideoPlayer url={mockCampaign.videoUrl} /> : null;
+          return mockCampaign?.videoUrl ? (
+            <VideoPlayer url={mockCampaign.videoUrl} />
+          ) : null;
         })()}
 
         <ContributionLeaderboard
@@ -277,6 +285,17 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
           onRollbackOptimistic={rollbackOptimistic}
         />
 
+        {/* Team Management (RBAC) — visible once a wallet is connected */}
+        {address && (
+          <div className="space-y-3" data-testid="team-management-section">
+            <h2 className="text-lg font-semibold">Manage Team</h2>
+            <TeamManagement
+              campaignId={contractId}
+              currentUserAddress={address}
+            />
+          </div>
+        )}
+
         {/* Trust Signals */}
         {(() => {
           const mock = ALL_CAMPAIGNS.find((c) => c.id === contractId);
@@ -305,13 +324,16 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
         {/* Team Members */}
         {(() => {
           const mock = ALL_CAMPAIGNS.find((c) => c.id === contractId);
-          const members = (mock as { teamMembers?: unknown[] } | undefined)?.teamMembers;
+          const members = (mock as { teamMembers?: unknown[] } | undefined)
+            ?.teamMembers;
           if (!members || members.length === 0) return null;
           return (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">Team</h2>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {(members as Parameters<typeof TeamMemberCard>[0]["member"][]).map((m) => (
+                {(
+                  members as Parameters<typeof TeamMemberCard>[0]["member"][]
+                ).map((m) => (
                   <TeamMemberCard key={m.id} member={m} />
                 ))}
               </div>
@@ -327,7 +349,9 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
           return (
             <div className="space-y-3">
               <h2 className="text-lg font-semibold">FAQ</h2>
-              <FAQAccordion faqs={faqs as Parameters<typeof FAQAccordion>[0]["faqs"]} />
+              <FAQAccordion
+                faqs={faqs as Parameters<typeof FAQAccordion>[0]["faqs"]}
+              />
             </div>
           );
         })()}

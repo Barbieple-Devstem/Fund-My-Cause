@@ -1,22 +1,22 @@
 import dynamic from 'next/dynamic';
 
 // Route-based lazy loading
-export const LazyDashboard = dynamic(() => import('@/app/dashboard/page'), {
+export const LazyDashboard = dynamic(() => import('@/app/[locale]/dashboard/page'), {
   loading: () => <div>Loading dashboard...</div>,
   ssr: true,
 });
 
-export const LazyCampaignCreate = dynamic(() => import('@/app/create/page'), {
+export const LazyCampaignCreate = dynamic(() => import('@/app/[locale]/create/page'), {
   loading: () => <div>Loading create campaign...</div>,
   ssr: true,
 });
 
-export const LazyCampaignDetail = dynamic(() => import('@/app/campaigns/[id]/page'), {
+export const LazyCampaignDetail = dynamic(() => import('@/app/[locale]/campaigns/[id]/page'), {
   loading: () => <div>Loading campaign...</div>,
   ssr: true,
 });
 
-export const LazyBookmarks = dynamic(() => import('@/app/bookmarks/page'), {
+export const LazyBookmarks = dynamic(() => import('@/app/[locale]/bookmarks/page'), {
   loading: () => <div>Loading bookmarks...</div>,
   ssr: true,
 });

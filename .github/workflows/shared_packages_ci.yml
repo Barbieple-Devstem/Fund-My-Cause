@@ -1,0 +1,93 @@
+name: Shared Packages CI
+
+# Issue #838 — packages/types is the canonical source for Campaign/
+# CampaignStatus and related domain types. Neither packages/types nor
+# sdks/js had any CI coverage before this. This workflow is the
+# CI-enforced check that catches re-divergence: packages/types' own
+# contract test guards the canonical values, and typechecking sdks/js
+# against them catches drift at the consumer.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'packages/types/**'
+      - 'sdks/js/**'
+      - '.github/workflows/shared_packages_ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'packages/types/**'
+      - 'sdks/js/**'
+      - '.github/workflows/shared_packages_ci.yml'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── packages/types ──────────────────────────────────────────────────────────
+  types:
+    name: packages/types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: packages/types/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-types-${{ hashFiles('packages/types/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-types-
+
+      - name: Install
+        working-directory: packages/types
+        # packages/types is an npm workspace member (root "workspaces": ["packages/*"]),
+        # but is installed standalone here so this job doesn't depend on the
+        # rest of the monorepo's root install succeeding.
+        run: npm ci --workspaces=false --include-workspace-root=false
+
+      - name: Typecheck
+        working-directory: packages/types
+        run: npx tsc --noEmit
+
+      - name: Test
+        working-directory: packages/types
+        run: npm test
+
+  # ── sdks/js ──────────────────────────────────────────────────────────────────
+  sdk:
+    name: sdks/js
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: sdks/js/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-${{ hashFiles('sdks/js/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-
+
+      - name: Install
+        working-directory: sdks/js
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: sdks/js
+        run: npx tsc --noEmit -p .
+
+      - name: Build
+        working-directory: sdks/js
+        run: npm run build
+
+      - name: Test
+        working-directory: sdks/js
+        run: npm test

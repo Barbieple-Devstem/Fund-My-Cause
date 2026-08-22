@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import { createUpdate, editUpdate } from "@/lib/updateStore";
 import type { Update } from "@/lib/updateStore";
-import { useNotifications } from "@/context/NotificationContext";
+import { useNotifications } from "@/hooks/useNotifications";
 import { useFocusTrap } from "@/hooks/useFocusTrap";
 
 const MAX_TITLE = 100;

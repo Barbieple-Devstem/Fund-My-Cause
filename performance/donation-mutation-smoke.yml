@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Donation Mutation — Smoke Test (CI / quick sanity check)
+#
+# Runs 5 VUs for 20 seconds.  Purpose: confirm the recordContribution
+# mutation returns HTTP 200 (even if it returns a GraphQL error because no
+# real on-chain state exists in CI).  Does NOT enforce latency thresholds.
+#
+# Usage:
+#   cd /workspaces/Fund-My-Cause/performance
+#   artillery run donation-mutation-smoke.yml
+# ─────────────────────────────────────────────────────────────────────────────
+
+config:
+  target: "{{ $env.GRAPHQL_URL || 'http://localhost:4000' }}"
+  processor: "./donation-mutation-helpers.js"
+
+  phases:
+    - name: "Smoke"
+      duration: 20
+      arrivalRate: 5
+
+  defaults:
+    headers:
+      Content-Type: "application/json"
+      Accept: "application/json"
+      X-Load-Test: "donation-mutation-smoke"
+
+  variables:
+    campaignId: "{{ $env.CAMPAIGN_ID || 'PLACEHOLDER_CAMPAIGN_CONTRACT_ID' }}"
+    contributorAddr: "{{ $env.CONTRIBUTOR_ADDR || 'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN' }}"
+    authToken: "{{ $env.AUTH_TOKEN || '' }}"
+
+scenarios:
+  - name: "Smoke: recordContribution mutation reachable"
+    weight: 100
+    flow:
+      - function: "setRequestHeaders"
+      - post:
+          url: "/graphql"
+          json:
+            query: |
+              mutation RecordContribution($input: RecordContributionInput!) {
+                recordContribution(input: $input) {
+                  id
+                  campaignId
+                  contributor
+                  amount
+                  timestamp
+                  transactionHash
+                }
+              }
+            variables:
+              input:
+                campaignId: "{{ campaignId }}"
+                contributor: "{{ contributorAddr }}"
+                amount: "1000000000"
+                transactionHash: "{{ txHash }}"
+          # Smoke test: only verify the HTTP transport works (200 or 4xx).
+          # GraphQL errors are expected if no real contract state is present.
+          expect:
+            - statusCode:
+                - 200
+                - 400
+                - 401
+                - 429
+      - function: "checkGraphQLErrors"

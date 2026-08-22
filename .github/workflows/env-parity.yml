@@ -1,0 +1,44 @@
+name: Env Parity
+
+# Issue #715 — Validates environment variable schema parity across all
+# .env.* files. Fails CI if any required key is missing or added without
+# being documented in the central REQUIRED_VARS list.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/interface/.env*'
+      - 'scripts/check-env-parity.js'
+      - '.github/workflows/env-parity.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'apps/interface/.env*'
+      - 'scripts/check-env-parity.js'
+      - '.github/workflows/env-parity.yml'
+
+jobs:
+  env-parity:
+    name: Validate env parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run env parity check
+        run: node scripts/check-env-parity.js --env-dir apps/interface
+
+      - name: Post result to job summary
+        if: always()
+        run: |
+          echo "## Env Parity Check" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Checked all \`.env.*\` files under \`apps/interface/\` against the required variable schema." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Source of truth: \`scripts/check-env-parity.js\` → \`REQUIRED_VARS\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Documentation:   \`docs/environment-config.md\`" >> "$GITHUB_STEP_SUMMARY"

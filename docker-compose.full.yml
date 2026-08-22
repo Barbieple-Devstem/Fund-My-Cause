@@ -1,0 +1,142 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: fund-my-cause-postgres
+    environment:
+      POSTGRES_USER: fundmycause
+      POSTGRES_PASSWORD: fundmycause123
+      POSTGRES_DB: fundmycause
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fundmycause"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fundmycause-network
+
+  # ============================================
+  # Redis Cache
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: fund-my-cause-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - fundmycause-network
+
+  # ============================================
+  # Indexer Service
+  # ============================================
+  indexer:
+    build:
+      context: ./indexer
+      dockerfile: Dockerfile
+    container_name: fund-my-cause-indexer
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://fundmycause:fundmycause123@postgres:5432/fundmycause
+      REDIS_URL: redis://redis:6379
+      STELLAR_RPC_URL: https://soroban-testnet.stellar.org
+      NETWORK: testnet
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./indexer:/app
+      - /app/node_modules
+    command: npm run dev
+    networks:
+      - fundmycause-network
+
+  # ============================================
+  # API Service
+  # ============================================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fund-my-cause-api
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DATABASE_URL: postgresql://fundmycause:fundmycause123@postgres:5432/fundmycause
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: dev-secret-key-change-in-production
+      CORS_ORIGIN: http://localhost:3002
+      INDEXER_URL: http://indexer:3001
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      indexer:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+    networks:
+      - fundmycause-network
+
+  # ============================================
+  # Frontend Service
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fund-my-cause-frontend
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3000/api
+      NEXT_PUBLIC_INDEXER_URL: http://localhost:3001
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    networks:
+      - fundmycause-network
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  postgres_data:
+  redis_data:
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  fundmycause-network:
+    driver: bridge

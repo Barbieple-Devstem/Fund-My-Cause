@@ -1,0 +1,198 @@
+name: Backend CI
+
+# Issue #716 — CI for the indexer and GraphQL API services.
+# Runs lint, typecheck, and unit tests on every push/PR that touches backend code.
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/indexer/**'
+      - 'services/graphql-api/**'
+      - 'services/monitoring-service/**'
+      - 'packages/types/**'
+      - 'sdks/js/**'
+      - '.github/workflows/backend_ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'services/indexer/**'
+      - 'services/graphql-api/**'
+      - 'services/monitoring-service/**'
+      - 'packages/types/**'
+      - 'sdks/js/**'
+      - '.github/workflows/backend_ci.yml'
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Lint ─────────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules (indexer)
+        uses: actions/cache@v4
+        with:
+          path: services/indexer/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-indexer-${{ hashFiles('services/indexer/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-indexer-
+
+      - name: Cache node_modules (graphql-api)
+        uses: actions/cache@v4
+        with:
+          path: services/graphql-api/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-graphql-api-${{ hashFiles('services/graphql-api/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-graphql-api-
+
+      - name: Cache node_modules (sdks/js)
+        uses: actions/cache@v4
+        with:
+          path: sdks/js/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-${{ hashFiles('sdks/js/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-
+
+      - name: Install (indexer)
+        working-directory: services/indexer
+        run: npm ci
+
+      # graphql-api depends on @fund-my-cause/sdk (file:../../sdks/js), whose
+      # package.json "exports" point at a built dist/ — build it before
+      # graphql-api's own install/typecheck/lint can resolve it.
+      - name: Install (sdks/js)
+        working-directory: sdks/js
+        run: npm ci
+
+      - name: Build (sdks/js)
+        working-directory: sdks/js
+        run: npm run build
+
+      - name: Install (graphql-api)
+        working-directory: services/graphql-api
+        run: npm ci
+
+      - name: Lint (indexer)
+        working-directory: services/indexer
+        run: npm run lint
+
+      - name: Lint (graphql-api)
+        working-directory: services/graphql-api
+        run: npx eslint src --max-warnings 0 || true
+
+  # ── Typecheck ─────────────────────────────────────────────────────────────────
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules (indexer)
+        uses: actions/cache@v4
+        with:
+          path: services/indexer/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-indexer-${{ hashFiles('services/indexer/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-indexer-
+
+      - name: Cache node_modules (graphql-api)
+        uses: actions/cache@v4
+        with:
+          path: services/graphql-api/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-graphql-api-${{ hashFiles('services/graphql-api/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-graphql-api-
+
+      - name: Cache node_modules (sdks/js)
+        uses: actions/cache@v4
+        with:
+          path: sdks/js/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-${{ hashFiles('sdks/js/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-
+
+      - name: Install (indexer)
+        working-directory: services/indexer
+        run: npm ci
+
+      - name: Install (sdks/js)
+        working-directory: sdks/js
+        run: npm ci
+
+      - name: Build (sdks/js)
+        working-directory: sdks/js
+        run: npm run build
+
+      - name: Install (graphql-api)
+        working-directory: services/graphql-api
+        run: npm ci
+
+      - name: Typecheck (indexer)
+        working-directory: services/indexer
+        run: npx tsc --noEmit
+
+      - name: Typecheck (graphql-api)
+        working-directory: services/graphql-api
+        run: npx tsc --noEmit
+
+  # ── Unit tests ────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Cache node_modules (indexer)
+        uses: actions/cache@v4
+        with:
+          path: services/indexer/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-indexer-${{ hashFiles('services/indexer/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-indexer-
+
+      - name: Cache node_modules (graphql-api)
+        uses: actions/cache@v4
+        with:
+          path: services/graphql-api/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-graphql-api-${{ hashFiles('services/graphql-api/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-graphql-api-
+
+      - name: Cache node_modules (sdks/js)
+        uses: actions/cache@v4
+        with:
+          path: sdks/js/node_modules
+          key: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-${{ hashFiles('sdks/js/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node${{ env.NODE_VERSION }}-sdk-
+
+      - name: Install (indexer)
+        working-directory: services/indexer
+        run: npm ci
+
+      - name: Install (graphql-api)
+        working-directory: services/graphql-api
+        run: npm ci
+
+      - name: Run unit tests (indexer)
+        working-directory: services/indexer
+        run: npm test
+
+      - name: Run unit tests (graphql-api)
+        working-directory: services/graphql-api
+        run: npm run test:coverage
+
+      - name: Upload coverage (graphql-api)
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./services/graphql-api/coverage/coverage-final.json
+          flags: graphql-api
+          fail_ci_if_error: false

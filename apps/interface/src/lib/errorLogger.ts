@@ -42,6 +42,9 @@ export function logError(error: unknown, errorInfo?: ErrorInfo): ErrorLog {
         : appError.severity === "warning"
           ? "warn"
           : "info";
+    /* Development-only mirror of the structured entry, so errors stay visible
+       while debugging. Gated on NODE_ENV, so it never ships to production. */
+    // eslint-disable-next-line no-console
     console[method](
       `[${appError.severity.toUpperCase()}] ${appError.code}:`,
       appError.message,

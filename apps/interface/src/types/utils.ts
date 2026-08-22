@@ -7,37 +7,6 @@ import type { Campaign } from "./campaign";
 import type { ContributionResponse, TransactionResponse } from "./api";
 
 /**
- * Wallet context type
- */
-export interface WalletContextType {
-  address: string | null;
-  isConnected: boolean;
-  isLoading: boolean;
-  error: Error | null;
-  connect: () => Promise<void>;
-  disconnect: () => void;
-  signTransaction: (xdr: string) => Promise<string>;
-}
-
-/**
- * Theme context type
- */
-export interface ThemeContextType {
-  isDark: boolean;
-  toggleTheme: () => void;
-}
-
-/**
- * Notification context type
- */
-export interface NotificationContextType {
-  notifications: Notification[];
-  addNotification: (notification: Omit<Notification, "id" | "createdAt">) => void;
-  removeNotification: (id: string) => void;
-  markAsRead: (id: string) => void;
-}
-
-/**
  * Bookmark context type
  */
 export interface BookmarkContextType {
@@ -108,19 +77,6 @@ export interface UseTransactionsReturn {
   isLoading: boolean;
   error: Error | null;
   refetch: () => Promise<void>;
-}
-
-/**
- * Notification type
- */
-export interface Notification {
-  id: string;
-  type: "success" | "error" | "info" | "warning";
-  title: string;
-  message: string;
-  duration?: number;
-  read: boolean;
-  createdAt: string;
 }
 
 /**

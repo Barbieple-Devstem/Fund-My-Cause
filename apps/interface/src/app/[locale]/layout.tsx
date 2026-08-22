@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import "../globals.css";
 import "../rtl.css";
-import { WalletProvider } from "@/context/WalletContext";
+import { WalletSelectModalHost } from "@/components/WalletSelectModalHost";
+import { ModalRenderer } from "@/components/ModalRenderer";
 import { ToastProvider } from "@/components/ui/Toast";
-import { ThemeProvider } from "@/context/ThemeContext";
-import { NotificationProvider } from "@/context/NotificationContext";
+import { ThemeInitializer } from "@/components/ThemeInitializer";
 import { NotificationPreferencesProvider } from "@/context/NotificationPreferencesContext";
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { ComparisonProvider } from "@/context/ComparisonContext";
@@ -12,18 +12,16 @@ import { BookmarkProvider } from "@/context/BookmarkContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorHandlerInitializer } from "@/components/ErrorHandlerInitializer";
 import { SkipNav } from "@/components/ui/SkipNav";
-import { BreadcrumbProvider } from "@/context/BreadcrumbContext";
+import { ThemeProvider } from "@fund-my-cause/components";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { rtlLocales, type Locale } from "@/i18n/config";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
-import { ReduxProvider } from "@/store/Provider";
-import { ThemeApplier } from "@/components/ThemeApplier";
-import { ModalRenderer } from "@/components/ModalRenderer";
 import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 import { CommandPaletteProvider } from "@/components/ui/CommandPaletteProvider";
 import { LimitedConnectivityBanner } from "@/components/ui/LimitedConnectivityBanner";
+import { ErrorSimulator } from "@/components/ErrorSimulator";
 
 export const metadata: Metadata = {
   title: "Fund My Cause",
@@ -66,25 +64,37 @@ export default async function LocaleLayout({
         <ServiceWorkerRegistration />
         <SkipNav />
         <LimitedConnectivityBanner />
+        <ErrorSimulator />
         <ErrorBoundary level="page">
           <ErrorHandlerInitializer />
-          <NextIntlClientProvider messages={messages}>
-            <ThemeProvider>
-              <ToastProvider>
-                <NotificationPreferencesProvider>
-                  <NotificationProvider>
+          <ThemeProvider>
+            <ThemeInitializer>
+              <NextIntlClientProvider messages={messages}>
+                <ToastProvider>
+                  <NotificationPreferencesProvider>
                     <CurrencyProvider>
                       <ComparisonProvider>
                         <BookmarkProvider>
-                          <WalletProvider>{children}</WalletProvider>
+                          <CommandPaletteProvider>
+                            <div
+                              id="main-content"
+                              role="main"
+                              tabIndex={-1}
+                              className="outline-none"
+                            >
+                              {children}
+                            </div>
+                          </CommandPaletteProvider>
+                          <WalletSelectModalHost />
+                          <ModalRenderer />
                         </BookmarkProvider>
                       </ComparisonProvider>
                     </CurrencyProvider>
-                  </NotificationProvider>
-                </NotificationPreferencesProvider>
-              </ToastProvider>
-            </ThemeProvider>
-          </NextIntlClientProvider>
+                  </NotificationPreferencesProvider>
+                </ToastProvider>
+              </NextIntlClientProvider>
+            </ThemeInitializer>
+          </ThemeProvider>
         </ErrorBoundary>
       </body>
     </html>

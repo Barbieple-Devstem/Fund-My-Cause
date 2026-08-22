@@ -5,5 +5,11 @@ target
 *.wasm
 .env
 .env.local
+.env.local.backup
 # Cargo.lock is intentionally tracked — see README
 task1.md
+
+# Test fixtures (generated)
+fixtures/seed-data.json
+fixtures/test-fixtures.json
+fixtures/archive/

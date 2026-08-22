@@ -1,11 +1,12 @@
 import React from "react";
-import Image from "next/image";
+// next/image used in JSX below (kept for future use)
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
 import { RecommendedSection } from "@/components/ui/RecommendedSection";
 import { FundingTicker } from "@/components/ui/FundingTicker";
+import { RootPageContent } from "@/components/RootPageContent";
 import { Rocket, Users, Coins, ArrowRight, PlusCircle } from "lucide-react";
 import { formatTimeLeft } from "@/lib/format";
 import {
@@ -90,7 +91,8 @@ const HOW_IT_WORKS = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-gray-950 text-white flex flex-col">
+    <RootPageContent>
+      <main className="min-h-screen bg-gray-950 text-white flex flex-col">
       <Navbar />
 
       {/* ── Hero ── */}
@@ -246,9 +248,23 @@ export default function Home() {
               Stellar Docs
             </a>
           </div>
-          <span>MIT License · Built on Stellar</span>
+          <div className="flex flex-col items-end gap-1">
+            <span>MIT License · Built on Stellar</span>
+            {process.env.NEXT_PUBLIC_VERIFIED_CONTRACT_HASH && (
+              <a
+                href={`https://github.com/Fund-My-Cause/Fund-My-Cause/commit/${process.env.NEXT_PUBLIC_SOURCE_COMMIT}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-mono text-gray-600 hover:text-indigo-400 transition"
+                title="Verified contract hash — click to view source commit"
+              >
+                Contract: {process.env.NEXT_PUBLIC_VERIFIED_CONTRACT_HASH.slice(0, 12)}…
+              </a>
+            )}
+          </div>
         </div>
       </footer>
     </main>
+    </RootPageContent>
   );
 }

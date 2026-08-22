@@ -1,0 +1,1436 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Button snapshots > renders danger variant 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500 px-4 py-2 text-base"
+>
+  Delete
+</button>
+`;
+
+exports[`Button snapshots > renders disabled state 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-4 py-2 text-base"
+  disabled=""
+>
+  Unavailable
+</button>
+`;
+
+exports[`Button snapshots > renders full-width button 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-4 py-2 text-base w-full"
+>
+  Submit
+</button>
+`;
+
+exports[`Button snapshots > renders ghost variant 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-indigo-600 hover:bg-indigo-50 focus-visible:ring-indigo-500 px-4 py-2 text-base"
+>
+  Skip
+</button>
+`;
+
+exports[`Button snapshots > renders large size 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-6 py-3 text-lg"
+>
+  Large
+</button>
+`;
+
+exports[`Button snapshots > renders loading state — spinner replaces children 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-4 py-2 text-base"
+  disabled=""
+>
+  <span
+    class="inline-block w-4 h-4 mr-2 border-2 border-current border-t-transparent rounded-full animate-spin"
+  />
+  Loading...
+</button>
+`;
+
+exports[`Button snapshots > renders outline variant 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 focus-visible:ring-indigo-500 px-4 py-2 text-base"
+>
+  Learn more
+</button>
+`;
+
+exports[`Button snapshots > renders primary variant (default) 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-4 py-2 text-base"
+>
+  Donate
+</button>
+`;
+
+exports[`Button snapshots > renders secondary variant 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-200 text-gray-900 hover:bg-gray-300 focus-visible:ring-gray-500 px-4 py-2 text-base"
+>
+  Cancel
+</button>
+`;
+
+exports[`Button snapshots > renders small size 1`] = `
+<button
+  class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-3 py-1.5 text-sm"
+>
+  Small
+</button>
+`;
+
+exports[`CampaignActions snapshots > renders donate disabled state 1`] = `
+<div
+  class="space-y-3"
+>
+  <button
+    class="w-full py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+    disabled=""
+    type="button"
+  >
+    Goal reached
+  </button>
+</div>
+`;
+
+exports[`CampaignActions snapshots > renders error state 1`] = `
+<p
+  class="text-sm text-red-500"
+  role="alert"
+>
+  Campaign is closed
+</p>
+`;
+
+exports[`CampaignActions snapshots > renders full action set — donate + share + save 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex gap-1"
+  >
+    <button
+      aria-label="Share campaign"
+      class="p-2 rounded-full transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-share2 lucide-share-2"
+        fill="none"
+        height="15"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="15"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle
+          cx="18"
+          cy="5"
+          r="3"
+        />
+        <circle
+          cx="6"
+          cy="12"
+          r="3"
+        />
+        <circle
+          cx="18"
+          cy="19"
+          r="3"
+        />
+        <line
+          x1="8.59"
+          x2="15.42"
+          y1="13.51"
+          y2="17.49"
+        />
+        <line
+          x1="15.41"
+          x2="8.59"
+          y1="6.51"
+          y2="10.49"
+        />
+      </svg>
+    </button>
+    <button
+      aria-label="Save campaign"
+      aria-pressed="false"
+      class="p-2 rounded-full transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-bookmark"
+        fill="none"
+        height="15"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="15"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"
+        />
+      </svg>
+    </button>
+  </div>
+  <button
+    class="w-full py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+    type="button"
+  >
+    Back this project
+  </button>
+</div>
+`;
+
+exports[`CampaignActions snapshots > renders inline layout with share and save buttons 1`] = `
+<div
+  class="flex gap-1"
+>
+  <div
+    class="contents"
+  >
+    <button
+      aria-label="Share campaign"
+      class="p-2 rounded-full transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-share2 lucide-share-2"
+        fill="none"
+        height="15"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="15"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <circle
+          cx="18"
+          cy="5"
+          r="3"
+        />
+        <circle
+          cx="6"
+          cy="12"
+          r="3"
+        />
+        <circle
+          cx="18"
+          cy="19"
+          r="3"
+        />
+        <line
+          x1="8.59"
+          x2="15.42"
+          y1="13.51"
+          y2="17.49"
+        />
+        <line
+          x1="15.41"
+          x2="8.59"
+          y1="6.51"
+          y2="10.49"
+        />
+      </svg>
+    </button>
+    <button
+      aria-label="Save campaign"
+      aria-pressed="false"
+      class="p-2 rounded-full transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-bookmark"
+        fill="none"
+        height="15"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="15"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"
+        />
+      </svg>
+    </button>
+  </div>
+</div>
+`;
+
+exports[`CampaignActions snapshots > renders loading state — all buttons disabled 1`] = `
+<div
+  class="space-y-3"
+>
+  <button
+    aria-busy="true"
+    class="w-full py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+    disabled=""
+    type="button"
+  >
+    Donate
+  </button>
+</div>
+`;
+
+exports[`CampaignActions snapshots > renders saved state — bookmark icon is active 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex gap-1"
+  >
+    <button
+      aria-label="Remove from saved"
+      aria-pressed="true"
+      class="p-2 rounded-full transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-bookmark"
+        fill="none"
+        height="15"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="15"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"
+        />
+      </svg>
+    </button>
+  </div>
+</div>
+`;
+
+exports[`CampaignActions snapshots > renders stacked layout with donate button (default) 1`] = `
+<div
+  class="space-y-3"
+>
+  <button
+    class="w-full py-3 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+    type="button"
+  >
+    Donate now
+  </button>
+</div>
+`;
+
+exports[`CampaignActions snapshots > renders unsaved state 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex gap-1"
+  >
+    <button
+      aria-label="Save campaign"
+      aria-pressed="false"
+      class="p-2 rounded-full transition touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
+      type="button"
+    >
+      <svg
+        aria-hidden="true"
+        class="lucide lucide-bookmark"
+        fill="none"
+        height="15"
+        stroke="currentColor"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        stroke-width="2"
+        viewBox="0 0 24 24"
+        width="15"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M17 3a2 2 0 0 1 2 2v15a1 1 0 0 1-1.496.868l-4.512-2.578a2 2 0 0 0-1.984 0l-4.512 2.578A1 1 0 0 1 5 20V5a2 2 0 0 1 2-2z"
+        />
+      </svg>
+    </button>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders default state with title only 1`] = `
+<div
+  class=""
+>
+  <div
+    class="relative"
+  />
+  <div>
+    <h2>
+      Clean Water Initiative
+    </h2>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders error state 1`] = `
+<div
+  class=""
+>
+  <div
+    class="relative"
+  >
+    <div
+      class="w-full h-full flex items-center justify-center text-sm text-red-500 bg-[var(--color-surface-elevated,#e5e7eb)]"
+      role="alert"
+    >
+      Failed to load image
+    </div>
+  </div>
+  <div>
+    <h2>
+      Error campaign
+    </h2>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders loading skeleton state 1`] = `
+<div
+  class=""
+>
+  <div
+    class="relative"
+  >
+    <div
+      aria-label="Loading campaign image"
+      class="w-full h-full animate-pulse bg-[var(--color-surface-elevated,#e5e7eb)]"
+      role="status"
+    />
+  </div>
+  <div>
+    <h2>
+      Loading…
+    </h2>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders with an imageUrl and fallback 1`] = `
+<div
+  class=""
+>
+  <div
+    class="relative"
+  >
+    <img
+      alt="Ocean cleanup campaign banner"
+      class="object-cover w-full h-full"
+      src="https://example.com/ocean.jpg"
+    />
+  </div>
+  <div>
+    <h2>
+      Ocean Cleanup
+    </h2>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders with custom class names applied 1`] = `
+<div
+  class="custom-root"
+>
+  <div
+    class="relative"
+  />
+  <div>
+    <h2
+      class="custom-title"
+    >
+      Styled header
+    </h2>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders with h3 heading level 1`] = `
+<div
+  class=""
+>
+  <div
+    class="relative"
+  />
+  <div>
+    <h3>
+      Community Garden
+    </h3>
+  </div>
+</div>
+`;
+
+exports[`CampaignHeader snapshots > renders with organisation and description 1`] = `
+<div
+  class=""
+>
+  <div
+    class="relative"
+  />
+  <div>
+    <h2>
+      Solar Energy for Schools
+    </h2>
+    <p>
+      Green Future NGO
+    </p>
+    <p>
+      Bringing clean energy to 50 rural schools.
+    </p>
+  </div>
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders animated bar 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex items-center gap-3"
+  >
+    <div
+      class="flex-1 relative"
+    >
+      <div
+        aria-label="Progress: 50%"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        aria-valuenow="50"
+        class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+        role="progressbar"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-500 bg-indigo-500 animate-shimmer"
+          style="width: 50%;"
+        />
+        <div
+          class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+        />
+      </div>
+    </div>
+    <span
+      aria-hidden="true"
+      class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+    >
+      50
+      %
+    </span>
+  </div>
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders at 0 % — nothing raised yet 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex items-center gap-3"
+  >
+    <div
+      class="flex-1 relative"
+    >
+      <div
+        aria-label="Progress: 0%"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        aria-valuenow="0"
+        class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+        role="progressbar"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-500 bg-indigo-500"
+          style="width: 0%;"
+        />
+        <div
+          class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+        />
+      </div>
+    </div>
+    <span
+      aria-hidden="true"
+      class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+    >
+      0
+      %
+    </span>
+  </div>
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders at 65 % with raised and goal text 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex items-center gap-3"
+  >
+    <div
+      class="flex-1 relative"
+    >
+      <div
+        aria-label="Progress: 65%"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        aria-valuenow="65"
+        class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+        role="progressbar"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-500 bg-indigo-500"
+          style="width: 65%;"
+        />
+        <div
+          class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+        />
+      </div>
+    </div>
+    <span
+      aria-hidden="true"
+      class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+    >
+      65
+      %
+    </span>
+  </div>
+  <div
+    class="flex justify-between text-sm"
+  >
+    <span>
+      6,500 XLM raised
+    </span>
+    <span>
+      10,000 XLM goal
+    </span>
+  </div>
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders at 100 % — fully funded 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex items-center gap-3"
+  >
+    <div
+      class="flex-1 relative"
+    >
+      <div
+        aria-label="Progress: 100%"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        aria-valuenow="100"
+        class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+        role="progressbar"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-500 bg-green-500"
+          style="width: 100%;"
+        />
+        <div
+          class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+        />
+      </div>
+    </div>
+    <span
+      aria-hidden="true"
+      class="text-sm font-medium min-w-[3rem] text-right text-green-400"
+    >
+      100
+      %
+    </span>
+  </div>
+  <div
+    class="flex justify-between text-sm"
+  >
+    <span>
+      10,000 XLM raised
+    </span>
+    <span>
+      10,000 XLM goal
+    </span>
+  </div>
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders error state 1`] = `
+<p
+  class="text-sm text-red-500"
+  role="alert"
+>
+  Could not load progress
+</p>
+`;
+
+exports[`CampaignProgress snapshots > renders loading skeleton state 1`] = `
+<div
+  aria-label="Loading funding progress"
+  class="space-y-3"
+  role="status"
+>
+  <div
+    class="h-2 w-full rounded-full animate-pulse bg-[var(--color-surface-elevated,#e5e7eb)]"
+  />
+  <div
+    class="h-4 w-2/3 rounded animate-pulse bg-[var(--color-surface-elevated,#e5e7eb)]"
+  />
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders over-funded state (percent > 100) 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex items-center gap-3"
+  >
+    <div
+      class="flex-1 relative"
+    >
+      <div
+        aria-label="Progress: 100%"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        aria-valuenow="100"
+        class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+        role="progressbar"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-500 bg-green-500"
+          style="width: 100%;"
+        />
+        <div
+          class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+        />
+      </div>
+    </div>
+    <span
+      aria-hidden="true"
+      class="text-sm font-medium min-w-[3rem] text-right text-green-400"
+    >
+      100
+      %
+    </span>
+  </div>
+  <div
+    class="flex justify-between text-sm"
+  >
+    <span>
+      13,000 XLM raised
+    </span>
+    <span>
+      10,000 XLM goal
+    </span>
+  </div>
+</div>
+`;
+
+exports[`CampaignProgress snapshots > renders with time remaining element 1`] = `
+<div
+  class="space-y-3"
+>
+  <div
+    class="flex items-center gap-3"
+  >
+    <div
+      class="flex-1 relative"
+    >
+      <div
+        aria-label="Progress: 40%"
+        aria-valuemax="100"
+        aria-valuemin="0"
+        aria-valuenow="40"
+        class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+        role="progressbar"
+      >
+        <div
+          class="h-2 rounded-full transition-all duration-500 bg-indigo-500"
+          style="width: 40%;"
+        />
+        <div
+          class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+        />
+      </div>
+    </div>
+    <span
+      aria-hidden="true"
+      class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+    >
+      40
+      %
+    </span>
+  </div>
+  <div
+    class="flex justify-between text-sm"
+  >
+    <span>
+      4,000 XLM
+    </span>
+    <span>
+      10,000 XLM
+    </span>
+  </div>
+  <div>
+    <span>
+      12 days left
+    </span>
+  </div>
+</div>
+`;
+
+exports[`Card snapshots > renders card with lg padding 1`] = `
+<div
+  class="bg-white rounded-lg border border-gray-200 shadow-sm p-6"
+>
+  Spacious
+</div>
+`;
+
+exports[`Card snapshots > renders card with sm padding 1`] = `
+<div
+  class="bg-white rounded-lg border border-gray-200 shadow-sm p-3"
+>
+  Compact
+</div>
+`;
+
+exports[`Card snapshots > renders default card 1`] = `
+<div
+  class="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+>
+  Simple content
+</div>
+`;
+
+exports[`Card snapshots > renders full card with header, body and footer 1`] = `
+<div
+  class="bg-white rounded-lg border border-gray-200 shadow-sm p-4"
+>
+  <div
+    class="mb-4 pb-4 border-b border-gray-200"
+  >
+    Card Title
+  </div>
+  <div
+    class=""
+  >
+    This is the body of the card.
+  </div>
+  <div
+    class="mt-4 pt-4 border-t border-gray-200"
+  >
+    Footer actions
+  </div>
+</div>
+`;
+
+exports[`Card snapshots > renders hoverable card 1`] = `
+<div
+  class="bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer p-4"
+>
+  Hover me
+</div>
+`;
+
+exports[`FormField snapshots > renders full-width variant 1`] = `
+<div
+  class="flex flex-col gap-1 w-full"
+>
+  <label
+    class="text-sm font-medium text-gray-700"
+    for="_r_4_"
+  >
+    Description
+  </label>
+  <textarea
+    id="_r_4_"
+  />
+</div>
+`;
+
+exports[`FormField snapshots > renders required field — shows asterisk 1`] = `
+<div
+  class="flex flex-col gap-1"
+>
+  <label
+    class="text-sm font-medium text-gray-700"
+    for="_r_3_"
+  >
+    Wallet Address
+    <span
+      aria-hidden="true"
+      class="text-red-500 ml-1"
+    >
+      *
+    </span>
+  </label>
+  <input
+    aria-required="true"
+    id="_r_3_"
+    required=""
+  />
+</div>
+`;
+
+exports[`FormField snapshots > renders with error message — error state 1`] = `
+<div
+  class="flex flex-col gap-1"
+>
+  <label
+    class="text-sm font-medium text-gray-700"
+    for="_r_1_"
+  >
+    Amount
+  </label>
+  <input
+    aria-describedby="_r_1_-error"
+    aria-errormessage="_r_1_-error"
+    aria-invalid="true"
+    id="_r_1_"
+  />
+  <span
+    class="text-sm text-red-500"
+    id="_r_1_-error"
+    role="alert"
+  >
+    Amount must be at least 10 XLM
+  </span>
+</div>
+`;
+
+exports[`FormField snapshots > renders with helper text — helper state 1`] = `
+<div
+  class="flex flex-col gap-1"
+>
+  <label
+    class="text-sm font-medium text-gray-700"
+    for="_r_2_"
+  >
+    Title
+  </label>
+  <input
+    aria-describedby="_r_2_-helper"
+    id="_r_2_"
+  />
+  <span
+    class="text-sm text-gray-500"
+    id="_r_2_-helper"
+  >
+    Max 80 characters
+  </span>
+</div>
+`;
+
+exports[`FormField snapshots > renders with label only 1`] = `
+<div
+  class="flex flex-col gap-1"
+>
+  <label
+    class="text-sm font-medium text-gray-700"
+    for="_r_0_"
+  >
+    Campaign Goal
+  </label>
+  <input
+    id="_r_0_"
+  />
+</div>
+`;
+
+exports[`Modal snapshots > renders lg modal with footer 1`] = `
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center"
+  role="presentation"
+>
+  <div
+    aria-hidden="true"
+    class="absolute inset-0 bg-black/50 animate-in fade-in duration-200"
+  />
+  <div
+    aria-labelledby="modal-title"
+    aria-modal="true"
+    class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full mx-4 animate-in zoom-in-95 fade-in duration-200 max-w-lg"
+    role="dialog"
+  >
+    <div
+      class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700"
+    >
+      <h2
+        class="text-lg font-semibold text-gray-900 dark:text-gray-100"
+        id="modal-title"
+      >
+        Campaign details
+      </h2>
+      <button
+        aria-label="Close modal"
+        class="ml-auto p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500 dark:text-gray-400"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-x w-5 h-5"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M18 6 6 18"
+          />
+          <path
+            d="m6 6 12 12"
+          />
+        </svg>
+      </button>
+    </div>
+    <div
+      class="p-6 text-gray-800 dark:text-gray-200"
+    >
+      Detailed information here.
+    </div>
+    <div
+      class="flex items-center justify-end gap-3 p-6 border-t border-gray-200 dark:border-gray-700"
+    >
+      <button
+        class="inline-flex items-center justify-center font-medium rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed bg-indigo-600 text-white hover:bg-indigo-700 focus-visible:ring-indigo-500 px-4 py-2 text-base"
+      >
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Modal snapshots > renders md modal with title and body (default) 1`] = `
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center"
+  role="presentation"
+>
+  <div
+    aria-hidden="true"
+    class="absolute inset-0 bg-black/50 animate-in fade-in duration-200"
+  />
+  <div
+    aria-labelledby="modal-title"
+    aria-modal="true"
+    class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full mx-4 animate-in zoom-in-95 fade-in duration-200 max-w-md"
+    role="dialog"
+  >
+    <div
+      class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700"
+    >
+      <h2
+        class="text-lg font-semibold text-gray-900 dark:text-gray-100"
+        id="modal-title"
+      >
+        Confirm donation
+      </h2>
+      <button
+        aria-label="Close modal"
+        class="ml-auto p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500 dark:text-gray-400"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-x w-5 h-5"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M18 6 6 18"
+          />
+          <path
+            d="m6 6 12 12"
+          />
+        </svg>
+      </button>
+    </div>
+    <div
+      class="p-6 text-gray-800 dark:text-gray-200"
+    >
+      Are you sure you want to donate 50 XLM?
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Modal snapshots > renders nothing when closed (isOpen=false) 1`] = `null`;
+
+exports[`Modal snapshots > renders sm modal when open 1`] = `
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center"
+  role="presentation"
+>
+  <div
+    aria-hidden="true"
+    class="absolute inset-0 bg-black/50 animate-in fade-in duration-200"
+  />
+  <div
+    aria-labelledby="modal-title"
+    aria-modal="true"
+    class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full mx-4 animate-in zoom-in-95 fade-in duration-200 max-w-sm"
+    role="dialog"
+  >
+    <div
+      class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700"
+    >
+      <h2
+        class="text-lg font-semibold text-gray-900 dark:text-gray-100"
+        id="modal-title"
+      >
+        Small modal
+      </h2>
+      <button
+        aria-label="Close modal"
+        class="ml-auto p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500 dark:text-gray-400"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-x w-5 h-5"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M18 6 6 18"
+          />
+          <path
+            d="m6 6 12 12"
+          />
+        </svg>
+      </button>
+    </div>
+    <div
+      class="p-6 text-gray-800 dark:text-gray-200"
+    >
+      Compact content
+    </div>
+  </div>
+</div>
+`;
+
+exports[`Modal snapshots > renders xl modal 1`] = `
+<div
+  class="fixed inset-0 z-50 flex items-center justify-center"
+  role="presentation"
+>
+  <div
+    aria-hidden="true"
+    class="absolute inset-0 bg-black/50 animate-in fade-in duration-200"
+  />
+  <div
+    aria-modal="true"
+    class="relative bg-white dark:bg-gray-800 rounded-lg shadow-lg w-full mx-4 animate-in zoom-in-95 fade-in duration-200 max-w-xl"
+    role="dialog"
+  >
+    <div
+      class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700"
+    >
+      <button
+        aria-label="Close modal"
+        class="ml-auto p-1 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors text-gray-500 dark:text-gray-400"
+      >
+        <svg
+          aria-hidden="true"
+          class="lucide lucide-x w-5 h-5"
+          fill="none"
+          height="24"
+          stroke="currentColor"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+          width="24"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M18 6 6 18"
+          />
+          <path
+            d="m6 6 12 12"
+          />
+        </svg>
+      </button>
+    </div>
+    <div
+      class="p-6 text-gray-800 dark:text-gray-200"
+    >
+      Full-width content
+    </div>
+  </div>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders animated state 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 65%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="65"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-indigo-500 animate-shimmer"
+        style="width: 65%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+  <span
+    aria-hidden="true"
+    class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+  >
+    65
+    %
+  </span>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders at 0 % 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 0%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="0"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-indigo-500"
+        style="width: 0%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+  <span
+    aria-hidden="true"
+    class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+  >
+    0
+    %
+  </span>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders at 50 % 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 50%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="50"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-indigo-500"
+        style="width: 50%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+  <span
+    aria-hidden="true"
+    class="text-sm font-medium min-w-[3rem] text-right text-indigo-400"
+  >
+    50
+    %
+  </span>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders at 100 % — funded state 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 100%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="100"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-green-500"
+        style="width: 100%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+  <span
+    aria-hidden="true"
+    class="text-sm font-medium min-w-[3rem] text-right text-green-400"
+  >
+    100
+    %
+  </span>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders green colour token 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 75%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="75"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-green-500"
+        style="width: 75%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+  <span
+    aria-hidden="true"
+    class="text-sm font-medium min-w-[3rem] text-right text-green-400"
+  >
+    75
+    %
+  </span>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders over 100 % — clamped to 100 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 100%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="100"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-green-500"
+        style="width: 100%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+  <span
+    aria-hidden="true"
+    class="text-sm font-medium min-w-[3rem] text-right text-green-400"
+  >
+    100
+    %
+  </span>
+</div>
+`;
+
+exports[`ProgressBar snapshots > renders without label 1`] = `
+<div
+  class="flex items-center gap-3"
+>
+  <div
+    class="flex-1 relative"
+  >
+    <div
+      aria-label="Progress: 42%"
+      aria-valuemax="100"
+      aria-valuemin="0"
+      aria-valuenow="42"
+      class="w-full bg-gray-800 rounded-full h-2 relative overflow-hidden"
+      role="progressbar"
+    >
+      <div
+        class="h-2 rounded-full transition-all duration-500 bg-indigo-500"
+        style="width: 42%;"
+      />
+      <div
+        class="absolute right-0 top-0 h-full w-0.5 bg-gray-600 opacity-50"
+      />
+    </div>
+  </div>
+</div>
+`;

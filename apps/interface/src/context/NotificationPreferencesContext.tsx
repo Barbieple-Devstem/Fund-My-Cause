@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, ReactNode } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
-import type { NotificationType } from "@/context/NotificationContext";
+import type { NotificationType } from "@/store/useNotificationStore";
 
 export interface NotificationPreferences {
   categories: Record<NotificationType, boolean>;

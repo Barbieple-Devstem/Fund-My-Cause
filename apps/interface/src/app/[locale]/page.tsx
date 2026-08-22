@@ -234,7 +234,20 @@ export default function Home() {
               {t("footer.stellarDocs")}
             </a>
           </div>
-          <span>{t("footer.license")}</span>
+          <div className="flex flex-col items-end gap-1">
+            <span>{t("footer.license")}</span>
+            {process.env.NEXT_PUBLIC_VERIFIED_CONTRACT_HASH && (
+              <a
+                href={`https://github.com/Fund-My-Cause/Fund-My-Cause/commit/${process.env.NEXT_PUBLIC_SOURCE_COMMIT}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-mono text-gray-600 hover:text-indigo-400 transition"
+                title="Verified contract hash — click to view source commit"
+              >
+                Contract: {process.env.NEXT_PUBLIC_VERIFIED_CONTRACT_HASH.slice(0, 12)}…
+              </a>
+            )}
+          </div>
         </div>
       </footer>
     </main>
