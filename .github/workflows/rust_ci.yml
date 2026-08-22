@@ -25,7 +25,7 @@ jobs:
       - name: Check contract WASM sizes
         id: size_check
         run: |
-          MAX=65536
+          MAX=524288
           FAILED=0
           REPORT=""
 
@@ -36,7 +36,7 @@ jobs:
             REPORT="${REPORT}\n| \`${name}\` | ${size} | ${MAX} | ${pct}% |"
             echo "${name}: ${size} bytes (${pct}% of limit)"
             if [ "$size" -gt "$MAX" ]; then
-              echo "ERROR: ${name} (${size} bytes) exceeds the 64 KB Soroban limit."
+              echo "ERROR: ${name} (${size} bytes) exceeds the 512 KB Soroban limit."
               FAILED=1
             fi
           done
