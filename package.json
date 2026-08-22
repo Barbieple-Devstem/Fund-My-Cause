@@ -18,7 +18,7 @@
     "fixtures:generate": "npx ts-node scripts/generate-fixtures.ts",
     "seed:testnet": "bash scripts/seed-testnet.sh",
     "format": "cd apps/interface && npx prettier --write",
-    "prepare": "husky"
+    "prepare": "which husky >/dev/null 2>&1 && husky || true"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.8.0",
