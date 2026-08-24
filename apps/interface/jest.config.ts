@@ -21,6 +21,7 @@ const config: Config = {
     "^next-intl/(.*)$": "<rootDir>/src/__mocks__/next-intl/$1.ts",
     "^@/hooks/useTheme$": "<rootDir>/src/__mocks__/hooks/useTheme.ts",
     "^@/(.*)$": "<rootDir>/src/$1",
+    "\\.css$": "<rootDir>/src/__mocks__/styleMock.js",
   },
   setupFiles: ["<rootDir>/jest.polyfills.ts"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
