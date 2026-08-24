@@ -5,10 +5,17 @@
  */
 
 /**
- * Retrieves a required environment variable.
- * @param {string} key - Environment variable name
- * @returns {string} Environment variable value
- * @throws {Error} If the environment variable is not set
+ * Validates a required environment variable's value.
+ *
+ * Next.js only inlines `NEXT_PUBLIC_*` vars into the client bundle when they're
+ * accessed as a literal `process.env.NEXT_PUBLIC_X` — a dynamic `process.env[key]`
+ * lookup can't be statically replaced, so it silently resolves to `undefined` in
+ * the browser even though the same code works fine on the server. Callers must
+ * pass the literal `process.env.NEXT_PUBLIC_X` expression in, not just the name.
+ * @param {string} name - Environment variable name, for the error message
+ * @param {string | undefined} value - The variable's value (pass `process.env.NAME` directly)
+ * @returns {string} The validated value
+ * @throws {Error} If the value is not set
  */
 const DEFAULT_ENV: Record<string, string> = {
   NEXT_PUBLIC_CONTRACT_ID:
@@ -31,16 +38,28 @@ function requireEnv(key: string): string {
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** The Soroban crowdfunding contract address. */
-export const CONTRACT_ID = requireEnv("NEXT_PUBLIC_CONTRACT_ID");
+export const CONTRACT_ID = requireEnv(
+  "NEXT_PUBLIC_CONTRACT_ID",
+  process.env.NEXT_PUBLIC_CONTRACT_ID,
+);
 
 /** The Soroban RPC endpoint URL. */
-export const RPC_URL = requireEnv("NEXT_PUBLIC_RPC_URL");
+export const RPC_URL = requireEnv(
+  "NEXT_PUBLIC_RPC_URL",
+  process.env.NEXT_PUBLIC_RPC_URL,
+);
 
 /** The Stellar network passphrase (testnet or mainnet). */
-export const NETWORK_PASSPHRASE = requireEnv("NEXT_PUBLIC_NETWORK_PASSPHRASE");
+export const NETWORK_PASSPHRASE = requireEnv(
+  "NEXT_PUBLIC_NETWORK_PASSPHRASE",
+  process.env.NEXT_PUBLIC_NETWORK_PASSPHRASE,
+);
 
 /** The Horizon API endpoint URL. */
-export const HORIZON_URL = requireEnv("NEXT_PUBLIC_HORIZON_URL");
+export const HORIZON_URL = requireEnv(
+  "NEXT_PUBLIC_HORIZON_URL",
+  process.env.NEXT_PUBLIC_HORIZON_URL,
+);
 
 /** Human-readable network name derived from NETWORK_PASSPHRASE. */
 export const NETWORK_NAME =
@@ -49,14 +68,16 @@ export const NETWORK_NAME =
     : "testnet";
 
 /** Application base URL for metadata and sharing */
-export const APP_BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://fund-my-cause.app";
+export const APP_BASE_URL =
+  process.env.NEXT_PUBLIC_APP_URL ?? "https://fund-my-cause.app";
 
 // ──────────────────────────────────────────────────────────────────────────────
 // External API endpoints
 // ──────────────────────────────────────────────────────────────────────────────
 
 /** CoinGecko API endpoint for cryptocurrency pricing */
-export const COINGECKO_API_URL = "https://api.coingecko.com/api/v3/simple/price";
+export const COINGECKO_API_URL =
+  "https://api.coingecko.com/api/v3/simple/price";
 
 /** Pinata IPFS pinning service endpoint */
 export const PINATA_API_URL = "https://api.pinata.cloud/pinning/pinFileToIPFS";

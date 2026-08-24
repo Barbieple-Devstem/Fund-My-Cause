@@ -1,10 +1,12 @@
-use soroban_sdk::{
-    testutils::{Address as _, Ledger},
-    token, Address, Env, String, Vec,
-};
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
+
+use soroban_sdk::{testutils::Address as _, token, Address, Env, String};
 
 use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig};
 
+#[allow(dead_code)] // fixture fields are used selectively across test files
 pub struct Campaign<'a> {
     pub client: CrowdfundContractClient<'a>,
     pub token: token::Client<'a>,
@@ -14,12 +16,12 @@ pub struct Campaign<'a> {
     pub creator: Address,
 }
 
-pub fn setup<'a>(
-    env: &'a Env,
+pub fn setup(
+    env: &Env,
     goal: i128,
     deadline: u64,
     platform_config: Option<PlatformConfig>,
-) -> Campaign<'a> {
+) -> Campaign<'_> {
     let creator = Address::generate(env);
     let token_admin_addr = Address::generate(env);
     let token_id = env.register_stellar_asset_contract(token_admin_addr);

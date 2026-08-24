@@ -141,8 +141,17 @@ describe("Indexer health endpoints (#914)", () => {
   // ── /health — original endpoint (kept for compat) ─────────────────────────
 
   describe("GET /health (original liveness, kept for backwards compat)", () => {
-    it("returns 503 before any events are recorded (unhealthy)", () => {
+    it("returns 202 (degraded), not 503, before any events are recorded during the startup grace period", () => {
+      // A freshly-started service hasn't had a chance to process its first
+      // event yet — that's not the same as being unhealthy.
       const { status, body } = handleHealth(healthChecker);
+      expect(status).toBe(202);
+      expect((body as any).status).toBe("degraded");
+    });
+
+    it("returns 503 (unhealthy) once the startup grace period elapses with still no events", () => {
+      const shortGraceChecker = new HealthChecker(logger, 0);
+      const { status, body } = handleHealth(shortGraceChecker);
       expect(status).toBe(503);
       expect((body as any).status).toBe("unhealthy");
     });

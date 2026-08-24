@@ -24,6 +24,7 @@ const config: Config = {
     "^vitest$": "<rootDir>/src/__mocks__/vitest.ts",
     "\\.css$": "<rootDir>/src/__mocks__/styleMock.js",
     "^@/(.*)$": "<rootDir>/src/$1",
+    "\\.css$": "<rootDir>/src/__mocks__/styleMock.js",
   },
   setupFiles: ["<rootDir>/jest.polyfills.ts"],
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],

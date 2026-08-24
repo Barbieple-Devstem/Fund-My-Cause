@@ -25,25 +25,10 @@ interface Props {
   campaignTitle?: string;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function truncate(addr: string) {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-}
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 const network =
   process.env.NEXT_PUBLIC_NETWORK === "mainnet" ? "mainnet" : "testnet";
 const STELLAR_EXPERT = `https://stellar.expert/explorer/${network}`;
 
-/** Map a ContributionRecord from soroban.ts to the ExportRecord shape. */
 function toExportRecord(
   r: ContributionRecord,
   contractId: string,
@@ -59,11 +44,6 @@ function toExportRecord(
     status: "Confirmed",
   };
 }
-
-const inputCls =
-  "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2 py-1 text-xs text-gray-700 dark:text-gray-300 focus:outline-none focus:border-indigo-500";
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export function TransactionHistory({
   contractId,
@@ -102,13 +82,11 @@ export function TransactionHistory({
     [records, contractId, campaignTitle],
   );
 
-  // Derive unique campaign IDs for the campaign filter dropdown
   const campaignIds = useMemo(
     () => Array.from(new Set(allExportRecords.map((r) => r.campaignId))),
     [allExportRecords],
   );
 
-  // Apply all filters with AND semantics
   const filteredRecords = useMemo(
     () =>
       applyFilters(allExportRecords, {
@@ -165,9 +143,8 @@ export function TransactionHistory({
           </h2>
 
           <div className="flex items-center gap-3">
-            {/* Filter toggle */}
             <button
-              onClick={() => setShowFilters((v) => !v)}
+              onClick={() => setShowFilters((v: boolean) => !v)}
               aria-label="Toggle filters"
               aria-pressed={showFilters}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
@@ -180,7 +157,6 @@ export function TransactionHistory({
               Filters{isFiltered ? " ●" : ""}
             </button>
 
-            {/* Export button */}
             <button
               onClick={() => setShowExport(true)}
               aria-label="Export transaction history"
@@ -195,7 +171,6 @@ export function TransactionHistory({
               Export
             </button>
 
-            {/* View all on Stellar Expert */}
             <a
               href={viewAllUrl}
               target="_blank"
@@ -208,7 +183,6 @@ export function TransactionHistory({
           </div>
         </div>
 
-        {/* Filter panel */}
         {showFilters && (
           <div className="flex flex-wrap gap-3 p-3 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700">
             {/* Type filter */}
@@ -298,7 +272,6 @@ export function TransactionHistory({
           </div>
         )}
 
-        {/* Result count when filtered */}
         {isFiltered && (
           <p
             className="text-xs text-gray-400 dark:text-gray-500"
@@ -368,7 +341,6 @@ export function TransactionHistory({
           </div>
         )}
 
-        {/* "Showing X of Y" note when there are more than 10 */}
         {filteredRecords.length > 10 && (
           <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
             Showing 10 of {filteredRecords.length} contributions.{" "}
@@ -382,7 +354,6 @@ export function TransactionHistory({
         )}
       </div>
 
-      {/* Export modal — passes the filtered set */}
       {showExport && (
         <TransactionExportModal
           records={filteredRecords}

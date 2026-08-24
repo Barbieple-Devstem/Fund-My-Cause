@@ -13,3 +13,8 @@ task1.md
 fixtures/seed-data.json
 fixtures/test-fixtures.json
 fixtures/archive/
+contracts/achievements/test_snapshots/
+contracts/crowdfund/test_snapshots/
+contracts/registry/test_snapshots/
+.claude/worktrees/
+**/test_snapshots/

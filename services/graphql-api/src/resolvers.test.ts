@@ -32,6 +32,7 @@ function createMockContext(overrides: Partial<Context> = {}): Context {
       get: vi.fn().mockResolvedValue(null),
       set: vi.fn().mockResolvedValue(undefined),
       del: vi.fn().mockResolvedValue(undefined),
+      delPattern: vi.fn().mockResolvedValue(undefined),
     },
     contractService: {
       getCampaign: vi.fn(),
@@ -125,7 +126,7 @@ describe("resolvers", () => {
 
       await expect(
         (resolvers.Query as any).campaign(null, { id: "missing" }, context),
-      ).rejects.toThrow(GraphQLError);
+      ).rejects.toMatchObject({ extensions: { code: "NOT_FOUND" } });
       expect(context.cache.set).not.toHaveBeenCalled();
     });
   });
@@ -380,7 +381,7 @@ describe("resolvers", () => {
           { id: "missing" },
           context,
         ),
-      ).rejects.toThrow(GraphQLError);
+      ).rejects.toMatchObject({ extensions: { code: "NOT_FOUND" } });
     });
   });
 
@@ -480,7 +481,7 @@ describe("resolvers", () => {
 
       await expect(
         (resolvers.Query as any).user(null, { address: "unknown" }, context),
-      ).rejects.toThrow(GraphQLError);
+      ).rejects.toMatchObject({ extensions: { code: "NOT_FOUND" } });
     });
   });
 
@@ -724,21 +725,28 @@ describe("resolvers", () => {
         campaign,
       );
 
+      const validInput = {
+        title: "New Campaign",
+        description: "A great cause worth funding.",
+        goal: 10000n,
+        deadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        category: "Technology",
+        minContribution: 10n,
+      };
+
       const result = await (resolvers.Mutation as any).createCampaign(
         null,
-        { input: { title: "New" } },
+        { input: validInput },
         context,
       );
 
       expect(result).toBe(campaign);
       expect(context.contractService.createCampaign).toHaveBeenCalledWith(
         context.user,
-        {
-          title: "New",
-        },
+        validInput,
       );
-      expect(context.cache.del).toHaveBeenCalledWith("campaigns:*");
-      expect(context.cache.del).toHaveBeenCalledWith("trending:*");
+      expect(context.cache.delPattern).toHaveBeenCalledWith("campaigns:*");
+      expect(context.cache.delPattern).toHaveBeenCalledWith("trending:*");
     });
   });
 
@@ -773,7 +781,8 @@ describe("resolvers", () => {
 
       expect(result).toBe(campaign);
       expect(context.cache.del).toHaveBeenCalledWith("campaign:camp_1");
-      expect(context.cache.del).toHaveBeenCalledWith("campaigns:*");
+      expect(context.cache.delPattern).toHaveBeenCalledWith("campaigns:*");
+      expect(context.cache.delPattern).toHaveBeenCalledWith("trending:*");
       expect(context.pubsub.publish).toHaveBeenCalledWith(
         "campaign_updated:camp_1",
         campaign,
@@ -802,7 +811,7 @@ describe("resolvers", () => {
       const input = {
         campaignId: "camp_1",
         contributor: "GCONTRIBUTOR",
-        amount: 1000n,
+        amount: 20000000n, // 2 XLM in stroops
         transactionHash: "hash",
       };
       const contribution = { id: "contrib_1", ...input };
@@ -827,6 +836,8 @@ describe("resolvers", () => {
       expect(context.cache.del).toHaveBeenCalledWith("campaign:camp_1");
       expect(context.cache.del).toHaveBeenCalledWith("platform:stats");
       expect(context.cache.del).toHaveBeenCalledWith("user:GCONTRIBUTOR");
+      expect(context.cache.delPattern).toHaveBeenCalledWith("campaigns:*");
+      expect(context.cache.delPattern).toHaveBeenCalledWith("trending:*");
       expect(context.pubsub.publish).toHaveBeenCalledWith(
         "contribution:camp_1",
         contribution,
@@ -844,7 +855,7 @@ describe("resolvers", () => {
       const input = {
         campaignId: "camp_missing",
         contributor: "GCONTRIBUTOR",
-        amount: 1000n,
+        amount: 20000000n, // 2 XLM in stroops
         transactionHash: "hash",
       };
       const contribution = { id: "contrib_1", ...input };

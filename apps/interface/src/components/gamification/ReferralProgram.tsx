@@ -1,23 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  Share2,
-  Copy,
-  CheckCircle,
-  Gift,
-  TrendingUp,
-  Users,
-  DollarSign,
-  Zap,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
+import React from "react";
+import { AnimatePresence } from "framer-motion";
+import { Gift, Users } from "lucide-react";
 import type {
   Referral,
   ReferralRewardTier,
   GamificationProfile,
 } from "@/types/gamification";
+import { ReferralCodeCard } from "./referral/ReferralCodeCard";
+import { ReferralTierDisplay } from "./referral/ReferralTierDisplay";
+import { ReferralItem } from "./referral/ReferralItem";
+import { SocialShareButtons } from "./referral/SocialShareButtons";
 
 interface ReferralProgramProps {
   userProfile?: GamificationProfile;
@@ -282,10 +276,10 @@ export function ReferralProgram({
   const referralsCount = userProfile?.referralsCount || 0;
 
   const activeReferrals = referrals.filter(
-    (r) => r.firstContributionAt !== undefined
+    (r) => r.firstContributionAt !== undefined,
   );
   const pendingReferrals = referrals.filter(
-    (r) => r.firstContributionAt === undefined
+    (r) => r.firstContributionAt === undefined,
   );
 
   if (loading) {

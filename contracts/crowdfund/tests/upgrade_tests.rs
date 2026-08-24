@@ -1,4 +1,7 @@
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
@@ -176,7 +179,7 @@ fn test_state_migration_metadata_versioning() {
 
     // Metadata version history should have entries
     let history = client.get_metadata_history();
-    assert!(history.len() >= 1);
+    assert!(!history.is_empty());
 }
 
 #[test]

@@ -210,6 +210,15 @@ SPIKE_WINDOW_SECONDS = 600          # 10-minute rolling window
 SPIKE_MAX_CONTRIBUTIONS = 50        # > 50 contributions in 10 min → spike
 DUPLICATE_JACCARD_THRESHOLD = 0.8   # titles ≥ 80 % token overlap → duplicate
 
+# scan_duplicate_content() is O(N²) in the number of campaigns and does not
+# change between contributions to the *same* set of campaigns — running it on
+# every single queued contribution (as run_full_scan() used to) makes
+# per-contribution scoring cost scale with the full campaign-content scan.
+# Rate-limit it instead: the worker's per-contribution calls skip it unless
+# this many seconds have passed since the last run; POST /scan bypasses the
+# limit for an explicit, on-demand full scan.
+DUPLICATE_SCAN_MIN_INTERVAL_SECONDS = 30
+
 # Scoring job queue settings
 SCORING_QUEUE_MAXSIZE = 1000        # bounded queue; 503 if full
 
@@ -400,15 +409,35 @@ def scan_duplicate_content() -> list[Flag]:
     return flags
 
 
-def run_full_scan() -> list[Flag]:
-    """Execute all heuristics and append new flags to the moderation queue."""
+#: Unix timestamp of the last time scan_duplicate_content() actually ran.
+_last_duplicate_scan_at: float = 0.0
+
+
+def run_full_scan(*, force_duplicate_scan: bool = False) -> list[Flag]:
+    """
+    Execute all heuristics and append new flags to the moderation queue.
+
+    The O(N²) duplicate-content pass is rate-limited (see
+    DUPLICATE_SCAN_MIN_INTERVAL_SECONDS) so that calling this once per
+    contribution — as the async scoring worker does — doesn't re-run the full
+    campaign-content scan on every single donation. Pass
+    force_duplicate_scan=True (used by the manual POST /scan trigger) to
+    bypass the rate limit and always run it.
+    """
+    global _last_duplicate_scan_at
+
     scan_log = log.bind(operation="run_full_scan")
     scan_log.info("scan_started")
 
     new_flags: list[Flag] = []
     new_flags.extend(scan_wash_contributions())
     new_flags.extend(scan_contribution_spikes())
-    new_flags.extend(scan_duplicate_content())
+
+    now = time.time()
+    if force_duplicate_scan or (now - _last_duplicate_scan_at) >= DUPLICATE_SCAN_MIN_INTERVAL_SECONDS:
+        new_flags.extend(scan_duplicate_content())
+        _last_duplicate_scan_at = now
+
     for f in new_flags:
         _enqueue(f)
 
@@ -619,9 +648,13 @@ async def ingest_contribution(request: Request) -> JSONResponse:
 
 @app.post("/scan")
 def trigger_scan(background_tasks: BackgroundTasks) -> dict:
-    """Trigger a full fraud scan asynchronously (manual trigger)."""
+    """Trigger a full fraud scan asynchronously (manual trigger).
+
+    Bypasses the duplicate-content scan's rate limit since this is an
+    explicit, on-demand request for a full scan.
+    """
     log.info("scan_scheduled")
-    background_tasks.add_task(run_full_scan)
+    background_tasks.add_task(run_full_scan, force_duplicate_scan=True)
     return {"status": "scan_scheduled"}
 
 

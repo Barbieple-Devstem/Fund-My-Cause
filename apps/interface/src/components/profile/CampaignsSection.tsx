@@ -85,9 +85,7 @@ export function CampaignsSection({
         if (!cancelled) setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    // onCampaignsLoaded omitted intentionally to prevent re-fetching loops on parent component re-renders
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
