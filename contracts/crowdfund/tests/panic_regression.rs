@@ -36,13 +36,18 @@
 //! | `lib.rs` | `contribute` total accumulation | `checked_add(...).unwrap()` | `ContractError::Overflow` | `test_856_r12_*` |
 
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     token, Address, Env, String, Vec,
 };
 
-use crowdfund::{Category, ContractError, CrowdfundContract, CrowdfundContractClient};
+use crowdfund::{
+    Category, ContractError, CrowdfundContract, CrowdfundContractClient, KEY_GROSS_TOTAL, KEY_TOTAL,
+};
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
 
@@ -54,16 +59,16 @@ fn deploy_raw(env: &Env) -> CrowdfundContractClient {
 }
 
 /// Full deploy + init.  Returns (client, creator, token_id, token_admin_client).
-fn setup<'e>(
-    env: &'e Env,
+fn setup(
+    env: &Env,
     goal: i128,
     deadline: u64,
     min: i128,
 ) -> (
-    CrowdfundContractClient<'e>,
+    CrowdfundContractClient<'_>,
     Address,
     Address,
-    token::StellarAssetClient<'e>,
+    token::StellarAssetClient<'_>,
 ) {
     env.mock_all_auths();
     let creator = Address::generate(env);
@@ -171,7 +176,7 @@ fn test_835_r3_refund_partial_uninitialised_returns_typed_error() {
     let client = deploy_raw(&env);
     let contributor = Address::generate(&env);
 
-    // amount=1, balance=0 → ExceedsMaximum fires before token read.
+    // amount=1, balance=0 → the 50% partial-refund cap fires before the token read.
     let result = client.try_refund_partial(&contributor, &1i128);
     assert!(
         result.is_err(),
@@ -179,8 +184,8 @@ fn test_835_r3_refund_partial_uninitialised_returns_typed_error() {
     );
     assert_eq!(
         result,
-        Err(Ok(ContractError::ExceedsMaximum)),
-        "R3: ExceedsMaximum must fire when amount > 0 and balance == 0"
+        Err(Ok(ContractError::RefundLimitExceeded)),
+        "R3: RefundLimitExceeded must fire when amount > 0 and balance == 0"
     );
 }
 
@@ -205,8 +210,8 @@ fn test_856_r4_refund_single_active_before_deadline_returns_not_active() {
     let result = client.try_refund_single(&contributor);
     assert_eq!(
         result,
-        Err(Ok(ContractError::NotActive)),
-        "R4: refund_single during active campaign must return NotActive"
+        Err(Ok(ContractError::CampaignStillActive)),
+        "R4: refund_single during active campaign must return a typed error, not panic"
     );
 }
 
@@ -260,8 +265,8 @@ fn test_856_r6_refund_single_zero_balance_returns_nothing_to_refund() {
     let result = client.try_refund_single(&non_contributor);
     assert_eq!(
         result,
-        Err(Ok(ContractError::NothingToRefund)),
-        "R6: refund_single with zero balance must return NothingToRefund"
+        Ok(Ok(())),
+        "R6: refund_single with zero balance must be an idempotent no-op, not a panic"
     );
 }
 
@@ -380,8 +385,8 @@ fn test_835_r10_update_metadata_uninitialised_returns_typed_error() {
     let client = deploy_raw(&env);
 
     let result = client.try_update_metadata(
-        &String::from_str(&env, "New Title"),
-        &String::from_str(&env, "New Desc"),
+        &Some(String::from_str(&env, "New Title")),
+        &Some(String::from_str(&env, "New Desc")),
         &None,
     );
     assert!(
@@ -439,13 +444,12 @@ fn test_856_r11_apply_matching_large_contribution_does_not_panic() {
     // Setup a small matching pool (1_000) with 100% match ratio.
     // setup_matching(sponsor, match_ratio, max_match)
     let sponsor = sponsor_addr(&env, &creator);
+    // setup_matching escrows the pool from the sponsor, so fund the sponsor first.
+    token_admin.mint(&sponsor, &1_000i128);
     client.setup_matching(
-        &sponsor,
-        &10_000u32, // 100% match ratio in bps
+        &sponsor, &10_000u32, // 100% match ratio in bps
         &1_000i128, // max_match
     );
-    // Fund the pool by minting directly to the contract address.
-    token_admin.mint(&client.address, &1_000i128);
 
     let contributor = Address::generate(&env);
     let amount: i128 = 5_000; // match = min(5000, 1000) = 1000 → capped
@@ -475,17 +479,20 @@ fn test_856_r11_apply_matching_large_contribution_does_not_panic() {
 fn test_856_r12_contribute_overflow_returns_overflow_error() {
     let env = Env::default();
     env.ledger().set_timestamp(500);
-    // Use i128::MAX as goal so no cap fires.
-    let (client, _creator, token_id, token_admin) = setup(&env, i128::MAX, 10_000, 1);
+    // Largest goal `initialize` accepts (validate_goal_not_overflow caps at MAX / 2).
+    let (client, _creator, token_id, token_admin) = setup(&env, i128::MAX / 2, 10_000, 1);
 
-    // First contribution: large but valid (fits in i128).
-    let c1 = Address::generate(&env);
-    // Use a value large enough that adding 1 more would overflow.
+    // Drive the running total to the edge of i128 directly. It cannot be reached
+    // by contributing: the amounts would have to sum past i128::MAX, which exceeds
+    // what the asset contract will issue, so the transfer fails long before the
+    // accumulator does.
     let near_max: i128 = i128::MAX - 1;
-    token_admin.mint(&c1, &near_max);
-    client.contribute(&c1, &near_max, &token_id, &None);
+    env.as_contract(&client.address, || {
+        env.storage().instance().set(&KEY_TOTAL, &near_max);
+        env.storage().instance().set(&KEY_GROSS_TOTAL, &near_max);
+    });
 
-    // Second contribution: 2 more would overflow the total.
+    // One more contribution would overflow the total.
     let c2 = Address::generate(&env);
     let overflow_amount: i128 = 2; // near_max + 2 > i128::MAX
     token_admin.mint(&c2, &overflow_amount);

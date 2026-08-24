@@ -1,4 +1,7 @@
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use proptest::prelude::*;
 use soroban_sdk::{
@@ -9,7 +12,7 @@ use soroban_sdk::{
 use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig, RewardTier};
 
 mod common;
-use common::{setup, Campaign};
+use common::setup;
 
 prop_compose! {
     fn valid_amount()(amount in 1i128..10_000_000i128) -> i128 { amount }
@@ -335,7 +338,7 @@ proptest! {
         client.withdraw();
 
         assert_eq!(client.total_raised(), 0);
-        let expected_fee = (goal as u128 * fee_bps as u128 / 10_000u128) as i128;
+        let _expected_fee = (goal as u128 * fee_bps as u128 / 10_000u128) as i128;
         let platform_balance = token.balance(&platform);
         assert!(platform_balance <= goal); // Fee cannot exceed goal
     }
@@ -361,7 +364,7 @@ proptest! {
             Address::generate(&env),
             Address::generate(&env),
         ];
-        let amounts = vec![a1, a2, a3, a4, a5];
+        let amounts = [a1, a2, a3, a4, a5];
 
         env.ledger().set_timestamp(500);
         for (addr, &amt) in contributors.iter().zip(amounts.iter()) {
@@ -519,8 +522,9 @@ proptest! {
 
         // Check saturating behavior or error handling
         if a1.checked_add(a2).is_none() {
-            // Overflow case should be handled (error or saturate)
-            assert!(result.is_err() || c.client.total_raised() <= i128::MAX);
+            // Overflow must be rejected or saturated, never wrapped. `<= i128::MAX`
+            // is vacuously true, so check the total did not wrap negative instead.
+            assert!(result.is_err() || c.client.total_raised() >= 0);
         }
     }
 

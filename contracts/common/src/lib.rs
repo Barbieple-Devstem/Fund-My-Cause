@@ -10,7 +10,7 @@ mod access_control;
 mod error;
 mod events;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "testutils"))]
 pub mod test_utils;
 
 pub use access_control::AccessControl;

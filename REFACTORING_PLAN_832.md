@@ -51,7 +51,7 @@ This document outlines the complete decomposition plan for issue #832: breaking 
 
 ---
 
-### Phase 3: Contribute Functions `contribute.rs` (TBD)
+### Phase 3: Contribute Functions `contribute.rs` (Complete)
 
 **Target functions** (5 functions, ~500 lines):
 - `contribute()` — Main contribution endpoint (373 lines)
@@ -74,7 +74,7 @@ This document outlines the complete decomposition plan for issue #832: breaking 
 
 ---
 
-### Phase 4: Withdrawal & Streaming `withdraw.rs` (TBD)
+### Phase 4: Withdrawal & Streaming `withdraw.rs` (Complete)
 
 **Target functions** (5 functions, ~230 lines):
 - `withdraw()` — Fund release to creator
@@ -398,4 +398,4 @@ If any phase encounters unexpected issues:
 
 ---
 
-**Status**: Phase 1 ✅ Complete; Ready to begin Phase 2
+**Status**: Phases 1-7, 17 and 21 complete and wired into `lib.rs`. Phases 8-16, 18-20 remain.

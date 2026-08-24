@@ -15,6 +15,9 @@
 //!     is arithmetically correct.
 
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use proptest::prelude::*;
 use soroban_sdk::{
@@ -22,7 +25,7 @@ use soroban_sdk::{
     token, Address, Env, String,
 };
 
-use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient, PlatformConfig};
+use crowdfund::{Category, CrowdfundContract, CrowdfundContractClient};
 
 mod common;
 use common::{setup, Campaign};

@@ -40,6 +40,9 @@
 //! fold a fix silently into this PR.
 
 #![cfg(test)]
+// Test harness still uses the deprecated `register_contract` /
+// `register_stellar_asset_contract` helpers; migrating them is separate work.
+#![allow(deprecated)]
 
 use soroban_sdk::{testutils::Address as _, Address, Env};
 
@@ -89,10 +92,16 @@ fn test_v1_reinitialize_to_swap_admin_is_blocked() {
     // transition its status — both must succeed under mock_all_auths.
     let campaign = Address::generate(&env);
     client.register_with_status(&campaign, &CampaignStatus::Active);
-    client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful);
+    client.update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
 
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Successful, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
         1,
         "V1: original admin must still govern the registry after blocked reinit"
     );
@@ -140,11 +149,8 @@ fn test_v3_non_admin_update_status_requires_stored_admin() {
 
     // Unregistered campaign — NotFound fires before admin auth is even checked.
     let ghost = Address::generate(&env);
-    let result = client.try_update_status(
-        &ghost,
-        &CampaignStatus::Active,
-        &CampaignStatus::Successful,
-    );
+    let result =
+        client.try_update_status(&ghost, &CampaignStatus::Active, &CampaignStatus::Successful);
     assert_eq!(
         result,
         Err(Ok(ContractError::NotFound)),
@@ -156,13 +162,21 @@ fn test_v3_non_admin_update_status_requires_stored_admin() {
     // application).
     let campaign = Address::generate(&env);
     client.register_with_status(&campaign, &CampaignStatus::Active);
-    client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful);
+    client.update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
         0
     );
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Successful, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
         1
     );
 }
@@ -181,22 +195,34 @@ fn test_v4_only_stored_admin_can_call_update_status() {
     let campaign = Address::generate(&env);
     client.register_with_status(&campaign, &CampaignStatus::Active);
 
-    client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful);
+    client.update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
 
     // The Soroban test harness records all require_auth() calls.  Verify that
     // the admin address — not the campaign address — is the auth subject.
     let auths = env.auths();
-    let admin_authorised = auths
-        .iter()
-        .any(|(addr, _invocation)| *addr == admin);
+    let admin_authorised = auths.iter().any(|(addr, _invocation)| *addr == admin);
     assert!(
         admin_authorised,
         "V4: admin address must appear in the auth record for update_status"
     );
 
     // Confirm the campaign is now in Successful and not Active.
-    assert_eq!(client.list_by_status(&CampaignStatus::Successful, &0, &10).len(), 1);
-    assert_eq!(client.list_by_status(&CampaignStatus::Active, &0, &10).len(), 0);
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
+        1
+    );
+    assert_eq!(
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
+        0
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -227,18 +253,24 @@ fn test_v5_blocked_reinit_leaves_state_unchanged() {
         "V5: campaign list must not change after blocked reinit"
     );
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Active, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Active, &0, &10)
+            .len(),
         1
     );
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Failed, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Failed, &0, &10)
+            .len(),
         1
     );
 
     // update_status still works — original admin auth in effect.
     client.update_status(&c1, &CampaignStatus::Active, &CampaignStatus::Successful);
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Successful, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
         1,
         "V5: original admin governance must be intact after blocked reinit"
     );
@@ -292,16 +324,24 @@ fn test_v7_all_mutators_require_initialization() {
     let r1 = client.try_register(&addr);
     let r2 = client.try_register_with_status(&addr, &CampaignStatus::Active);
     let r3 = client.try_register_with_category(&addr, &42);
-    let r4 = client.try_update_status(
-        &addr,
-        &CampaignStatus::Active,
-        &CampaignStatus::Successful,
-    );
+    let r4 = client.try_update_status(&addr, &CampaignStatus::Active, &CampaignStatus::Successful);
 
     assert_eq!(r1, Err(Ok(ContractError::NotInitialized)), "V7: register");
-    assert_eq!(r2, Err(Ok(ContractError::NotInitialized)), "V7: register_with_status");
-    assert_eq!(r3, Err(Ok(ContractError::NotInitialized)), "V7: register_with_category");
-    assert_eq!(r4, Err(Ok(ContractError::NotInitialized)), "V7: update_status");
+    assert_eq!(
+        r2,
+        Err(Ok(ContractError::NotInitialized)),
+        "V7: register_with_status"
+    );
+    assert_eq!(
+        r3,
+        Err(Ok(ContractError::NotInitialized)),
+        "V7: register_with_category"
+    );
+    assert_eq!(
+        r4,
+        Err(Ok(ContractError::NotInitialized)),
+        "V7: update_status"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -348,7 +388,7 @@ fn test_v9_extreme_ids_cannot_corrupt_admin_key() {
 
     // Values that could plausibly alias short Soroban Symbol encodings if type
     // encoding were naive (it is not, but we verify empirically).
-    let suspicious_ids: &[u32] = &[0, 1, u32::MAX, u32::MAX - 1, 0x0041_444D_4E];
+    let suspicious_ids: &[u32] = &[0, 1, u32::MAX, u32::MAX - 1, 0x00_4144_4D4E];
 
     for &id in suspicious_ids {
         let campaign = Address::generate(&env);
@@ -365,11 +405,8 @@ fn test_v9_extreme_ids_cannot_corrupt_admin_key() {
     // KEY_ADMIN still intact: update_status returns NotFound (not NotInitialized)
     // for an unknown campaign.
     let ghost = Address::generate(&env);
-    let result = client.try_update_status(
-        &ghost,
-        &CampaignStatus::Active,
-        &CampaignStatus::Successful,
-    );
+    let result =
+        client.try_update_status(&ghost, &CampaignStatus::Active, &CampaignStatus::Successful);
     assert_eq!(
         result,
         Err(Ok(ContractError::NotFound)),
@@ -395,7 +432,11 @@ fn test_v10_campaign_self_promotion_requires_admin_auth() {
     let campaign = Address::generate(&env);
     client.register_with_status(&campaign, &CampaignStatus::Active);
 
-    client.update_status(&campaign, &CampaignStatus::Active, &CampaignStatus::Successful);
+    client.update_status(
+        &campaign,
+        &CampaignStatus::Active,
+        &CampaignStatus::Successful,
+    );
 
     // Auth history: verify admin — not campaign — is recorded as the authoriser
     // of the update_status call.
@@ -425,7 +466,9 @@ fn test_v10_campaign_self_promotion_requires_admin_auth() {
     );
 
     assert_eq!(
-        client.list_by_status(&CampaignStatus::Successful, &0, &10).len(),
+        client
+            .list_by_status(&CampaignStatus::Successful, &0, &10)
+            .len(),
         1
     );
 }

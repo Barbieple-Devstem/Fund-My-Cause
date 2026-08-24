@@ -77,6 +77,10 @@
 //! `unlock_achievement`.
 
 #![no_std]
+// The SDK deprecated `Events::publish` in favour of the `#[contractevent]` macro.
+// Migrating changes how events are encoded on the wire, so it is a behaviour change
+// for every off-chain consumer, not a lint cleanup, and is tracked separately.
+#![allow(deprecated)]
 
 mod achievements;
 mod errors;
@@ -619,7 +623,7 @@ fn generate_nft_id(env: &Env, user: &Address, achievement_type: u32) -> String {
     }
 
     let hex_str = core::str::from_utf8(&hex_buf)
-        .unwrap_or_else(|_| "0000000000000000000000000000000000000000000000000000000000000000");
+        .unwrap_or("0000000000000000000000000000000000000000000000000000000000000000");
     String::from_str(env, hex_str)
 }
 
