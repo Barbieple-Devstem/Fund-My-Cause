@@ -24,9 +24,9 @@ Standardize on **Option (a): Funnel all browser chain state reads through `graph
 
 1. **Deprecate and remove read-only query functions from `apps/interface/src/lib/soroban.ts`:**
    - `fetchCampaignView`, `fetchCampaign`, `fetchContribution`, `fetchContributorList`, `fetchAllCampaigns`, `getStaticCampaignIds`, and `fetchTransactionHistory` are deprecated and replaced by typed GraphQL queries in `apps/interface/src/lib/graphql/` (leveraging `client.ts` and codegen types).
-2. **Preserve `apps/interface/src/lib/soroban.ts` strictly as the Client-Side Transaction Pipeline:**
+2. **Preserve `apps/interface/src/lib/soroban/` strictly as the Client-Side Transaction Pipeline:**
    - Client-side transaction preparation, offline authorization assembly, fee estimation, simulation, and signed submission cannot be offloaded to a central server without custody of user private keys.
-   - The following functions remain client-side in `lib/soroban.ts`:
+   - The following functions remain client-side, now split across `lib/soroban/client.ts` (shared Horizon/RPC connections), `lib/soroban/tx-builders.ts`, and `lib/soroban/submit.ts` (re-exported from `lib/soroban/index.ts`):
      - Transaction builders: `buildInitializeTx`, `buildWithdrawTx`, `buildCancelTx`, `buildPauseTx`, `buildUnpauseTx`, `buildRefundTx`, `buildUpdateMetadataTx`, `buildContributeTx`.
      - Transaction simulation & fee estimation: `simulateTx`.
      - Signed transaction broadcast: `submitSignedTx`.
@@ -60,5 +60,5 @@ Standardize on **Option (a): Funnel all browser chain state reads through `graph
 - [ADR-002](./ADR-002-off-chain-indexer-architecture.md) — Off-chain indexer architecture
 - [ADR-003](./ADR-003-graphql-api-for-frontend-queries.md) — GraphQL API for frontend queries
 - [`docs/assets/architecture-data-flow.mmd`](../assets/architecture-data-flow.mmd) — Data flow diagram and Seam 1 resolution
-- [`apps/interface/src/lib/soroban.ts`](../../apps/interface/src/lib/soroban.ts) — Client-side transaction pipeline
+- [`apps/interface/src/lib/soroban/`](../../apps/interface/src/lib/soroban/) — Client-side transaction pipeline
 - [`services/graphql-api/src/services/contract.ts`](../../services/graphql-api/src/services/contract.ts) — Server-side contract read service
