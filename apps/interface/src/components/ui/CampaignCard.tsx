@@ -24,6 +24,11 @@ import {
   calculateIsEnded,
 } from "@/lib/campaignProgress";
 import { useTranslations } from "next-intl";
+import {
+  Highlight,
+  StatusBadge,
+  CategoryBadge,
+} from "./campaign/CampaignCardBadges";
 
 export interface CampaignCardProps {
   campaign: Campaign;
@@ -35,66 +40,6 @@ export interface CampaignCardProps {
   index?: number;
   /** Search query for highlighting matching text */
   query?: string;
-}
-
-function Highlight({ text, query }: { text: string; query?: string }) {
-  if (!query) return <>{text}</>;
-  const regex = new RegExp(
-    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
-    "gi",
-  );
-  const parts = text.split(regex);
-  return (
-    <>
-      {parts.map((part, i) =>
-        regex.test(part) ? (
-          <mark
-            key={i}
-            className="bg-yellow-200 dark:bg-yellow-700 text-inherit rounded px-0.5"
-          >
-            {part}
-          </mark>
-        ) : (
-          part
-        ),
-      )}
-    </>
-  );
-}
-
-function StatusBadge({
-  status,
-  label,
-}: {
-  status: "funded" | "ended";
-  label: string;
-}) {
-  const icon = status === "funded" ? "✓" : "⏰";
-  return (
-    <span
-      className={cn(
-        "absolute top-3 left-3 px-2 py-0.5 rounded-full text-xs font-semibold",
-        status === "funded"
-          ? "bg-[var(--color-success)]/90 text-white"
-          : "bg-[var(--color-surface-elevated)]/90 text-[var(--color-text-secondary)]",
-      )}
-    >
-      <span aria-hidden="true" className="mr-1">
-        {icon}
-      </span>
-      {label}
-    </span>
-  );
-}
-
-function CategoryBadge({ slug }: { slug?: string }) {
-  const cat = getCategoryBySlug(slug);
-  if (!cat) return null;
-  return (
-    <span className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-black/60 text-white backdrop-blur-sm">
-      {cat.emoji} {cat.label}
-    </span>
-  );
 }
 
 const ICON_BUTTON_CLS =
