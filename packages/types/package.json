@@ -34,6 +34,18 @@
       "import": "./src/graphql.ts",
       "types": "./src/graphql.ts"
     },
+    "./graphql-server": {
+      "import": "./src/graphql-server.ts",
+      "types": "./src/graphql-server.ts"
+    },
+    "./contract": {
+      "import": "./src/contract.ts",
+      "types": "./src/contract.ts"
+    },
+    "./indexer": {
+      "import": "./src/indexer.ts",
+      "types": "./src/indexer.ts"
+    },
     "./validation": {
       "import": "./src/validation.ts",
       "types": "./src/validation.ts"
