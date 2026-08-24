@@ -299,7 +299,7 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
         {/* Trust Signals */}
         {(() => {
           const mock = ALL_CAMPAIGNS.find((c) => c.id === contractId);
-          const trustData = {
+          const trustData: Record<string, unknown> = {
             isVerified: true,
             campaignCount: 3,
             accountAgeDays: 420,

@@ -1,4 +1,4 @@
-let activeFailure: FailureConfig | null = null;
+let activeFailure: (FailureConfig & { _target?: string }) | null = null;
 let failureCount = 0;
 
 export interface FailureConfig {

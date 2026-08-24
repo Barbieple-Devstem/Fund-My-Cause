@@ -176,7 +176,7 @@ export function loadScoringWeights(
     }
   }
 
-  const weights = resolved as ScoringWeights;
+  const weights = resolved as unknown as ScoringWeights;
   // Run the full semantic validator after merging with defaults
   validateScoringWeights(weights);
   return Object.freeze(weights);

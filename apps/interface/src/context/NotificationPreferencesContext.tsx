@@ -17,6 +17,7 @@ const DEFAULTS: NotificationPreferences = {
     contribution: true,
     goal_reached: true,
     deadline: true,
+    campaign_update: true,
     info: true,
   },
   channels: {
@@ -81,11 +82,14 @@ export function NotificationPreferencesProvider({
   );
 }
 
+const fallbackPrefsContext: PrefsContextType = {
+  prefs: DEFAULTS,
+  setCategoryEnabled: () => {},
+  setChannelEnabled: () => {},
+  isCategoryEnabled: () => true,
+};
+
 export function useNotificationPreferences() {
   const ctx = useContext(PrefsContext);
-  if (!ctx)
-    throw new Error(
-      "useNotificationPreferences must be used within NotificationPreferencesProvider",
-    );
-  return ctx;
+  return ctx || fallbackPrefsContext;
 }

@@ -3,9 +3,9 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Loader2, ExternalLink } from "lucide-react";
-import { fetchAllCampaigns } from "@/lib/soroban";
+import { fetchAllCampaigns } from "@/lib/graphql/client";
 import { formatCampaignDateShort } from "@/lib/campaignDateFormatting";
-import type { CampaignData } from "@/lib/soroban";
+import type { CampaignData } from "@fund-my-cause/types";
 
 interface CampaignsSectionProps {
   address: string;

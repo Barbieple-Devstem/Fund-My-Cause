@@ -5,7 +5,8 @@ import { useWallet } from "@/hooks/useWallet";
 import { PledgeModal } from "@/components/ui/PledgeModal";
 import { TransactionStatus, TxStatus } from "@/components/ui/TransactionStatus";
 import { withdraw, refundSingle, getCampaignStats } from "@/lib/contract";
-import { fetchContribution, type CampaignStatus } from "@/lib/soroban";
+import { fetchContribution } from "@/lib/graphql/client";
+import type { CampaignStatus } from "@fund-my-cause/types";
 import { useNotifications } from "@/hooks/useNotifications";
 
 interface Props {
@@ -154,7 +155,7 @@ export function CampaignActions({
       const newRaised = Number(stats.totalRaised) / 1e7;
       setRaised(newRaised);
       // Notify if this pledge pushed the campaign over the goal
-      if (stats.totalRaised >= stats.goal) {
+      if (stats.progressBps >= 10000) {
         addNotification({
           type: "goal_reached",
           title: "Goal Reached! 🎉",

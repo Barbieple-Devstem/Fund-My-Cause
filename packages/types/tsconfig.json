@@ -3,7 +3,7 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "lib": ["ES2020"],
+    "lib": ["ES2020", "DOM"],
     "noImplicitAny": true,
     "strictNullChecks": true,
     "strictFunctionTypes": true,
@@ -16,6 +16,8 @@
     "sourceMap": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "rootDir": "src",
     "noEmit": true
-  }
+  },
+  "include": ["src"]
 }

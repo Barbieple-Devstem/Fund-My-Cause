@@ -5,7 +5,7 @@ import type { Campaign } from "@/types/campaign";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { formatXlm } from "@/lib/price";
 import { formatCampaignDateShort } from "@/lib/campaignDateFormatting";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ComparisonTableProps {

@@ -131,7 +131,7 @@ export function CommandPalette({ isOpen, onClose }: CommandPaletteProps) {
       icon: <BookOpen size={16} />,
       category: "campaign" as const,
       action: () => router.push(`/campaigns/${campaign.id}`),
-      keywords: [campaign.title, campaign.category, "campaign"],
+      keywords: [campaign.title, campaign.category ?? "", "campaign"],
     })),
   ];
 

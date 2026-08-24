@@ -4,9 +4,9 @@
     "module": "CommonJS",
     "lib": ["ES2020", "DOM"],
     "types": ["jest", "node"],
-    "rootDir": "src",
-    "outDir": "dist"
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "declaration": true
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "include": ["src"]
 }

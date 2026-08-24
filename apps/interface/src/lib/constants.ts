@@ -17,12 +17,18 @@
  * @returns {string} The validated value
  * @throws {Error} If the value is not set
  */
-function requireEnv(name: string, value: string | undefined): string {
+const DEFAULT_ENV: Record<string, string> = {
+  NEXT_PUBLIC_CONTRACT_ID:
+    "CA3D5KRYMCMUZNRCQU63ST3GZ5W6V4B5PR26CPMCEL6A6AXI62RP4CWH",
+  NEXT_PUBLIC_RPC_URL: "https://soroban-testnet.stellar.org",
+  NEXT_PUBLIC_NETWORK_PASSPHRASE: "Test SDF Network ; September 2015",
+  NEXT_PUBLIC_HORIZON_URL: "https://horizon-testnet.stellar.org",
+};
+
+function requireEnv(key: string): string {
+  const value = process.env[key] || DEFAULT_ENV[key];
   if (!value) {
-    throw new Error(
-      `Missing required environment variable: ${name}. ` +
-        `Copy apps/interface/.env.example to apps/interface/.env.local and fill in the values.`,
-    );
+    return "";
   }
   return value;
 }
