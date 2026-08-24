@@ -159,6 +159,13 @@ class TraceIDMiddleware(BaseHTTPMiddleware):
 _CACHE: dict[str, tuple[float, object]] = {}
 CACHE_TTL_SECONDS = 300  # 5 minutes
 
+# _CACHE is keyed by distinct (wallet, limit) pairs, so an unbounded number of
+# distinct wallets querying the service would grow it without limit. Bound it
+# with simple FIFO eviction (dicts preserve insertion order in Python 3.7+),
+# mirroring the bounded-queue approach fraud_detection uses for its own
+# in-memory growth risk.
+CACHE_MAX_SIZE = 1000
+
 
 def _cache_get(key: str) -> object | None:
     entry = _CACHE.get(key)
@@ -168,6 +175,9 @@ def _cache_get(key: str) -> object | None:
 
 
 def _cache_set(key: str, value: object) -> None:
+    if key not in _CACHE and len(_CACHE) >= CACHE_MAX_SIZE:
+        oldest_key = next(iter(_CACHE))
+        del _CACHE[oldest_key]
     _CACHE[key] = (time.time(), value)
 
 
@@ -228,20 +238,22 @@ def _personalised_score(c: Campaign, activity: IndexedActivity) -> float:
 def _recommend(wallet: Optional[str], limit: int) -> list[dict]:
     activity = _ACTIVITY.get(wallet) if wallet else None
 
+    # Compute each campaign's score exactly once per request and reuse it for
+    # sorting, filtering, and the output payload — previously
+    # _personalised_score()/_trending_score() was called three separate times
+    # per campaign (once for each of those three uses).
     if activity:
-        scored = sorted(
-            _CAMPAIGNS,
-            key=lambda c: _personalised_score(c, activity),
-            reverse=True,
-        )
-        # Exclude campaigns the wallet has already contributed to (score == 0).
-        # Use activity.wallet as the recommendation key for auditability.
-        rec_wallet = activity.wallet
-        scored = [c for c in scored if _personalised_score(c, activity) > 0.0]
+        # Log the resolved activity record's wallet (not just the raw query
+        # param) for auditability — it's the key that actually drove scoring.
+        log.debug("personalising_recommendations", wallet=activity.wallet)
+        scores = {c.id: _personalised_score(c, activity) for c in _CAMPAIGNS}
     else:
-        # Cold-start: return trending
-        rec_wallet = wallet
-        scored = sorted(_CAMPAIGNS, key=_trending_score, reverse=True)
+        scores = {c.id: _trending_score(c) for c in _CAMPAIGNS}
+
+    scored = sorted(_CAMPAIGNS, key=lambda c: scores[c.id], reverse=True)
+    if activity:
+        # Exclude campaigns the wallet has already contributed to (score == 0).
+        scored = [c for c in scored if scores[c.id] > 0.0]
 
     return [
         {
@@ -250,9 +262,7 @@ def _recommend(wallet: Optional[str], limit: int) -> list[dict]:
             "category": c.category,
             "total_raised": c.total_raised,
             "contributor_count": c.contributor_count,
-            "score": round(
-                _personalised_score(c, activity) if activity else _trending_score(c), 4
-            ),
+            "score": round(scores[c.id], 4),
         }
         for c in scored[:limit]
     ]
