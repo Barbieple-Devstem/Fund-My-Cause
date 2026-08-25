@@ -154,6 +154,8 @@ The app uses `@stellar/freighter-api` for wallet connectivity. The `WalletContex
 
 ## Getting Started
 
+> 💡 **New contributor?** Check out the comprehensive **[Local Development Setup Guide (docs/SETUP.md)](./docs/SETUP.md)** for workspace-by-workspace instructions, contract compilation, microservices startup, and troubleshooting.
+
 ### 1. Clone
 
 ```bash
@@ -324,6 +326,7 @@ We follow [coordinated disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 
 | Resource | Description |
 |----------|-------------|
+| [docs/SETUP.md](./docs/SETUP.md) | Comprehensive monorepo local development setup and troubleshooting guide |
 | [docs/api/](./docs/api/README.md) | Full contract API reference — every function, type, event, and error code |
 | [docs/tutorials/](./docs/tutorials/README.md) | Step-by-step guides: getting started, contributing, dashboards, matching, saved searches |
 | [sdks/js/](./sdks/js/README.md) | TypeScript SDK — typed client for all contract operations |
