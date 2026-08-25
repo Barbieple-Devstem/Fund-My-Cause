@@ -7,6 +7,11 @@ export { Button, type ButtonProps } from "./Button";
 export { Modal, type ModalProps } from "./Modal";
 export { Card, CardHeader, CardBody, CardFooter, type CardProps } from "./Card";
 export { ProgressBar, type ProgressBarProps } from "./ProgressBar";
+export {
+  calculateProgress,
+  clampProgress,
+  isProgressFunded,
+} from "./utils/progress";
 export { cn } from "./lib/utils";
 
 // ── Form primitives ────────────────────────────────────────────────────────
