@@ -1,53 +1,23 @@
+/**
+ * Client-side transaction building for the campaign contract.
+ *
+ * `buildSimpleContractTx` is the single parameterized builder behind every
+ * no-arg/simple-arg contract call; the named `build*Tx` exports below are
+ * thin wrappers over it (method name + arg shaping only, no duplicated
+ * transaction-assembly logic).
+ */
+
 import {
   Address,
   BASE_FEE,
   Contract,
-  Horizon,
-  Networks,
   TransactionBuilder,
   nativeToScVal,
-  rpc as SorobanRpc,
   xdr,
 } from "@stellar/stellar-sdk";
 import { isValidContractId } from "@/lib/validation";
 import type { InitializeParams } from "@/types/soroban";
-
-// Re-export types for backward compatibility
-export type {
-  CampaignStatus,
-  CampaignInfo,
-  CampaignStats,
-  CampaignData,
-  InitializeParams,
-  PlatformConfig,
-  StatusVariant,
-  ContributionRecord,
-} from "@/types/soroban";
-
-const SOROBAN_RPC_URL =
-  process.env.NEXT_PUBLIC_SOROBAN_RPC_URL ??
-  "https://soroban-testnet.stellar.org";
-const RPC_URL = SOROBAN_RPC_URL;
-const HORIZON_URL =
-  process.env.NEXT_PUBLIC_HORIZON_URL ?? "https://horizon-testnet.stellar.org";
-const NETWORK_PASSPHRASE = Networks.TESTNET;
-
-const CONTRACT_IDS: string[] = (
-  process.env.NEXT_PUBLIC_CAMPAIGN_CONTRACT_IDS ?? ""
-)
-  .split(",")
-  .map((value) => value.trim())
-  .filter(Boolean);
-
-/**
- * Returns all known campaign contract IDs from environment variables.
- * Used for static site generation fallback.
- */
-export function getStaticCampaignIds(): string[] {
-  return [...CONTRACT_IDS];
-}
-
-// ── Transaction Building Pipeline (Client-Side) ──────────────────────────────
+import { getHorizonServer, NETWORK_PASSPHRASE } from "./client";
 
 export async function buildInitializeTx(
   params: InitializeParams,
@@ -56,7 +26,7 @@ export async function buildInitializeTx(
     throw new Error(`Invalid contract ID format: ${params.contractId}`);
   }
 
-  const server = new Horizon.Server(HORIZON_URL);
+  const server = getHorizonServer();
   const account = await server.loadAccount(params.creator);
   const contract = new Contract(params.contractId);
 
@@ -117,13 +87,13 @@ export async function buildInitializeTx(
 
 export const buildInitializeXdr = buildInitializeTx;
 
-async function buildSimpleContractTx(
+export async function buildSimpleContractTx(
   caller: string,
   contractId: string,
   method: string,
   args: xdr.ScVal[] = [],
 ): Promise<string> {
-  const server = new Horizon.Server(HORIZON_URL);
+  const server = getHorizonServer();
   const account = await server.loadAccount(caller);
   const contract = new Contract(contractId);
 
@@ -204,71 +174,3 @@ export async function buildContributeTx(
   ]);
 }
 export const buildContributeXdr = buildContributeTx;
-
-// ── Simulation & Submission Pipeline ──────────────────────────────────────────
-
-export interface SimulateResult {
-  /** Minimum resource fee in stroops */
-  minFee: number;
-  /** Fee formatted as XLM string for display, e.g. "0.0001234 XLM" */
-  minFeeXlm: string;
-  /** Transaction XDR with the simulation-populated soroban data attached */
-  preparedXdr: string;
-}
-
-/**
- * Simulate a transaction against the Soroban RPC before asking the user to sign.
- * - Estimates the resource fee
- * - Detects contract errors early (before the user touches Freighter)
- * - Returns the fee-bumped, simulation-prepared XDR ready for signing
- *
- * Throws a user-friendly Error if simulation fails.
- */
-export async function simulateTx(unsignedXdr: string): Promise<SimulateResult> {
-  const rpc = new SorobanRpc.Server(RPC_URL);
-
-  const tx = TransactionBuilder.fromXDR(unsignedXdr, NETWORK_PASSPHRASE);
-  const result = await rpc.simulateTransaction(tx);
-
-  if (SorobanRpc.Api.isSimulationError(result)) {
-    const msg = result.error ?? "Simulation failed";
-    throw new Error(parseSimulationError(msg));
-  }
-
-  if (SorobanRpc.Api.isSimulationRestore(result)) {
-    throw new Error(
-      "This transaction requires a ledger entry restore. Please try again shortly.",
-    );
-  }
-
-  const success = result as SorobanRpc.Api.SimulateTransactionSuccessResponse;
-
-  // Attach soroban auth + resource data to the transaction
-  const prepared = SorobanRpc.assembleTransaction(tx, success).build();
-
-  const minFee = Number(success.minResourceFee ?? 0);
-  const minFeeXlm = (minFee / 1e7).toFixed(7).replace(/\.?0+$/, "") + " XLM";
-
-  return { minFee, minFeeXlm, preparedXdr: prepared.toXDR() };
-}
-export const simulateTransaction = simulateTx;
-
-/** Extract a readable message from a Soroban diagnostic error string. */
-function parseSimulationError(raw: string): string {
-  const contractMatch = raw.match(/ContractError\((\d+)\)/);
-  if (contractMatch)
-    return `Contract error code ${contractMatch[1]}. Please check your inputs.`;
-  if (raw.includes("below minimum"))
-    return "Amount is below the campaign's minimum contribution.";
-  if (raw.includes("deadline")) return "This campaign's deadline has passed.";
-  if (raw.includes("Cancelled")) return "This campaign has been cancelled.";
-  return raw.split("\n")[0] ?? "Simulation failed. Please try again.";
-}
-
-export async function submitSignedTx(signedXdr: string): Promise<string> {
-  const server = new Horizon.Server(HORIZON_URL);
-  const tx = TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
-  const result = await server.submitTransaction(tx);
-  return result.hash;
-}
-export const submitSignedTransaction = submitSignedTx;

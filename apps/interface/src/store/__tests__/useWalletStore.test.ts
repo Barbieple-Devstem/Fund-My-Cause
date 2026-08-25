@@ -1,5 +1,5 @@
 /**
- * Unit tests for walletSlice selectors.
+ * Unit tests for useWalletStore selectors.
  *
  * The underlying reducer logic lives in useWalletStore and is tested via
  * useWallet.test.tsx.  These tests verify:
@@ -7,8 +7,8 @@
  *   • derived selectors (selectIsConnected) compute correctly
  */
 
-import { useWalletStore } from "../useWalletStore";
 import {
+  useWalletStore,
   selectWalletAddress,
   selectIsConnecting,
   selectIsAutoConnecting,
@@ -18,7 +18,7 @@ import {
   selectWalletNetwork,
   selectShowWalletSelect,
   selectIsConnected,
-} from "../walletSlice";
+} from "../useWalletStore";
 
 // Freeze the initial state snapshot so each test begins from a known baseline.
 const INITIAL = useWalletStore.getState();
