@@ -7,32 +7,18 @@ import {
   type CircuitBreakerOptions,
   type CircuitBreakerMetrics,
 } from "./circuit-breaker.js";
+import type { IndexerEvent } from "@fund-my-cause/types";
+
+// Re-exported so the rest of the indexer keeps importing IndexerEvent from
+// here, while the definition itself lives in @fund-my-cause/types alongside
+// the other shared domain types.
+export type { IndexerEvent };
 
 export interface SorobanRPCConfig {
   url: string;
   contractId: string;
   /** Optional circuit breaker tuning. Defaults: failureThreshold=5, cooldownMs=30_000 */
   circuitBreaker?: CircuitBreakerOptions;
-}
-
-/**
- * A normalised contract event emitted by the indexer.
- *
- * ## Timestamp convention (#911)
- *
- * `timestamp` is always **UTC milliseconds since the Unix epoch**
- * (`Date.now()` style).  Soroban RPC returns ledger close times as Unix
- * seconds; `parseEvent` converts them to milliseconds before storing.  Any
- * code that reads `IndexerEvent.timestamp` can safely pass it directly to
- * `new Date(event.timestamp)` or compare it with `Date.now()`.
- */
-export interface IndexerEvent {
-  id: string;
-  /** UTC milliseconds since the Unix epoch. Never in seconds or local time. */
-  timestamp: number;
-  type: string;
-  contractId: string;
-  data: Record<string, unknown>;
 }
 
 // ---------------------------------------------------------------------------

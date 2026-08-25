@@ -276,3 +276,4 @@ export function sanitizeTitle(title: string): string {
 export function sanitizeDescription(description: string): string {
   return stripHtmlTags(description).trim();
 }
+

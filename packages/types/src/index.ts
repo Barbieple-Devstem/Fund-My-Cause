@@ -1,3 +1,8 @@
+// ./graphql and ./graphql-server are deliberately not re-exported here: both
+// describe the GraphQL schema and so declare names (Campaign, Milestone, ...)
+// that would collide with the domain types below. Import them from
+// "@fund-my-cause/types/graphql" and "@fund-my-cause/types/graphql-server".
+
 export type { Campaign, FAQ, TeamMember, TrustSignalData } from "./campaign";
 
 export { CAMPAIGN_STATUS_VALUES } from "./soroban";
@@ -16,6 +21,16 @@ export type {
 export type { Milestone, MilestoneInput } from "./milestone";
 
 export type { Comment, CommentInput, CommentVote } from "./comment";
+
+export type { IndexerEvent } from "./indexer";
+
+export type {
+  ContractCategory,
+  RawCampaignInfo,
+  RawCampaignStats,
+  RawPerformanceMetrics,
+  RawCampaignIdList,
+} from "./contract";
 
 export type {
   ApiResponse,
