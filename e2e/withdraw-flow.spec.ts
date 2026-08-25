@@ -2,8 +2,8 @@
  * Issue #1062 — E2E: creator withdrawal (goal met → withdraw)
  *
  * Covers the "campaign reaches its goal, creator withdraws funds" flow at
- * the UI/wallet-integration layer. `buildWithdrawTx` (lib/soroban.ts) and
- * the contract's `withdraw` entrypoint are already covered at the contract
+ * the UI/wallet-integration layer. `buildWithdrawTx` (lib/soroban/tx-builders.ts)
+ * and the contract's `withdraw` entrypoint are already covered at the contract
  * level by contracts/crowdfund/tests/integration.rs — this spec exercises
  * the `CampaignActions` "Withdraw Funds" control
  * (apps/interface/src/app/[locale]/campaigns/[id]/CampaignActions.tsx),

@@ -25,12 +25,12 @@ const DEFAULT_ENV: Record<string, string> = {
   NEXT_PUBLIC_HORIZON_URL: "https://horizon-testnet.stellar.org",
 };
 
-function requireEnv(key: string): string {
-  const value = process.env[key] || DEFAULT_ENV[key];
-  if (!value) {
+function requireEnv(name: string, value: string | undefined): string {
+  const resolved = value || DEFAULT_ENV[name];
+  if (!resolved) {
     return "";
   }
-  return value;
+  return resolved;
 }
 
 // ──────────────────────────────────────────────────────────────────────────────

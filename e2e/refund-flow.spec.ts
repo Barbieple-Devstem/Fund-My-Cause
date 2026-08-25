@@ -9,8 +9,8 @@ import type { Page } from "@playwright/test";
  * cancelled/failed campaign the connected wallet may have contributed to and
  * lets the user claim their own refund with a per-campaign "Claim Refund"
  * button. Each claim builds and submits a `refund_single` transaction
- * (see `buildRefundTx` in `apps/interface/src/lib/soroban.ts`) — this is the
- * pull-based model documented in `docs/refund-model.md`.
+ * (see `buildRefundTx` in `apps/interface/src/lib/soroban/tx-builders.ts`) —
+ * this is the pull-based model documented in `docs/refund-model.md`.
  *
  * Scope of this file:
  *  1. Single-contributor claim flow (pre-existing coverage, kept & fixed to
@@ -25,7 +25,7 @@ import type { Page } from "@playwright/test";
  *     refund coverage — see the block below.
  *
  * ── Batch & partial refund: no UI surface exists ──────────────────────────
- * `apps/interface/src/lib/soroban.ts` only ever builds `refund_single`
+ * `apps/interface/src/lib/soroban/tx-builders.ts` only ever builds `refund_single`
  * transactions (`grep -rn "refund_batch\|refund_partial" apps/interface/src`
  * returns zero matches). The refund page has no multi-select/"claim all"
  * control and no admin/insurance partial-refund control. There is nothing in
