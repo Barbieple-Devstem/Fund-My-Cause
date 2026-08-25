@@ -22,11 +22,13 @@ pub fn validate_leaderboard_type(leaderboard_type: u32) -> Result<LeaderboardTyp
 }
 
 /// Validate amount (must be positive)
+///
+/// Delegates to `common::validate_positive_amount` — the single canonical
+/// implementation shared across contracts.  Maps `CommonError::InvalidInput`
+/// onto this contract's `ContractError::InvalidAmount` via the
+/// `From<CommonError>` impl in `errors.rs`.
 pub fn validate_amount(amount: i128) -> Result<(), ContractError> {
-    if amount <= 0 {
-        return Err(ContractError::InvalidAmount);
-    }
-    Ok(())
+    common::validate_positive_amount(amount).map_err(ContractError::from)
 }
 
 /// Validate metadata string length

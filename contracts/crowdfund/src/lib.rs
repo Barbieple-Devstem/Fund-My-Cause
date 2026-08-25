@@ -85,7 +85,7 @@ mod views;
 mod withdraw;
 
 pub use errors::ContractError;
-pub use security::{AccessControl, CircuitBreaker, InputValidator, RateLimiter, ReentrancyGuard};
+pub use security::{CircuitBreaker, ContributorGate, InputValidator, RateLimiter, ReentrancyGuard};
 pub use storage::{
     BASIS_POINTS_MAX,
     CONTRACT_VERSION,
