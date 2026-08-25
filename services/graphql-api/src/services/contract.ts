@@ -8,6 +8,7 @@ import {
   nativeToScVal,
   Address,
 } from "@stellar/stellar-sdk";
+import { createRpcServer } from "@fund-my-cause/rpc-client";
 import type { CampaignStatus } from "../types.js";
 import type {
   AuthenticatedUser,
@@ -73,7 +74,9 @@ export class ContractService {
   readonly registryContractId?: string;
 
   constructor(config: ContractServiceConfig) {
-    this.server = new SorobanRpc.Server(config.rpcUrl);
+    // Use the shared factory so both graphql-api and indexer construct
+    // rpc.Server with identical options (allowHttp derived from URL scheme).
+    this.server = createRpcServer({ url: config.rpcUrl });
     this.networkPassphrase = config.networkPassphrase;
     this.registryContractId = config.registryContractId;
   }

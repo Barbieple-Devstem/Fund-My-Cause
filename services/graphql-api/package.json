@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@apollo/server": "^4.10.0",
+    "@fund-my-cause/rpc-client": "file:../../packages/rpc-client",
     "@fund-my-cause/sdk": "file:../../sdks/js",
     "@fund-my-cause/shared-utils": "file:../../packages/shared-utils",
     "@fund-my-cause/types": "file:../../packages/types",

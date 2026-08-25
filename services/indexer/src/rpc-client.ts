@@ -1,12 +1,13 @@
-import { SorobanRpc } from "@stellar/stellar-sdk";
+import { rpc as SorobanRpc } from "@stellar/stellar-sdk";
 import pino from "pino";
 import { createHttpClient, type HttpClientOptions } from "./http-client.js";
 import {
+  createRpcServer,
   CircuitBreaker,
   CircuitOpenError,
   type CircuitBreakerOptions,
   type CircuitBreakerMetrics,
-} from "./circuit-breaker.js";
+} from "@fund-my-cause/rpc-client";
 import type { IndexerEvent } from "@fund-my-cause/types";
 
 // Re-exported so the rest of the indexer keeps importing IndexerEvent from
@@ -68,16 +69,15 @@ export class SorobanRPCClient {
     this.config = config;
     this.logger = logger;
     this._sleep = _sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
-    this.server = new SorobanRpc.Server(config.url, {
-      allowHttp: config.url.startsWith("http://"),
-    });
+    // Use the shared factory — allowHttp is derived from the URL scheme.
+    this.server = createRpcServer({ url: config.url });
     this.circuitBreaker = new CircuitBreaker(config.circuitBreaker ?? {});
   }
 
   /**
    * Connect to Soroban RPC and verify connectivity.
-   * Uses the SDK's own HTTP transport (SorobanRpc.Server) which manages its
-   * own connection lifecycle.  The 10 s reconnect loop in index.ts covers the
+   * Uses the SDK's own HTTP transport (rpc.Server) which manages its own
+   * connection lifecycle. The 10 s reconnect loop in index.ts covers the
    * case where this returns false.
    */
   async connect(): Promise<boolean> {
@@ -109,7 +109,7 @@ export class SorobanRPCClient {
    * Yields batches of events as they are discovered.
    *
    * On a stream-level error (e.g. unexpected exception from fetchEvents) the
-   * generator waits STREAM_RETRY_DELAY_MS before the next poll.  This is
+   * generator waits STREAM_RETRY_DELAY_MS before the next poll. This is
    * intentionally separate from the per-request retry logic inside
    * fetchEvents() — the stream loop is a coarse outer circuit-breaker, while
    * the HTTP client handles fine-grained per-attempt retries.
@@ -138,7 +138,6 @@ export class SorobanRPCClient {
           { error: error instanceof Error ? error.message : String(error) },
           "Error streaming events",
         );
-        // Back off before the next poll attempt.
         await this._sleep(STREAM_RETRY_DELAY_MS);
       }
     }
@@ -147,7 +146,7 @@ export class SorobanRPCClient {
   /**
    * Fetch contract events for a specific ledger sequence.
    *
-   * The outbound HTTP call is wrapped in the circuit breaker.  If the breaker
+   * The outbound HTTP call is wrapped in the circuit breaker. If the breaker
    * is OPEN (i.e. Horizon/RPC has been repeatedly failing) the call is
    * short-circuited and an empty array is returned immediately so the stream
    * loop can continue without blocking.
@@ -158,11 +157,11 @@ export class SorobanRPCClient {
    *
    * Returns an empty array (rather than throwing) so the stream loop above
    * can silently skip ledgers that have no events or produced a transient
-   * error, and move on.  Permanent errors (e.g. malformed URL) will still
+   * error, and move on. Permanent errors (e.g. malformed URL) will still
    * throw after exhausting retries.
    */
   async fetchEvents(ledgerSequence: number): Promise<IndexerEvent[]> {
-    // Create a fresh client per call.  createHttpClient is lightweight —
+    // Create a fresh client per call. createHttpClient is lightweight —
     // it merges options and returns a thin wrapper; it does not open sockets.
     const client = createHttpClient(RPC_HTTP_OPTIONS);
 
@@ -189,7 +188,6 @@ export class SorobanRPCClient {
       );
 
       if (!result.ok) {
-        // Non-retryable HTTP error (4xx other than 429 already exhausted retries).
         this.logger.warn(
           { ledger: ledgerSequence, status: result.status },
           "RPC request failed with non-retryable status",
@@ -205,7 +203,6 @@ export class SorobanRPCClient {
       return events.map((e: unknown) => this.parseEvent(e));
     } catch (error) {
       if (error instanceof CircuitOpenError) {
-        // Circuit is open — RPC is known-down; skip gracefully without noise.
         this.logger.warn(
           {
             ledger: ledgerSequence,
@@ -241,7 +238,7 @@ export class SorobanRPCClient {
    * ## Timestamp normalisation (#911)
    *
    * Soroban RPC returns `close_time` / `timestamp` values as **Unix seconds**
-   * (uint32).  We multiply by 1 000 to convert to UTC milliseconds so that
+   * (uint32). We multiply by 1 000 to convert to UTC milliseconds so that
    * `IndexerEvent.timestamp` is always ms-since-epoch, consistent with
    * `Date.now()` and the rest of the Fund-My-Cause codebase.
    *
@@ -251,7 +248,6 @@ export class SorobanRPCClient {
   private parseEvent(rawEvent: unknown): IndexerEvent {
     const event = rawEvent as Record<string, unknown>;
 
-    // Soroban timestamps are Unix seconds; convert to milliseconds.
     const rawTimestamp = event.timestamp as number | undefined;
     const timestampMs =
       rawTimestamp != null
