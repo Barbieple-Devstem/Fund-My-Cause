@@ -36,11 +36,17 @@ Consolidated architecture specifications extracted from feature implementations:
 
 ---
 
-## 📜 Smart Contract Architecture Decisions (ADR)
+## 📜 Architecture Decision Records (ADRs)
 
-| ADR | Title |
-|-----|-------|
-| [ADR-001](./adr/0001-stellar-contract-upgrade-strategy.md) | Stellar Smart Contract Upgrade Strategy & Storage Migration |
+| ADR | Title | Status |
+|-----|-------|--------|
+| [ADR-001](./adr/ADR-001-pull-based-refund-model.md) | Pull-based refund model | Accepted |
+| [ADR-002](./adr/ADR-002-off-chain-indexer-architecture.md) | Off-chain indexer architecture | Accepted |
+| [ADR-003](./adr/ADR-003-graphql-api-for-frontend-queries.md) | GraphQL API for frontend queries | Accepted |
+| [ADR-004](./adr/ADR-004-contract-module-boundaries.md) | Soroban contract module boundaries (`contracts/common`) | Proposed |
+| [ADR-005](./adr/ADR-005-fraud-detection-vs-recommendations-service-split.md) | Keeping `fraud_detection` and `recommendations` as separate services | Proposed |
+| [ADR-006](./adr/ADR-006-unify-frontend-read-paths.md) | Unify Frontend Chain Read Paths via GraphQL API | Proposed |
+| [ADR-007](./adr/ADR-007-stellar-contract-upgrade-strategy.md) | Stellar smart contract upgrade strategy & state migration | Accepted |
 
 ---
 
