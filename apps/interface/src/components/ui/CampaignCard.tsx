@@ -5,8 +5,8 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { Bookmark, GitCompare, Share2 } from "lucide-react";
 import {
-  CampaignActions,
   CampaignHeader,
+  CampaignHeaderActions,
   CampaignProgress,
 } from "@fund-my-cause/components";
 import { formatXlmWithUsd } from "@fund-my-cause/shared-utils";
@@ -141,7 +141,7 @@ function CampaignCardComponent({
               </span>
             )}
             <CategoryBadge slug={campaign.category} />
-            <CampaignActions
+            <CampaignHeaderActions
               unstyled
               layout="inline"
               className="absolute top-10 right-3 flex gap-1"
@@ -189,7 +189,7 @@ function CampaignCardComponent({
                   )}
                 />
               </button>
-            </CampaignActions>
+            </CampaignHeaderActions>
           </>
         }
       >
@@ -219,9 +219,7 @@ function CampaignCardComponent({
             className="accent-[var(--color-brand)] w-4 h-4"
           />
           <GitCompare size={12} className="text-[var(--color-text-muted)]" />
-          <span className="text-[var(--color-text-muted)]">
-            {t("compare")}
-          </span>
+          <span className="text-[var(--color-text-muted)]">{t("compare")}</span>
         </label>
         <button
           className="ds-btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
