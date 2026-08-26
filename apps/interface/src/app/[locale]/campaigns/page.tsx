@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Navbar } from "@/components/layout/Navbar";
 import { CampaignCard } from "@/components/ui/CampaignCard";
-import { PledgeModal } from "@/components/ui/PledgeModal";
+import { LazyPledgeModal as PledgeModal } from "@/lib/lazy-components";
 import { ShareModal } from "@/components/ui/ShareModal";
 import {
   EmptyState,

@@ -55,3 +55,13 @@ export {
   type Theme,
   type ThemeProviderProps,
 } from "./context/ThemeContext";
+
+// ── Error handling ────────────────────────────────────────────────────────────
+export {
+  ErrorBoundary,
+  ErrorFallback,
+  withErrorBoundary,
+  type ErrorBoundaryProps,
+  type ErrorBoundaryLevel,
+  type ErrorFallbackProps,
+} from "./ErrorBoundary";

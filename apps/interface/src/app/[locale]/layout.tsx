@@ -9,10 +9,9 @@ import { NotificationPreferencesProvider } from "@/context/NotificationPreferenc
 import { CurrencyProvider } from "@/context/CurrencyContext";
 import { ComparisonProvider } from "@/context/ComparisonContext";
 import { BookmarkProvider } from "@/context/BookmarkContext";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ErrorHandlerInitializer } from "@/components/ErrorHandlerInitializer";
 import { SkipNav } from "@/components/ui/SkipNav";
-import { ThemeProvider } from "@fund-my-cause/components";
+import { ErrorBoundary, ThemeProvider } from "@fund-my-cause/components";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages } from "next-intl/server";
 import { rtlLocales, type Locale } from "@/i18n/config";
