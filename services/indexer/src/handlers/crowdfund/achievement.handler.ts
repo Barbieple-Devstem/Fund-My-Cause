@@ -1,7 +1,7 @@
 import type pino from "pino";
-import type { IndexerEvent } from "../rpc-client.js";
-import type { EventRepository } from "../repository.js";
-import type { EventHandler } from "./types.js";
+import type { IndexerEvent } from "../../rpc-client.js";
+import type { EventRepository } from "../../repository.js";
+import type { EventHandler } from "../types.js";
 
 /**
  * Handles achievement events emitted by the crowdfund contract.
@@ -14,9 +14,13 @@ import type { EventHandler } from "./types.js";
  * These events are persisted alongside all other event types so that the
  * /events and /stats endpoints surface them, and so that future consumers
  * (e.g. a gamification dashboard) can query them via the repository interface.
+ *
+ * Part of the `crowdfund` contract-type module (#1125) — see
+ * `services/indexer/src/handlers/index.ts` for the full module layout.
  */
 export class AchievementHandler implements EventHandler {
   readonly eventType = "achievement";
+  readonly contractType = "crowdfund" as const;
 
   private readonly logger: pino.Logger;
 

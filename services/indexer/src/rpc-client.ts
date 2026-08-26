@@ -17,7 +17,16 @@ export type { IndexerEvent };
 
 export interface SorobanRPCConfig {
   url: string;
+  /** Primary contract ID (kept for backward compatibility). Ignored when `contractIds` is set. */
   contractId: string;
+  /**
+   * Full set of contract IDs to subscribe to (#1125). Lets the indexer
+   * ingest events from multiple contract types in a single stream — e.g. the
+   * crowdfund contract and the registry contract — so each can be routed to
+   * its own handler module under `handlers/<contractType>/`. Falls back to
+   * `[contractId]` when omitted or empty.
+   */
+  contractIds?: string[];
   /** Optional circuit breaker tuning. Defaults: failureThreshold=5, cooldownMs=30_000 */
   circuitBreaker?: CircuitBreakerOptions;
 }
@@ -180,7 +189,13 @@ export class SorobanRPCClient {
             params: {
               startLedger: ledgerSequence,
               filters: [
-                { type: "contract", contractIds: [this.config.contractId] },
+                {
+                  type: "contract",
+                  contractIds:
+                    this.config.contractIds && this.config.contractIds.length > 0
+                      ? this.config.contractIds
+                      : [this.config.contractId],
+                },
               ],
             },
           }),

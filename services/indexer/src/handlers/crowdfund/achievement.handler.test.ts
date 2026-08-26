@@ -5,8 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import pino from "pino";
 import { AchievementHandler } from "./achievement.handler.js";
-import type { EventRepository } from "../repository.js";
-import type { IndexerEvent } from "../rpc-client.js";
+import type { EventRepository } from "../../repository.js";
+import type { IndexerEvent } from "../../rpc-client.js";
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
