@@ -16,7 +16,7 @@ export interface ProgressBarProps {
  * @example
  * <ProgressBar progress={65} animated showLabel />
  */
-export function ProgressBar({
+function ProgressBarComponent({
   progress,
   animated = false,
   showLabel = true,
@@ -75,3 +75,5 @@ export function ProgressBar({
     </div>
   );
 }
+
+export const ProgressBar = React.memo(ProgressBarComponent);
