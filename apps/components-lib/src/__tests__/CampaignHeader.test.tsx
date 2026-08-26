@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
-import { CampaignHeader } from "../CampaignHeader";
+import {
+  CampaignHeader,
+  CampaignHeaderTitle,
+  CampaignHeaderMeta,
+  CampaignHeaderActions,
+} from "../CampaignHeader";
 
 describe("CampaignHeader", () => {
   it("renders the title, organisation and description when populated", () => {
@@ -73,7 +78,9 @@ describe("CampaignHeader", () => {
     );
 
     expect(renderImage).toHaveBeenCalled();
-    expect(screen.getByLabelText("Custom - campaign header image")).toBeDefined();
+    expect(
+      screen.getByLabelText("Custom - campaign header image"),
+    ).toBeDefined();
   });
 
   it("renders the overlay and body children", () => {
@@ -85,5 +92,79 @@ describe("CampaignHeader", () => {
 
     expect(screen.getByText("Badge")).toBeDefined();
     expect(screen.getByText("Progress")).toBeDefined();
+  });
+});
+
+describe("CampaignHeaderTitle", () => {
+  it("renders title with default h2 heading", () => {
+    render(<CampaignHeaderTitle title="Community Well Project" />);
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe(
+      "Community Well Project",
+    );
+  });
+
+  it("renders title with custom heading level", () => {
+    render(<CampaignHeaderTitle title="School Renovation" headingLevel={3} />);
+    expect(screen.getByRole("heading", { level: 3 }).textContent).toBe(
+      "School Renovation",
+    );
+  });
+
+  it("supports custom title render function", () => {
+    render(
+      <CampaignHeaderTitle
+        title="Highlighted Title"
+        renderTitle={(t) => <mark>{t}</mark>}
+      />,
+    );
+    expect(screen.getByText("Highlighted Title").tagName.toLowerCase()).toBe(
+      "mark",
+    );
+  });
+});
+
+describe("CampaignHeaderMeta", () => {
+  it("renders organization and description", () => {
+    render(
+      <CampaignHeaderMeta
+        organization="Eco Builders"
+        description="Building eco houses."
+      />,
+    );
+    expect(screen.getByText("Eco Builders")).toBeDefined();
+    expect(screen.getByText("Building eco houses.")).toBeDefined();
+  });
+
+  it("returns null when neither organization nor description is provided", () => {
+    const { container } = render(<CampaignHeaderMeta />);
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("wraps in a container if className is supplied", () => {
+    const { container } = render(
+      <CampaignHeaderMeta
+        organization="Eco"
+        description="Desc"
+        className="meta-wrapper"
+      />,
+    );
+    expect(container.querySelector(".meta-wrapper")).toBeDefined();
+  });
+});
+
+describe("CampaignHeaderActions", () => {
+  it("defaults to inline layout", () => {
+    const onShare = vi.fn();
+    const onSave = vi.fn();
+    render(
+      <CampaignHeaderActions
+        onShare={onShare}
+        onSave={onSave}
+        shareAriaLabel="Share"
+        saveAriaLabel="Save"
+      />,
+    );
+    expect(screen.getByLabelText("Share")).toBeDefined();
+    expect(screen.getByLabelText("Save")).toBeDefined();
   });
 });
