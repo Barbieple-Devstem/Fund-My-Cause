@@ -49,6 +49,12 @@ export {
   type CampaignActionsClassNames,
 } from "./CampaignActions";
 
+// ── Loading / skeleton primitives ──────────────────────────────────────────
+export {
+  CampaignDetailSkeleton,
+  type CampaignDetailSkeletonProps,
+} from "./CampaignDetailSkeleton";
+
 export {
   ThemeProvider,
   useTheme,
