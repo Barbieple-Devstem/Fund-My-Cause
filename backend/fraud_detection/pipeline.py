@@ -1,91 +1,41 @@
 """
-Fraud / Anomaly Detection Pipeline (#636)
+Fraud / Anomaly Detection Pipeline (#636, #1122)
 
-Detects suspicious patterns over indexed contribution and campaign data:
+HTTP ingestion and API layer — thin handlers only.
 
- - Wash contributions  : same wallet contributing and immediately requesting
-                         a refund in a short window, repeatedly.
- - Sudden spike        : campaign receives an unusually large number of
-                         contributions in a short window.
- - Duplicate content   : campaign title/description appears nearly identical
-                         to an existing campaign (Jaccard similarity).
+Architecture after #1122 split
+────────────────────────────────
+  repository.py  — all mutable in-process state (event store, flag queue)
+  scoring.py     — pure heuristic logic, no HTTP / asyncio dependencies
+  pipeline.py    — this file: FastAPI app, async job queue, HTTP handlers
 
-Each check produces a ``Flag`` that is appended to a moderation queue and
-surfaced via the ``/moderation-queue`` endpoint.
+By keeping scoring rules in a separate module with no FastAPI dependency,
+every heuristic can be unit-tested without starting an HTTP server or
+setting up request contexts.  See tests_scoring_layers.py.
 
-Heuristics and their thresholds are documented in
-``docs/fraud-detection-heuristics.md``.
+Backward-compatibility re-exports
+────────────────────────────────────
+All public symbols that tests_pipeline.py and tests_scoring.py import from
+``pipeline`` are still importable from here.  The domain types and state are
+delegated to the sub-modules; this file only re-exports them so existing
+imports keep working without modification.
 
 Async job queue (#904)
 ──────────────────────
-Fraud scoring is no longer synchronous on the donation request path.
-``POST /contributions`` now enqueues a ``ScoringJob`` into a bounded
-asyncio queue and returns immediately with ``{"status": "queued"}``.  A
-background worker coroutine (``_scoring_worker``) dequeues jobs, stores the
-contribution, runs the full heuristic scan, and records metrics.
-
-Baseline latency improvement
-────────────────────────────
-Old synchronous path (before #904):
-  - Contribution stored inline: ~0.1–0.5 ms (in-memory append)
-  - ``run_full_scan()`` called inline: O(C × R) for wash check, O(C) for
-    spike check, O(N²) for duplicate check — grows with event-store size.
-    At 1,000 events this measured ~5–20 ms; at 10,000 events ~200–500 ms.
-  - Total request-path cost: 5–500 ms, blocking the HTTP worker thread.
-
-New async path (after #904):
-  - Request path: enqueue a ScoringJob in <0.1 ms; respond immediately.
-  - Background worker: dequeues and processes at its own pace (1–50 ms
-    per job depending on event-store size), independent of HTTP latency.
-  - Donation request latency improvement: 5–500 ms → <0.1 ms (50–5000×).
-
-Queue monitoring
-────────────────
-``GET /metrics`` exposes:
-  - ``queue_depth``             – current pending jobs
-  - ``total_jobs_processed``   – lifetime counter
-  - ``total_flags_found``      – lifetime flag count
-  - ``avg_processing_latency_ms`` – exponential moving average
-  - ``last_job_at``            – Unix timestamp of last processed job
+``POST /contributions`` enqueues a ``ScoringJob`` and returns immediately
+with ``{"status": "queued"}``.  The background worker (``_scoring_worker``)
+dequeues jobs, calls repository + scoring functions, and updates metrics.
 
 Dead-code audit (#900)
 ──────────────────────
-Audit date: 2026-07-28
-Auditor: automated
-
-Audit scope: conditional branches referencing removed feature flags or
-deprecated scoring models.
-
-Findings:
-  - No feature-flag conditionals found (no flag-variable references or
-    os.getenv flag-key calls).
-  - No versioned-model dispatch found (no model_version or scoring_model
-    equality checks).
-  - No commented-out heuristic blocks found.
-  - ``_is_valid_trace_id`` is live: called by ``TraceIDMiddleware.dispatch``.
-  - ``_QUEUE``, ``_CONTRIBUTIONS``, ``_REFUNDS``, ``_CAMPAIGN_RECORDS`` are all
-    live: written by ingest endpoints and read by scan functions.
-  - All three scan functions (``scan_wash_contributions``,
-    ``scan_contribution_spikes``, ``scan_duplicate_content``) are called by
-    ``run_full_scan``.
-  - ``run_full_scan`` is called by the scoring worker and ``POST /scan``.
-
-Result: NO dead code paths found.  The rules engine is clean.
-
-See ``tests_pipeline.py → test_no_dead_feature_flag_branches`` for the
-automated regression guard that prevents future dead branches from being
-silently introduced.
+No feature-flag conditionals, no versioned-model dispatch.
+See tests_pipeline.py → test_no_dead_feature_flag_branches.
 
 Trace-ID propagation
 ────────────────────
-Every inbound HTTP request carries an ``X-Trace-ID`` header injected by the
-graphql-api service (or generated fresh there for requests that arrive without
-one).  A Starlette middleware extracts that value and stores it in a
-``contextvars.ContextVar`` so that every ``structlog`` log line emitted during
-the request lifecycle automatically includes ``trace_id`` — making it trivial
-to correlate fraud-detection log entries with the originating donation request.
-
-See ``docs/logging-conventions.md`` for the project-wide convention.
+Every inbound HTTP request carries ``X-Trace-ID``.  TraceIDMiddleware
+extracts or generates the value and binds it into structlog's context-var
+store so every log line automatically includes ``trace_id``.
 """
 
 from __future__ import annotations
@@ -97,28 +47,97 @@ import time
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import AsyncIterator, Callable, Optional
 
 import structlog
 from fastapi import FastAPI, BackgroundTasks, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp
 
 # ---------------------------------------------------------------------------
-# Logging — structlog configured for JSON output in production,
-# coloured console output in development.
+# Sub-module imports
+# ---------------------------------------------------------------------------
+
+# Repository: all mutable state lives here
+import repository as _repo
+from repository import (
+    CampaignRecord,
+    ContributionEvent,
+    Flag,
+    FlagReason,
+    FlagSeverity,
+    RefundEvent,
+    append_contribution,
+    append_refund,
+    append_campaign,
+    enqueue_flag,
+    next_flag_id,
+    get_contributions,
+    get_refunds,
+    get_campaign_records,
+    get_flags,
+    total_flag_count,
+    mark_flag_reviewed,
+    clear_all as _repo_clear_all,
+)
+
+# Scoring: pure heuristic logic
+import scoring as _scoring
+from scoring import (
+    WASH_WINDOW_SECONDS,
+    WASH_MIN_OCCURRENCES,
+    SPIKE_WINDOW_SECONDS,
+    SPIKE_MAX_CONTRIBUTIONS,
+    DUPLICATE_JACCARD_THRESHOLD,
+    DUPLICATE_SCAN_MIN_INTERVAL_SECONDS,
+    scan_wash_contributions,
+    scan_contribution_spikes,
+    scan_duplicate_content,
+    run_full_scan,
+)
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility aliases for tests_pipeline.py / tests_scoring.py
+# that import from ``pipeline`` directly.
+# ---------------------------------------------------------------------------
+# These module-level lists are the same objects as in repository.py — tests
+# that mutate them (e.g. _CONTRIBUTIONS.append(…)) will see the changes
+# reflected in the repository and vice-versa, because Python list identity
+# is preserved across assignments.
+
+_CONTRIBUTIONS = _repo._CONTRIBUTIONS
+_REFUNDS = _repo._REFUNDS
+_CAMPAIGN_RECORDS = _repo._CAMPAIGN_RECORDS
+_QUEUE = _repo._QUEUE
+
+# _last_duplicate_scan_at lives in scoring.py; tests access it as
+# pipeline_module._last_duplicate_scan_at so we expose it as a property-like
+# module attribute.  Reads/writes go through scoring module.
+
+def __getattr__(name: str):
+    if name == "_last_duplicate_scan_at":
+        return _scoring._last_duplicate_scan_at
+    raise AttributeError(name)
+
+def __setattr__(name: str, value):  # type: ignore[override]
+    if name == "_last_duplicate_scan_at":
+        _scoring._last_duplicate_scan_at = value
+        return
+    raise AttributeError(name)
+
+
+# ---------------------------------------------------------------------------
+# Logging
 # ---------------------------------------------------------------------------
 
 structlog.configure(
     processors=[
-        structlog.contextvars.merge_contextvars,       # injects trace_id
+        structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
-        structlog.dev.ConsoleRenderer()                # swap for JSONRenderer in prod
+        structlog.dev.ConsoleRenderer()
         if __import__("os").getenv("LOG_FORMAT") != "json"
         else structlog.processors.JSONRenderer(),
     ],
@@ -135,14 +154,8 @@ log: structlog.BoundLogger = structlog.get_logger("fraud_detection")
 # Trace-ID convention
 # ---------------------------------------------------------------------------
 
-#: The canonical header name — must match TRACE_ID_HEADER in shared-utils.
 TRACE_ID_HEADER = "x-trace-id"
-
-#: Valid Fund-My-Cause trace IDs match this pattern.
 _TRACE_ID_RE = re.compile(r"^fmc-[0-9a-f]{8}-[0-9a-f]{16}$")
-
-#: Holds the trace ID for the current request.  structlog middleware reads
-#: this to bind ``trace_id`` onto every log line inside the request.
 _trace_id_var: ContextVar[str] = ContextVar("trace_id", default="")
 
 
@@ -155,299 +168,34 @@ def _is_valid_trace_id(value: str) -> bool:
 # ---------------------------------------------------------------------------
 
 class TraceIDMiddleware(BaseHTTPMiddleware):
-    """
-    Extract (or generate) an X-Trace-ID for every inbound request.
-
-    - If the caller supplies a well-formed ``X-Trace-ID`` header, it is
-      accepted and stored in the ``_trace_id_var`` context variable.
-    - Otherwise a placeholder ``unknown-<timestamp>`` value is stored so
-      log lines are never missing the field.
-    - The resolved value is echoed back as a response header so callers can
-      correlate their own logs.
-    - structlog's ``contextvars`` integration picks up the value automatically
-      because ``bind_contextvars`` is called before the next middleware runs.
-    """
+    """Extract (or generate) an X-Trace-ID for every inbound request."""
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         raw = request.headers.get(TRACE_ID_HEADER, "")
         trace_id = raw if _is_valid_trace_id(raw) else f"unknown-{int(time.time())}"
 
-        # Bind into structlog's context-var store so every downstream log call
-        # emitted during this request automatically carries trace_id.
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(trace_id=trace_id)
-
-        # Also store in a plain ContextVar for non-structlog callsites.
         _trace_id_var.set(trace_id)
 
-        log.info(
-            "request_started",
-            method=request.method,
-            path=request.url.path,
-        )
-
+        log.info("request_started", method=request.method, path=request.url.path)
         response: Response = await call_next(request)
-
-        # Echo the trace ID back so callers can correlate their logs.
         response.headers[TRACE_ID_HEADER] = trace_id
-
         log.info(
             "request_completed",
             method=request.method,
             path=request.url.path,
             status_code=response.status_code,
         )
-
         return response
 
 
 # ---------------------------------------------------------------------------
-# Tuneable thresholds (see docs/fraud-detection-heuristics.md for rationale)
-# ---------------------------------------------------------------------------
-WASH_WINDOW_SECONDS = 3600          # contributions that refund within 1 h
-WASH_MIN_OCCURRENCES = 3            # flag after 3 wash cycles
-SPIKE_WINDOW_SECONDS = 600          # 10-minute rolling window
-SPIKE_MAX_CONTRIBUTIONS = 50        # > 50 contributions in 10 min → spike
-DUPLICATE_JACCARD_THRESHOLD = 0.8   # titles ≥ 80 % token overlap → duplicate
-
-# scan_duplicate_content() is O(N²) in the number of campaigns and does not
-# change between contributions to the *same* set of campaigns — running it on
-# every single queued contribution (as run_full_scan() used to) makes
-# per-contribution scoring cost scale with the full campaign-content scan.
-# Rate-limit it instead: the worker's per-contribution calls skip it unless
-# this many seconds have passed since the last run; POST /scan bypasses the
-# limit for an explicit, on-demand full scan.
-DUPLICATE_SCAN_MIN_INTERVAL_SECONDS = 30
-
-# Scoring job queue settings
-SCORING_QUEUE_MAXSIZE = 1000        # bounded queue; 503 if full
-
-
-# ---------------------------------------------------------------------------
-# Domain types
-# ---------------------------------------------------------------------------
-class FlagReason(str, Enum):
-    WASH_CONTRIBUTION = "wash_contribution"
-    CONTRIBUTION_SPIKE = "contribution_spike"
-    DUPLICATE_CONTENT = "duplicate_content"
-
-
-class FlagSeverity(str, Enum):
-    LOW = "low"
-    MEDIUM = "medium"
-    HIGH = "high"
-
-
-@dataclass
-class Flag:
-    id: str
-    reason: FlagReason
-    severity: FlagSeverity
-    campaign_id: str
-    wallet: Optional[str]
-    detail: str
-    flagged_at: float = field(default_factory=time.time)
-    reviewed: bool = False
-
-
-# ---------------------------------------------------------------------------
-# Moderation queue (in-memory; replace with DB in production)
-# ---------------------------------------------------------------------------
-_QUEUE: list[Flag] = []
-_FLAG_COUNTER = 0
-
-
-def _next_flag_id() -> str:
-    global _FLAG_COUNTER
-    _FLAG_COUNTER += 1
-    return f"FLAG-{_FLAG_COUNTER:05d}"
-
-
-def _enqueue(flag: Flag) -> None:
-    _QUEUE.append(flag)
-
-
-# ---------------------------------------------------------------------------
-# Indexed event store (populated by indexer; stubbed here)
-# ---------------------------------------------------------------------------
-@dataclass
-class ContributionEvent:
-    campaign_id: str
-    wallet: str
-    amount: int
-    timestamp: float
-
-
-@dataclass
-class RefundEvent:
-    campaign_id: str
-    wallet: str
-    timestamp: float
-
-
-@dataclass
-class CampaignRecord:
-    id: str
-    title: str
-    description: str
-
-
-_CONTRIBUTIONS: list[ContributionEvent] = []
-_REFUNDS: list[RefundEvent] = []
-_CAMPAIGN_RECORDS: list[CampaignRecord] = []
-
-
-# ---------------------------------------------------------------------------
-# Heuristic implementations
+# Scoring queue (#904)
 # ---------------------------------------------------------------------------
 
-def _jaccard(a: str, b: str) -> float:
-    """Token-level Jaccard similarity between two strings."""
-    sa = set(a.lower().split())
-    sb = set(b.lower().split())
-    if not sa and not sb:
-        return 1.0
-    return len(sa & sb) / len(sa | sb)
+SCORING_QUEUE_MAXSIZE = 1000
 
-
-def scan_wash_contributions() -> list[Flag]:
-    """
-    Wash contribution heuristic.
-
-    A wallet that contributes then refunds the *same campaign* within
-    WASH_WINDOW_SECONDS, and does so WASH_MIN_OCCURRENCES or more times,
-    is flagged as a potential wash contributor.
-    """
-    flags: list[Flag] = []
-    # Group refunds by (campaign, wallet)
-    refund_lookup: dict[tuple[str, str], list[float]] = {}
-    for r in _REFUNDS:
-        key = (r.campaign_id, r.wallet)
-        refund_lookup.setdefault(key, []).append(r.timestamp)
-
-    # For each contribution, check if at least one refund followed within the
-    # window.  Count each contribution event as at most one wash cycle so
-    # N contributions and N refunds → N cycles, not N² cross-product pairings.
-    wash_count: dict[tuple[str, str], int] = {}
-    for c in _CONTRIBUTIONS:
-        key = (c.campaign_id, c.wallet)
-        refund_times = refund_lookup.get(key, [])
-        if any(0 < rt - c.timestamp <= WASH_WINDOW_SECONDS for rt in refund_times):
-            wash_count[key] = wash_count.get(key, 0) + 1
-
-    for (campaign_id, wallet), count in wash_count.items():
-        if count >= WASH_MIN_OCCURRENCES:
-            flags.append(Flag(
-                id=_next_flag_id(),
-                reason=FlagReason.WASH_CONTRIBUTION,
-                severity=FlagSeverity.HIGH,
-                campaign_id=campaign_id,
-                wallet=wallet,
-                detail=f"Wallet performed {count} wash cycles within {WASH_WINDOW_SECONDS}s",
-            ))
-    return flags
-
-
-def scan_contribution_spikes() -> list[Flag]:
-    """
-    Sudden-spike heuristic.
-
-    If a campaign receives more than SPIKE_MAX_CONTRIBUTIONS in any
-    SPIKE_WINDOW_SECONDS rolling window, flag it as a potential sybil attack.
-    """
-    flags: list[Flag] = []
-    by_campaign: dict[str, list[float]] = {}
-    for c in _CONTRIBUTIONS:
-        by_campaign.setdefault(c.campaign_id, []).append(c.timestamp)
-
-    for campaign_id, timestamps in by_campaign.items():
-        ts = sorted(timestamps)
-        for i, t_start in enumerate(ts):
-            window = [t for t in ts[i:] if t - t_start <= SPIKE_WINDOW_SECONDS]
-            if len(window) > SPIKE_MAX_CONTRIBUTIONS:
-                flags.append(Flag(
-                    id=_next_flag_id(),
-                    reason=FlagReason.CONTRIBUTION_SPIKE,
-                    severity=FlagSeverity.MEDIUM,
-                    campaign_id=campaign_id,
-                    wallet=None,
-                    detail=(
-                        f"{len(window)} contributions in "
-                        f"{SPIKE_WINDOW_SECONDS}s window "
-                        f"(threshold: {SPIKE_MAX_CONTRIBUTIONS})"
-                    ),
-                ))
-                break  # one flag per campaign per scan
-    return flags
-
-
-def scan_duplicate_content() -> list[Flag]:
-    """
-    Duplicate-content heuristic.
-
-    Compares every pair of campaigns by title Jaccard similarity.
-    Pairs above DUPLICATE_JACCARD_THRESHOLD are flagged.
-    """
-    flags: list[Flag] = []
-    records = _CAMPAIGN_RECORDS
-    for i in range(len(records)):
-        for j in range(i + 1, len(records)):
-            a, b = records[i], records[j]
-            sim = _jaccard(a.title, b.title)
-            if sim >= DUPLICATE_JACCARD_THRESHOLD:
-                flags.append(Flag(
-                    id=_next_flag_id(),
-                    reason=FlagReason.DUPLICATE_CONTENT,
-                    severity=FlagSeverity.LOW,
-                    campaign_id=b.id,
-                    wallet=None,
-                    detail=(
-                        f"Title Jaccard similarity {sim:.2f} with campaign {a.id} "
-                        f"(threshold: {DUPLICATE_JACCARD_THRESHOLD})"
-                    ),
-                ))
-    return flags
-
-
-#: Unix timestamp of the last time scan_duplicate_content() actually ran.
-_last_duplicate_scan_at: float = 0.0
-
-
-def run_full_scan(*, force_duplicate_scan: bool = False) -> list[Flag]:
-    """
-    Execute all heuristics and append new flags to the moderation queue.
-
-    The O(N²) duplicate-content pass is rate-limited (see
-    DUPLICATE_SCAN_MIN_INTERVAL_SECONDS) so that calling this once per
-    contribution — as the async scoring worker does — doesn't re-run the full
-    campaign-content scan on every single donation. Pass
-    force_duplicate_scan=True (used by the manual POST /scan trigger) to
-    bypass the rate limit and always run it.
-    """
-    global _last_duplicate_scan_at
-
-    scan_log = log.bind(operation="run_full_scan")
-    scan_log.info("scan_started")
-
-    new_flags: list[Flag] = []
-    new_flags.extend(scan_wash_contributions())
-    new_flags.extend(scan_contribution_spikes())
-
-    now = time.time()
-    if force_duplicate_scan or (now - _last_duplicate_scan_at) >= DUPLICATE_SCAN_MIN_INTERVAL_SECONDS:
-        new_flags.extend(scan_duplicate_content())
-        _last_duplicate_scan_at = now
-
-    for f in new_flags:
-        _enqueue(f)
-
-    scan_log.info("scan_completed", new_flags=len(new_flags), queue_depth=len(_QUEUE))
-    return new_flags
-
-
-# ---------------------------------------------------------------------------
-# Contribution notification model
-# ---------------------------------------------------------------------------
 
 @dataclass
 class ContributionPayload:
@@ -459,14 +207,10 @@ class ContributionPayload:
     """
     campaignId: str
     contributor: str
-    amount: str          # stringified bigint
+    amount: str
     transactionHash: str
-    timestamp: float     # Unix epoch seconds
+    timestamp: float
 
-
-# ---------------------------------------------------------------------------
-# Async scoring job queue (#904)
-# ---------------------------------------------------------------------------
 
 @dataclass
 class ScoringJob:
@@ -475,18 +219,17 @@ class ScoringJob:
     enqueued_at: float = field(default_factory=time.time)
 
 
-#: Bounded asyncio queue — prevents unbounded memory growth under load.
-#: When full, POST /contributions returns 503 rather than blocking.
 _scoring_queue: asyncio.Queue[ScoringJob] = asyncio.Queue(maxsize=SCORING_QUEUE_MAXSIZE)
 
 # ---------------------------------------------------------------------------
-# Queue metrics — updated by _scoring_worker
+# Queue metrics
 # ---------------------------------------------------------------------------
+
 _JOBS_PROCESSED: int = 0
 _TOTAL_FLAGS_FOUND: int = 0
-_AVG_LATENCY_MS_EMA: float = 0.0   # exponential moving average, α=0.1
+_AVG_LATENCY_MS_EMA: float = 0.0
 _LAST_JOB_AT: Optional[float] = None
-_EMA_ALPHA = 0.1                    # smoothing factor for latency EMA
+_EMA_ALPHA = 0.1
 
 
 async def _scoring_worker() -> None:
@@ -495,12 +238,10 @@ async def _scoring_worker() -> None:
 
     For each job:
     1. Dequeue a ScoringJob.
-    2. Store the contribution in the in-memory event store.
-    3. Run the full heuristic scan (run_full_scan).
-    4. Update metrics (job count, flag count, EMA latency).
+    2. Store the contribution via the repository layer.
+    3. Run the full heuristic scan via the scoring layer.
+    4. Update metrics.
     5. Mark the task done.
-
-    Any exception is logged and swallowed so the worker never crashes.
     """
     global _JOBS_PROCESSED, _TOTAL_FLAGS_FOUND, _AVG_LATENCY_MS_EMA, _LAST_JOB_AT
 
@@ -512,24 +253,22 @@ async def _scoring_worker() -> None:
         try:
             payload = job.payload
 
-            # Store the contribution event
-            _CONTRIBUTIONS.append(ContributionEvent(
+            # Store via repository (not inline in this module)
+            append_contribution(ContributionEvent(
                 campaign_id=payload.campaignId,
                 wallet=payload.contributor,
                 amount=int(payload.amount) if payload.amount.isdigit() else 0,
                 timestamp=payload.timestamp,
             ))
 
-            # Run the full scan to apply heuristics post-hoc
+            # Score via scoring layer
             new_flags = run_full_scan()
 
-            # Update metrics
             processing_latency_ms = (time.time() - job.enqueued_at) * 1000
             _JOBS_PROCESSED += 1
             _TOTAL_FLAGS_FOUND += len(new_flags)
             _LAST_JOB_AT = time.time()
 
-            # Exponential moving average for latency
             if _JOBS_PROCESSED == 1:
                 _AVG_LATENCY_MS_EMA = processing_latency_ms
             else:
@@ -558,7 +297,7 @@ async def _scoring_worker() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Application lifespan: start/stop the scoring worker
+# Application lifespan
 # ---------------------------------------------------------------------------
 
 @asynccontextmanager
@@ -578,16 +317,15 @@ async def lifespan(app_: FastAPI) -> AsyncIterator[None]:
 
 
 # ---------------------------------------------------------------------------
-# FastAPI app
+# FastAPI app — thin HTTP handlers only
 # ---------------------------------------------------------------------------
+
 app = FastAPI(
     title="Fund-My-Cause Fraud Detection",
-    version="1.1.0",
+    version="1.2.0",
     lifespan=lifespan,
 )
 
-# Register the trace-ID middleware first so every subsequent handler has
-# trace_id bound in structlog's context-var store.
 app.add_middleware(TraceIDMiddleware)
 
 
@@ -599,13 +337,8 @@ def health() -> dict:
 @app.post("/contributions")
 async def ingest_contribution(request: Request) -> JSONResponse:
     """
-    Accept a contribution notification from graphql-api.
-
-    Changed in #904: rather than storing the contribution synchronously and
-    running the scan inline, this endpoint enqueues a ScoringJob and returns
-    immediately.  The background worker (``_scoring_worker``) processes the
-    job asynchronously — keeping the donation request path latency < 0.1 ms
-    regardless of how many events the heuristics need to scan.
+    Accept a contribution notification from graphql-api and enqueue it for
+    async fraud scoring.
 
     Returns:
       200 {"status": "queued", "queue_depth": N}  – job enqueued successfully
@@ -619,8 +352,6 @@ async def ingest_contribution(request: Request) -> JSONResponse:
         log.warning("contributions_ingest_invalid_payload", error=str(exc))
         return JSONResponse(status_code=422, content={"error": "invalid payload"})
 
-    # Attempt a non-blocking enqueue.  put_nowait raises asyncio.QueueFull
-    # when the queue has reached SCORING_QUEUE_MAXSIZE.
     try:
         _scoring_queue.put_nowait(ScoringJob(payload=payload))
     except asyncio.QueueFull:
@@ -693,21 +424,16 @@ def moderation_queue(
     - ``reason``: filter by flag reason
     - ``limit``: max flags returned (default 50)
     """
-    items = _QUEUE
-    if reviewed is not None:
-        items = [f for f in items if f.reviewed == reviewed]
-    if reason is not None:
-        items = [f for f in items if f.reason == reason]
-    items = items[-limit:]
+    items = get_flags(reviewed=reviewed, reason=reason, limit=limit)
 
     log.debug(
         "moderation_queue_queried",
         returned=len(items),
-        total=len(_QUEUE),
+        total=total_flag_count(),
     )
 
     return JSONResponse(content={
-        "total": len(_QUEUE),
+        "total": total_flag_count(),
         "returned": len(items),
         "flags": [
             {
@@ -728,10 +454,9 @@ def moderation_queue(
 @app.patch("/moderation-queue/{flag_id}/reviewed")
 def mark_reviewed(flag_id: str) -> dict:
     """Mark a flag as reviewed by a moderator."""
-    for f in _QUEUE:
-        if f.id == flag_id:
-            f.reviewed = True
-            log.info("flag_marked_reviewed", flag_id=flag_id)
-            return {"status": "updated", "id": flag_id}
+    found = mark_flag_reviewed(flag_id)
+    if found:
+        log.info("flag_marked_reviewed", flag_id=flag_id)
+        return {"status": "updated", "id": flag_id}
     log.warning("flag_not_found", flag_id=flag_id)
     return JSONResponse(status_code=404, content={"error": "flag not found"})
