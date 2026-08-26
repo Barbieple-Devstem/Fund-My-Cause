@@ -12,7 +12,7 @@
 //! organizing principle for this module vs. [`crate::lookup`] (read-only,
 //! no auth, no writes).
 
-use common::EVENT_SCHEMA_VERSION;
+use common::{AccessControl, EVENT_SCHEMA_VERSION};
 use soroban_sdk::{Address, Env, Vec};
 
 use crate::{
@@ -166,7 +166,7 @@ pub(crate) fn update_status(
         .instance()
         .get(&KEY_ADMIN)
         .ok_or(ContractError::NotInitialized)?;
-    admin.require_auth();
+    AccessControl::require_role_auth(&admin);
 
     // Guard: campaign must already be registered globally
     let campaigns: Vec<Address> = env

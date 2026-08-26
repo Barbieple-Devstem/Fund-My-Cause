@@ -1,7 +1,8 @@
 # ADR-004: Soroban contract module boundaries (`contracts/common` vs `crowdfund` / `registry` / `achievements`)
 
-- **Status:** Proposed
+- **Status:** Active
 - **Date:** 2026-07-25
+- **Updated:** 2026-08-25 (registry migration complete; `types.rs` split; `ContributorGate` rename; `validate_positive_amount` consolidated)
 - **Deciders:** owners of `contracts/crowdfund`, `contracts/registry`, `contracts/achievements`, `contracts/common`
 
 ## Context

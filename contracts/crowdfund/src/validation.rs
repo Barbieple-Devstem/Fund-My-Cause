@@ -241,6 +241,11 @@ pub(crate) fn validate_string_length(
 
 /// Validates that an `i128` amount is strictly positive (> 0).
 ///
+/// Delegates to `common::validate_positive_amount` — the single canonical
+/// implementation shared across contracts.  Maps `CommonError::InvalidInput`
+/// onto `ContractError::AmountNotPositive` via the `From<CommonError>` impl
+/// in `errors.rs`.
+///
 /// # Arguments
 /// * `amount` - The amount to validate
 ///
@@ -248,10 +253,7 @@ pub(crate) fn validate_string_length(
 /// * `Ok(())` if amount > 0
 /// * `Err(ContractError::AmountNotPositive)` otherwise
 pub(crate) fn validate_positive_amount(amount: i128) -> Result<(), ContractError> {
-    if amount <= 0 {
-        return Err(ContractError::AmountNotPositive);
-    }
-    Ok(())
+    common::validate_positive_amount(amount).map_err(|_| ContractError::AmountNotPositive)
 }
 
 /// Validates that the platform fee address is not the same as the creator.
