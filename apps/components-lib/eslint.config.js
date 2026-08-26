@@ -38,6 +38,11 @@ export default [
       // TypeScript is the authority on undefined identifiers in .ts/.tsx;
       // leaving this on just double-reports and misses DOM lib types.
       "no-undef": "off",
+      // Disallow raw console calls in library source — callers should use
+      // their own logger. warn/error are still permitted so genuine failures
+      // remain visible.
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "no-debugger": "error",
     },
   },
   {
@@ -46,6 +51,7 @@ export default [
       // Test files intentionally use require() to assert on entry points.
       "@typescript-eslint/no-require-imports": "off",
       "@typescript-eslint/no-unused-vars": "off",
+      "no-console": "off",
     },
   },
 ];

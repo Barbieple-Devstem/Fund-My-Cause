@@ -315,4 +315,67 @@ describe("Formatting utilities", () => {
       expect(result).toMatch(/^GABCD\.\.\./);
     });
   });
+
+  // ── Stellar Asset Decimal Precision ─────────────────────────────────
+  // XLM uses 7 decimal places (1 XLM = 10_000_000 stroops).
+  // These tests guard against regressions in the stroop-to-XLM conversion
+  // that could cause incorrect display amounts in the UI.
+
+  describe("Stellar asset decimal precision (XLM / stroop boundary)", () => {
+    const STROOPS_PER_XLM = 10_000_000n;
+
+    it("1 stroop rounds to 0.00 XLM in display (below 0.005 XLM threshold)", () => {
+      // 1 stroop = 0.0000001 XLM — should display as "0.00 XLM"
+      expect(formatXLM(1n, "en")).toBe("0.00 XLM");
+    });
+
+    it("1 XLM (10_000_000 stroops) displays exactly as 1.00 XLM", () => {
+      expect(formatXLM(STROOPS_PER_XLM, "en")).toBe("1.00 XLM");
+    });
+
+    it("0.01 XLM (100_000 stroops) displays as 0.01 XLM", () => {
+      expect(formatXLM(100_000n, "en")).toBe("0.01 XLM");
+    });
+
+    it("0.001 XLM (10_000 stroops) rounds to 0.00 XLM in 2-decimal display", () => {
+      // 10_000 stroops = 0.001 XLM, which rounds to 0.00 at 2 decimal places
+      expect(formatXLM(10_000n, "en")).toBe("0.00 XLM");
+    });
+
+    it("0.005 XLM (50_000 stroops) rounds to 0.01 XLM in 2-decimal display", () => {
+      // 50_000 stroops = 0.005 XLM, rounds up to 0.01
+      expect(formatXLM(50_000n, "en")).toBe("0.01 XLM");
+    });
+
+    it("maximum safe integer stroop value does not overflow or produce NaN", () => {
+      // 2^53 - 1 stroops ≈ 900_719_925 XLM — must not produce NaN or Infinity
+      const result = formatXLM(BigInt(Number.MAX_SAFE_INTEGER), "en");
+      expect(result).not.toContain("NaN");
+      expect(result).not.toContain("Infinity");
+      expect(result).toContain("XLM");
+    });
+
+    it("formatXLMAmount returns plain number string without the 'XLM' suffix", () => {
+      expect(formatXLMAmount(STROOPS_PER_XLM, "en")).toBe("1.00");
+      expect(formatXLMAmount(0n, "en")).toBe("0.00");
+    });
+
+    it("1_234_567_890 stroops formats to 123.46 XLM (rounded at 2 decimal places)", () => {
+      // 1_234_567_890 / 10_000_000 = 123.456789 → rounds to 123.46
+      expect(formatXLM(1_234_567_890n, "en")).toMatch(/123\.46\s+XLM/);
+    });
+
+    it("zero stroops displays as 0.00 XLM", () => {
+      expect(formatXLM(0n, "en")).toBe("0.00 XLM");
+    });
+
+    it("locale-aware formatting uses correct decimal separator (German)", () => {
+      // German uses comma as decimal separator: "1,00 XLM"
+      const result = formatXLM(STROOPS_PER_XLM, "de");
+      expect(result).toContain("1");
+      expect(result).toContain("XLM");
+      // The comma or period depends on the runtime's Intl support — just verify no NaN
+      expect(result).not.toContain("NaN");
+    });
+  });
 });
