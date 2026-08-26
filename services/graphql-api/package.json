@@ -8,6 +8,8 @@
     "dev": "node --loader ts-node/esm src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "docs": "tsx scripts/generate-schema-docs.ts",
+    "docs:generate": "tsx scripts/generate-schema-docs.ts",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

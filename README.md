@@ -108,6 +108,10 @@ Rather than a single transaction refunding all contributors (which would fail at
 
 An optional `PlatformConfig` can be set at initialization with a fee in basis points (e.g. `250` = 2.5%). The fee is deducted from the creator's payout on withdrawal and sent to the platform address.
 
+### Contract Upgrades & State Migration
+
+Contracts support in-place bytecode upgrades via Soroban's `update_current_contract_wasm` host function, preserving contract IDs, escrow balances, and active campaign state across releases. For architectural rationale, trade-offs, and migration procedures, see **[ADR-007: Stellar Contract Upgrade Strategy](./docs/adr/ADR-007-stellar-contract-upgrade-strategy.md)** and the **[Contract Upgrade Guide](./docs/contract-upgrades.md)**.
+
 ---
 
 ## Frontend
@@ -153,6 +157,8 @@ The app uses `@stellar/freighter-api` for wallet connectivity. The `WalletContex
 ---
 
 ## Getting Started
+
+> 💡 **New contributor?** Check out the comprehensive **[Local Development Setup Guide (docs/SETUP.md)](./docs/SETUP.md)** for workspace-by-workspace instructions, contract compilation, microservices startup, and troubleshooting.
 
 ### 1. Clone
 
@@ -324,6 +330,9 @@ We follow [coordinated disclosure](https://en.wikipedia.org/wiki/Coordinated_vul
 
 | Resource | Description |
 |----------|-------------|
+| [docs/INDEX.md](./docs/INDEX.md) | Complete documentation index and architecture catalog |
+| [docs/SETUP.md](./docs/SETUP.md) | Comprehensive monorepo local development setup and troubleshooting guide |
+| [docs/adr/](./docs/adr/README.md) | Architecture Decision Records (including [ADR-007](./docs/adr/ADR-007-stellar-contract-upgrade-strategy.md)) |
 | [docs/api/](./docs/api/README.md) | Full contract API reference — every function, type, event, and error code |
 | [docs/tutorials/](./docs/tutorials/README.md) | Step-by-step guides: getting started, contributing, dashboards, matching, saved searches |
 | [sdks/js/](./sdks/js/README.md) | TypeScript SDK — typed client for all contract operations |
