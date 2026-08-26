@@ -36,7 +36,7 @@ export function Card({
         "bg-white rounded-lg border border-gray-200 shadow-sm",
         hoverable && "hover:shadow-md transition-shadow cursor-pointer",
         paddingClasses[padding],
-        className
+        className,
       )}
       {...props}
     >
@@ -54,7 +54,10 @@ export function CardHeader({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("mb-4 pb-4 border-b border-gray-200", className)} {...props}>
+    <div
+      className={cn("mb-4 pb-4 border-b border-gray-200", className)}
+      {...props}
+    >
       {children}
     </div>
   );
@@ -69,7 +72,7 @@ export function CardBody({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("", className)} {...props}>
+    <div className={cn(className)} {...props}>
       {children}
     </div>
   );
@@ -84,7 +87,10 @@ export function CardFooter({
   ...props
 }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={cn("mt-4 pt-4 border-t border-gray-200", className)} {...props}>
+    <div
+      className={cn("mt-4 pt-4 border-t border-gray-200", className)}
+      {...props}
+    >
       {children}
     </div>
   );

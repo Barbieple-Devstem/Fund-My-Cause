@@ -12,6 +12,12 @@ export {
   clampProgress,
   isProgressFunded,
 } from "./utils/progress";
+export {
+  formatCampaignCard,
+  type CampaignCardData,
+  type FormatCampaignCardOptions,
+  type FormattedCampaignCard,
+} from "./utils/formatCampaignCard";
 export { cn } from "./lib/utils";
 
 // ── Form primitives ────────────────────────────────────────────────────────
@@ -54,4 +60,5 @@ export {
   useTheme,
   type Theme,
   type ThemeProviderProps,
+  type UseThemeReturn,
 } from "./context/ThemeContext";
