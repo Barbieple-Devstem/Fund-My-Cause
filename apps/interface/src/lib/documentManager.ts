@@ -1,3 +1,5 @@
+import { apiClient } from "@/lib/api-client";
+
 export interface CampaignDocument {
   id: string;
   name: string;
@@ -56,16 +58,7 @@ export async function uploadDocument(
   formData.append("file", file);
   formData.append("campaignId", campaignId);
 
-  const response = await fetch("/api/documents/upload", {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new Error("Failed to upload document");
-  }
-
-  return response.json();
+  return apiClient.post<CampaignDocument>("/api/documents/upload", formData);
 }
 
 export function downloadDocument(doc: CampaignDocument): void {

@@ -12,6 +12,12 @@ export {
   clampProgress,
   isProgressFunded,
 } from "./utils/progress";
+export {
+  formatCampaignCard,
+  type CampaignCardData,
+  type FormatCampaignCardOptions,
+  type FormattedCampaignCard,
+} from "./utils/formatCampaignCard";
 export { cn } from "./lib/utils";
 
 // ── Form primitives ────────────────────────────────────────────────────────
@@ -49,9 +55,26 @@ export {
   type CampaignActionsClassNames,
 } from "./CampaignActions";
 
+// ── Loading / skeleton primitives ──────────────────────────────────────────
+export {
+  CampaignDetailSkeleton,
+  type CampaignDetailSkeletonProps,
+} from "./CampaignDetailSkeleton";
+
 export {
   ThemeProvider,
   useTheme,
   type Theme,
   type ThemeProviderProps,
+  type UseThemeReturn,
 } from "./context/ThemeContext";
+
+// ── Error handling ────────────────────────────────────────────────────────────
+export {
+  ErrorBoundary,
+  ErrorFallback,
+  withErrorBoundary,
+  type ErrorBoundaryProps,
+  type ErrorBoundaryLevel,
+  type ErrorFallbackProps,
+} from "./ErrorBoundary";

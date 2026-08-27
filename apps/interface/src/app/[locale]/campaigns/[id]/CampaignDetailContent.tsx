@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-import { Loader2, Copy, Check, ExternalLink } from "lucide-react";
+import { Copy, Check, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
@@ -26,6 +26,7 @@ import { GoalSuccessBadge } from "@/components/ui/GoalSuccessBadge";
 import { ShareModal } from "@/components/ui/ShareModal";
 import { PausedBanner } from "@/components/ui/PausedBanner";
 import { CampaignAnalytics } from "@/components/ui/CampaignAnalytics";
+import { CampaignDetailSkeleton } from "@fund-my-cause/components";
 import { useTranslations } from "next-intl";
 
 function ContractIdRow({ contractId }: { contractId: string }) {
@@ -111,11 +112,7 @@ export function CampaignDetailContent({ contractId }: { contractId: string }) {
   }, [info, stats, address]);
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Loader2 size={32} className="animate-spin text-indigo-400" />
-      </div>
-    );
+    return <CampaignDetailSkeleton />;
   }
 
   if (error || !info || !stats) {
