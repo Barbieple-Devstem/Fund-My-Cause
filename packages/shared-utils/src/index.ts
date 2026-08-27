@@ -3,4 +3,4 @@ export * from "./campaign";
 export * from "./trace";
 export * from "./timestamps";
 export * from "./mappers";
-export * from "./db-config";
+export * from "./auth";

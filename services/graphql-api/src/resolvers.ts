@@ -192,11 +192,48 @@ export const resolvers: IResolvers<any, Context> = {
       return result;
     },
 
-    async activeCampaigns(_, { limit = 20 }, context: Context) {
-      return context.dataLoader.campaignsByStatus.load({
+    async activeCampaigns(_, { first, after, limit = 20 }, context: Context) {
+      const pageSize = first ?? limit ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      const campaigns = await context.dataLoader.campaignsByStatus.load({
         status: "Active",
-        limit,
+        limit: clampedSize + 1,
+        afterSortKey,
+        afterId,
       });
+
+      const hasNextPage = campaigns.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems: Campaign[] = campaigns.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.createdAt,
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
 
     async trendingCampaigns(_, { limit = 10 }, context: Context) {
@@ -244,17 +281,62 @@ export const resolvers: IResolvers<any, Context> = {
       return context.dataLoader.contributions.load(id);
     },
 
-    async contributions(_, { campaignId, contributor }, context: Context) {
+    async contributions(_, { campaignId, contributor, first, after }, context: Context) {
+      const pageSize = first ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      let items: any[] = [];
       if (campaignId) {
-        return context.dataLoader.campaignContributions.load(campaignId);
+        const allContributions = await context.dataLoader.campaignContributions.load(campaignId);
+        items = allContributions || [];
+      } else if (contributor) {
+        const allContributions = await context.dataLoader.userContributions.load(contributor);
+        items = allContributions || [];
+      } else {
+        throw new GraphQLError(
+          "Either campaignId or contributor must be provided",
+        );
       }
 
-      if (contributor) {
-        return context.dataLoader.userContributions.load(contributor);
+      // Filter by afterSortKey if provided
+      let filteredItems = items;
+      if (afterSortKey && afterId) {
+        const afterIndex = items.findIndex((c) => c.id === afterId);
+        if (afterIndex !== -1) {
+          filteredItems = items.slice(afterIndex + 1);
+        }
       }
 
-      throw new GraphQLError(
-        "Either campaignId or contributor must be provided",
+      const hasNextPage = filteredItems.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems = filteredItems.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.timestamp || new Date().toISOString(),
+        hasNextPage,
+        hasPreviousPage,
       );
     },
 
@@ -328,12 +410,98 @@ export const resolvers: IResolvers<any, Context> = {
 
   // User field resolvers
   User: {
-    async campaigns(user, _, context: Context) {
-      return context.dataLoader.userCampaigns.load(user.address);
+    async campaigns(user, { first, after }, context: Context) {
+      const pageSize = first ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      const allCampaigns = await context.dataLoader.userCampaigns.load(user.address);
+      let items = allCampaigns || [];
+
+      if (afterSortKey && afterId) {
+        const afterIndex = items.findIndex((c) => c.id === afterId);
+        if (afterIndex !== -1) {
+          items = items.slice(afterIndex + 1);
+        }
+      }
+
+      const hasNextPage = items.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems = items.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.createdAt,
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
 
-    async contributions(user, _, context: Context) {
-      return context.dataLoader.userContributions.load(user.address);
+    async contributions(user, { first, after }, context: Context) {
+      const pageSize = first ?? 20;
+      const clampedSize = Math.max(1, Math.min(pageSize, 100));
+
+      let afterSortKey: string | undefined;
+      let afterId: string | undefined;
+      if (after) {
+        try {
+          const decoded = decodeCursor(after);
+          afterSortKey = decoded.sortKey;
+          afterId = decoded.id;
+        } catch (err) {
+          if (err instanceof CursorError) {
+            throw new GraphQLError(
+              `Invalid pagination cursor: ${err.message}`,
+              {
+                extensions: { code: "BAD_USER_INPUT" },
+              },
+            );
+          }
+          throw err;
+        }
+      }
+
+      const allContributions = await context.dataLoader.userContributions.load(user.address);
+      let items = allContributions || [];
+
+      if (afterSortKey && afterId) {
+        const afterIndex = items.findIndex((c) => c.id === afterId);
+        if (afterIndex !== -1) {
+          items = items.slice(afterIndex + 1);
+        }
+      }
+
+      const hasNextPage = items.length > clampedSize;
+      const hasPreviousPage = !!after;
+      const pageItems = items.slice(0, clampedSize);
+
+      return buildPage(
+        pageItems,
+        (c) => c.id,
+        (c) => c.timestamp || new Date().toISOString(),
+        hasNextPage,
+        hasPreviousPage,
+      );
     },
   },
 
