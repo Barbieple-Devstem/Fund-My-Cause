@@ -1,7 +1,7 @@
 import type pino from "pino";
-import type { IndexerEvent } from "../rpc-client.js";
-import type { EventRepository } from "../repository.js";
-import type { EventHandler } from "./types.js";
+import type { IndexerEvent } from "../../rpc-client.js";
+import type { EventRepository } from "../../repository.js";
+import type { EventHandler } from "../types.js";
 
 /**
  * Handles campaign lifecycle events emitted by the crowdfund contract.
@@ -14,9 +14,13 @@ import type { EventHandler } from "./types.js";
  * This handler persists campaign events to the repository and emits
  * domain-specific log entries so operators can monitor campaign creation
  * activity without tailing raw event logs.
+ *
+ * Part of the `crowdfund` contract-type module (#1125) — see
+ * `services/indexer/src/handlers/index.ts` for the full module layout.
  */
 export class CampaignHandler implements EventHandler {
   readonly eventType = "campaign";
+  readonly contractType = "crowdfund" as const;
 
   private readonly logger: pino.Logger;
 

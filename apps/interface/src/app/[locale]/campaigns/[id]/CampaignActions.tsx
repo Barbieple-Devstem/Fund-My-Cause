@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { PledgeModal } from "@/components/ui/PledgeModal";
+import { LazyPledgeModal as PledgeModal } from "@/lib/lazy-components";
 import { TransactionStatus } from "@/components/ui/TransactionStatus";
 import type { CampaignStatus } from "@fund-my-cause/types";
 import { useCampaignActions } from "./useCampaignActions";

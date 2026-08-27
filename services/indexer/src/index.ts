@@ -10,20 +10,36 @@ import {
   CampaignHandler,
   DonationHandler,
   AchievementHandler,
+  RegisteredHandler,
   EventDispatcher,
 } from "./handlers/index.js";
+import type { EventHandler } from "./handlers/index.js";
 import type { EventRepository } from "./repository.js";
 import { loadStoreConfig } from "./store-config.js";
+import { loadDbPoolConfig } from "@fund-my-cause/shared-utils";
 
 // Environment variables
 const PORT = parseInt(process.env.PORT ?? "3001", 10);
 const RPC_URL =
   process.env.SOROBAN_RPC_URL ?? "https://soroban-testnet.stellar.org:443";
 const CONTRACT_ID = process.env.CROWDFUND_CONTRACT_ID ?? "";
+// Registry contract ID (#1125) — optional. When set, the RPC client also
+// subscribes to registry contract events (routed to handlers/registry/*).
+const REGISTRY_CONTRACT_ID = process.env.REGISTRY_CONTRACT_ID ?? "";
+const CONTRACT_IDS = [CONTRACT_ID, REGISTRY_CONTRACT_ID].filter(
+  (id): id is string => id.length > 0,
+);
 const LOG_LEVEL = process.env.LOG_LEVEL ?? "info";
 
 // Resolve store / RPC capacity configuration from environment (#902)
 const storeConfig = loadStoreConfig();
+
+// Resolve the shared DB pool config (#1128). Not yet backing a live
+// connection — this service stores events in-memory (see
+// README.md#connection-pool-configuration) — but resolved and logged at
+// startup ahead of a real persistence layer landing. See
+// docs/db-pool-conventions.md.
+const dbPoolConfig = loadDbPoolConfig();
 
 // Logger
 const logger = pino({ level: LOG_LEVEL });
@@ -33,7 +49,7 @@ const app: Express = express();
 
 // Global state
 const rpcClient = new SorobanRPCClient(
-  { url: RPC_URL, contractId: CONTRACT_ID },
+  { url: RPC_URL, contractId: CONTRACT_ID, contractIds: CONTRACT_IDS },
   logger,
 );
 const healthChecker = new HealthChecker(logger);
@@ -47,6 +63,24 @@ const eventRepository: EventRepository = new EventStoreRepository(
   logger,
 );
 
+// Apply store migrations (#894, #1127) before ingestion starts so
+// queryByContract/queryByType/queryByContractAndType use the O(k) secondary
+// indexes from the first event onward instead of falling back to a linear
+// scan for the lifetime of the process.
+runMigrations(eventStore, "up", logger);
+
+// Build the dispatcher once at startup, registering one handler per
+// (contractType, eventType) pair (#896, modularized by contract type in
+// #1125). Unknown event types fall back to `eventRepository` directly so no
+// event is ever lost.
+const handlers: EventHandler[] = [
+  new CampaignHandler(logger),
+  new DonationHandler(logger),
+  new AchievementHandler(logger),
+  new RegisteredHandler(logger),
+];
+const dispatcher = new EventDispatcher(handlers, eventRepository, logger);
+
 let isRunning = false;
 
 /**
@@ -54,10 +88,11 @@ let isRunning = false;
  */
 async function startIndexer(): Promise<void> {
   logger.info(
-    { rpc: RPC_URL, contract: CONTRACT_ID },
+    { rpc: RPC_URL, contract: CONTRACT_ID, contractIds: CONTRACT_IDS },
     "Starting indexer service",
   );
   logger.info({ storeConfig }, "Effective store configuration");
+  logger.info({ dbPoolConfig }, "Effective DB pool configuration (#1128)");
 
   // Connect to RPC
   const connected = await rpcClient.connect();

@@ -18,6 +18,9 @@ import React, {
   type ComponentType,
 } from "react";
 import { AlertCircle, RefreshCw, WifiOff, Lock } from "lucide-react";
+import { cn } from "./lib/utils";
+
+export type ErrorBoundaryLevel = "page" | "section" | "component";
 
 // ── Public prop types ────────────────────────────────────────────────────────
 
@@ -25,7 +28,7 @@ export interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: (error: Error, reset: () => void) => ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  level?: "page" | "section" | "component";
+  level?: ErrorBoundaryLevel;
 }
 
 // ── Internal class boundary (never exported) ─────────────────────────────────
@@ -46,6 +49,12 @@ interface ClassBoundaryProps extends ErrorBoundaryProps {
  * @internal
  * The class boundary contains the only React-required class component.
  * Nothing outside this file should ever import it.
+ *
+ * Shared error boundary for catching render errors in a subtree.
+ * @example
+ * <ErrorBoundary level="section">
+ *   <SomeComponent />
+ * </ErrorBoundary>
  */
 class ClassErrorBoundary extends React.Component<
   ClassBoundaryProps,
@@ -89,7 +98,7 @@ class ClassErrorBoundary extends React.Component<
       }
 
       return (
-        <DefaultErrorFallback
+        <ErrorFallback
           error={this.state.error}
           reset={this.props.onReset}
           level={this.props.level}
@@ -154,28 +163,36 @@ export function withErrorBoundary<P extends object>(
   return WithErrorBoundary;
 }
 
-// ── Default fallback UI ──────────────────────────────────────────────────────
+// ── Public fallback UI ───────────────────────────────────────────────────────
 
-interface DefaultErrorFallbackProps {
+export interface ErrorFallbackProps {
   error: Error;
   reset: () => void;
-  level?: "page" | "section" | "component";
+  level?: ErrorBoundaryLevel;
 }
 
-function DefaultErrorFallback({
+/**
+ * Presentational fallback UI shared by `ErrorBoundary` and by route-level
+ * `error.tsx` files (Next's own error boundaries take the same
+ * `{ error, reset }` shape), so every crash surface in the app renders the
+ * same look with the same retry affordance.
+ */
+export function ErrorFallback({
   error,
   reset,
   level = "component",
-}: DefaultErrorFallbackProps) {
+}: ErrorFallbackProps) {
   const { icon, title, description } = getErrorMeta(error);
 
-  const containerClasses = {
+  const containerClasses: Record<ErrorBoundaryLevel, string> = {
     page: "min-h-screen flex items-center justify-center p-4",
-    section: "p-6 rounded-lg border border-red-200 bg-red-50",
-    component: "p-4 rounded border border-red-200 bg-red-50",
+    section:
+      "p-6 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30",
+    component:
+      "p-4 rounded border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30",
   };
 
-  const titleClasses = {
+  const titleClasses: Record<ErrorBoundaryLevel, string> = {
     page: "text-3xl",
     section: "text-xl",
     component: "text-lg",
@@ -188,21 +205,24 @@ function DefaultErrorFallback({
           {icon}
           <div className="flex-1">
             <h2
-              className={`font-semibold text-red-900 ${titleClasses[level]}`}
+              className={cn(
+                "font-semibold text-red-900 dark:text-red-200",
+                titleClasses[level],
+              )}
             >
               {title}
             </h2>
-            <p className="text-sm text-red-700 mt-2">
+            <p className="text-sm text-red-700 dark:text-red-300 mt-2">
               {process.env.NODE_ENV === "development"
                 ? error.message
                 : description}
             </p>
             {process.env.NODE_ENV === "development" && (
-              <details className="mt-3 text-xs text-red-600">
+              <details className="mt-3 text-xs text-red-600 dark:text-red-400">
                 <summary className="cursor-pointer font-mono">
                   Error details
                 </summary>
-                <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto max-h-40">
+                <pre className="mt-2 p-2 bg-red-100 dark:bg-red-900/40 rounded overflow-auto max-h-40">
                   {error.stack}
                 </pre>
               </details>
