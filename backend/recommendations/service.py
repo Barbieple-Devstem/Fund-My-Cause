@@ -74,6 +74,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from scoring_config import SCORING_CONFIG
+from error_schema import bad_request, internal_error
 
 # ---------------------------------------------------------------------------
 # Shared DB pool config (#1128) — see backend/shared/db_config.py. Neither
@@ -326,6 +327,12 @@ def get_recommendations(
       by category affinity and exclude campaigns already contributed to.
     - Cold-start (unknown wallet or no wallet) returns the top trending campaigns.
     - Results are cached per (wallet, limit) key for CACHE_TTL_SECONDS.
+
+    Success response (200):
+        { wallet, personalised, recommendations, cached_at }
+
+    Error responses follow the standard error envelope from error_schema.py:
+        { "error": { "code": "...", "message": "...", "detail": "..." } }
     """
     cache_key = f"{wallet}:{limit}"
     cached = _cache_get(cache_key)
@@ -333,9 +340,22 @@ def get_recommendations(
         log.debug("recommendations_cache_hit", wallet=wallet, limit=limit)
         return JSONResponse(content=cached, headers={"X-Cache": "HIT"})
 
-    log.info("recommendations_requested", wallet=wallet, limit=limit, personalised=wallet in _ACTIVITY if wallet else False)
+    log.info(
+        "recommendations_requested",
+        wallet=wallet,
+        limit=limit,
+        personalised=wallet in _ACTIVITY if wallet else False,
+    )
 
-    recommendations = _recommend(wallet, limit)
+    try:
+        recommendations = _recommend(wallet, limit)
+    except Exception as exc:
+        log.error("recommendations_scoring_failed", wallet=wallet, limit=limit, error=str(exc))
+        return internal_error(
+            "Failed to compute recommendations",
+            detail=str(exc) if __import__("os").getenv("LOG_FORMAT") != "json" else None,
+        )
+
     payload = {
         "wallet": wallet,
         "personalised": wallet is not None and wallet in _ACTIVITY,

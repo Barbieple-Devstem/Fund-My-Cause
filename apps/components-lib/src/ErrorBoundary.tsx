@@ -1,10 +1,28 @@
 "use client";
 
-import React, { ReactNode, Component, ErrorInfo, ComponentType } from "react";
+/**
+ * ErrorBoundary — function-component public API backed by a class boundary.
+ *
+ * React error boundaries require getDerivedStateFromError / componentDidCatch,
+ * which are class-only lifecycle methods. The class is kept as a private
+ * implementation detail; callers import only the exported function components.
+ *
+ * Closes #1121
+ */
+
+import React, {
+  useState,
+  useCallback,
+  type ReactNode,
+  type ErrorInfo,
+  type ComponentType,
+} from "react";
 import { AlertCircle, RefreshCw, WifiOff, Lock } from "lucide-react";
 import { cn } from "./lib/utils";
 
 export type ErrorBoundaryLevel = "page" | "section" | "component";
+
+// ── Public prop types ────────────────────────────────────────────────────────
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -13,28 +31,41 @@ export interface ErrorBoundaryProps {
   level?: ErrorBoundaryLevel;
 }
 
-interface ErrorBoundaryState {
+// ── Internal class boundary (never exported) ─────────────────────────────────
+
+interface ClassBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
 
+interface ClassBoundaryProps extends ErrorBoundaryProps {
+  /** Incrementing this prop resets the boundary without unmounting the tree. */
+  resetKey: number;
+  /** Stable callback injected from the function-component wrapper. */
+  onReset: () => void;
+}
+
 /**
+ * @internal
+ * The class boundary contains the only React-required class component.
+ * Nothing outside this file should ever import it.
+ *
  * Shared error boundary for catching render errors in a subtree.
  * @example
  * <ErrorBoundary level="section">
  *   <SomeComponent />
  * </ErrorBoundary>
  */
-export class ErrorBoundary extends Component<
-  ErrorBoundaryProps,
-  ErrorBoundaryState
+class ClassErrorBoundary extends React.Component<
+  ClassBoundaryProps,
+  ClassBoundaryState
 > {
-  constructor(props: ErrorBoundaryProps) {
+  constructor(props: ClassBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  static getDerivedStateFromError(error: Error): ClassBoundaryState {
     return { hasError: true, error };
   }
 
@@ -50,20 +81,26 @@ export class ErrorBoundary extends Component<
     }
   }
 
-  reset = () => {
-    this.setState({ hasError: false, error: null });
-  };
+  /** Sync boundary state with the resetKey prop driven from the parent. */
+  componentDidUpdate(prevProps: ClassBoundaryProps) {
+    if (
+      prevProps.resetKey !== this.props.resetKey &&
+      this.state.hasError
+    ) {
+      this.setState({ hasError: false, error: null });
+    }
+  }
 
   render() {
     if (this.state.hasError && this.state.error) {
       if (this.props.fallback) {
-        return this.props.fallback(this.state.error, this.reset);
+        return this.props.fallback(this.state.error, this.props.onReset);
       }
 
       return (
         <ErrorFallback
           error={this.state.error}
-          reset={this.reset}
+          reset={this.props.onReset}
           level={this.props.level}
         />
       );
@@ -72,6 +109,61 @@ export class ErrorBoundary extends Component<
     return this.props.children;
   }
 }
+
+// ── Public function component ────────────────────────────────────────────────
+
+/**
+ * Drop-in error boundary with hooks-friendly API.
+ *
+ * @example
+ * <ErrorBoundary level="section">
+ *   <SomeComponent />
+ * </ErrorBoundary>
+ */
+export function ErrorBoundary({
+  children,
+  fallback,
+  onError,
+  level,
+}: ErrorBoundaryProps): React.ReactElement {
+  const [resetKey, setResetKey] = useState(0);
+  const reset = useCallback(() => setResetKey((k) => k + 1), []);
+
+  return (
+    <ClassErrorBoundary
+      resetKey={resetKey}
+      onReset={reset}
+      fallback={fallback}
+      onError={onError}
+      level={level}
+    >
+      {children}
+    </ClassErrorBoundary>
+  );
+}
+
+// ── withErrorBoundary HOC ────────────────────────────────────────────────────
+
+export function withErrorBoundary<P extends object>(
+  WrappedComponent: ComponentType<P>,
+  boundaryProps?: Omit<ErrorBoundaryProps, "children">,
+) {
+  const displayName =
+    WrappedComponent.displayName ?? WrappedComponent.name ?? "Component";
+
+  function WithErrorBoundary(props: P) {
+    return (
+      <ErrorBoundary {...boundaryProps}>
+        <WrappedComponent {...props} />
+      </ErrorBoundary>
+    );
+  }
+
+  WithErrorBoundary.displayName = `withErrorBoundary(${displayName})`;
+  return WithErrorBoundary;
+}
+
+// ── Public fallback UI ───────────────────────────────────────────────────────
 
 export interface ErrorFallbackProps {
   error: Error;
@@ -149,26 +241,7 @@ export function ErrorFallback({
   );
 }
 
-// ── withErrorBoundary HOC ─────────────────────────────────────────────────────
-
-export function withErrorBoundary<P extends object>(
-  WrappedComponent: ComponentType<P>,
-  boundaryProps?: Omit<ErrorBoundaryProps, "children">,
-) {
-  const displayName =
-    WrappedComponent.displayName ?? WrappedComponent.name ?? "Component";
-  function WithErrorBoundary(props: P) {
-    return (
-      <ErrorBoundary {...boundaryProps}>
-        <WrappedComponent {...props} />
-      </ErrorBoundary>
-    );
-  }
-  WithErrorBoundary.displayName = `withErrorBoundary(${displayName})`;
-  return WithErrorBoundary;
-}
-
-// ── Typed error messages ──────────────────────────────────────────────────────
+// ── Typed error metadata ─────────────────────────────────────────────────────
 
 function getErrorMeta(error: Error): {
   icon: ReactNode;
@@ -176,6 +249,7 @@ function getErrorMeta(error: Error): {
   description: string;
 } {
   const msg = error.message.toLowerCase();
+
   if (
     msg.includes("network") ||
     msg.includes("fetch") ||
@@ -189,17 +263,21 @@ function getErrorMeta(error: Error): {
       description: "Check your internet connection and try again.",
     };
   }
+
   if (
     msg.includes("unauthorized") ||
     msg.includes("403") ||
     msg.includes("401")
   ) {
     return {
-      icon: <Lock className="w-6 h-6 text-orange-500 flex-shrink-0 mt-0.5" />,
+      icon: (
+        <Lock className="w-6 h-6 text-orange-500 flex-shrink-0 mt-0.5" />
+      ),
       title: "Access denied",
       description: "You don't have permission to view this content.",
     };
   }
+
   if (msg.includes("not found") || msg.includes("404")) {
     return {
       icon: (
@@ -209,12 +287,17 @@ function getErrorMeta(error: Error): {
       description: "The requested resource could not be found.",
     };
   }
+
   return {
-    icon: <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />,
+    icon: (
+      <AlertCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" />
+    ),
     title: "Something went wrong",
     description: "An unexpected error occurred. Please try again.",
   };
 }
+
+// ── Extend window interface for error logger ─────────────────────────────────
 
 declare global {
   interface Window {
