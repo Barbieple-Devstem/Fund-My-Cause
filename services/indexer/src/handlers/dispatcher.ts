@@ -2,7 +2,6 @@ import type pino from "pino";
 import type { IndexerEvent } from "../rpc-client.js";
 import type { EventRepository } from "../repository.js";
 import type { EventHandler } from "./types.js";
-import { DonationHandler } from "./donation.handler.js";
 
 /**
  * EventDispatcher receives a mixed batch of events, groups them by type,

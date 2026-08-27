@@ -61,7 +61,9 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import re
+import sys
 import time
 from dataclasses import dataclass, field
 from typing import Callable, Optional
@@ -72,6 +74,15 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from scoring_config import SCORING_CONFIG
+
+# ---------------------------------------------------------------------------
+# Shared DB pool config (#1128) — see backend/shared/db_config.py. Neither
+# service in this repo is packaged as an installable Python package, so we
+# add the sibling `backend/shared/` directory to sys.path rather than
+# duplicating the config module per service.
+# ---------------------------------------------------------------------------
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
+from db_config import load_db_pool_config  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Structured logging — same configuration as fraud_detection/pipeline.py
@@ -97,6 +108,13 @@ structlog.configure(
 )
 
 log: structlog.BoundLogger = structlog.get_logger("recommendations")
+
+# Effective DB pool configuration (#1128). Not yet backing a live connection
+# pool — this service stores data in-memory (see module docstring) — but
+# resolved and logged at startup so the single shared source of truth is
+# visible in this service's logs ahead of a real persistence layer landing.
+DB_POOL_CONFIG = load_db_pool_config()
+log.info("db_pool_config_resolved", **DB_POOL_CONFIG.__dict__)
 
 # ---------------------------------------------------------------------------
 # Trace-ID convention (mirrors fraud_detection/pipeline.py)
@@ -280,6 +298,20 @@ app.add_middleware(TraceIDMiddleware)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {"status": "ok", "timestamp": time.time()}
+
+
+@app.get("/readyz")
+def readyz() -> dict:
+    return {
+        "ready": True,
+        "checks": {"service": "ready"},
+        "timestamp": time.time(),
+    }
 
 
 @app.get("/recommendations")

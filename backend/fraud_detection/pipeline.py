@@ -92,7 +92,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
+import sys
 import time
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -105,6 +107,17 @@ from fastapi import FastAPI, BackgroundTasks, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+from shared_math_utils import jaccard_similarity
+
+# ---------------------------------------------------------------------------
+# Shared DB pool config (#1128) — see backend/shared/db_config.py. Neither
+# service in this repo is packaged as an installable Python package, so we
+# add the sibling `backend/shared/` directory to sys.path rather than
+# duplicating the config module per service.
+# ---------------------------------------------------------------------------
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
+from db_config import load_db_pool_config  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Logging — structlog configured for JSON output in production,
@@ -130,6 +143,13 @@ structlog.configure(
 )
 
 log: structlog.BoundLogger = structlog.get_logger("fraud_detection")
+
+# Effective DB pool configuration (#1128). Not yet backing a live connection
+# pool — this service stores data in-memory (see module docstring) — but
+# resolved and logged at startup so the single shared source of truth is
+# visible in this service's logs ahead of a real persistence layer landing.
+DB_POOL_CONFIG = load_db_pool_config()
+log.info("db_pool_config_resolved", **DB_POOL_CONFIG.__dict__)
 
 # ---------------------------------------------------------------------------
 # Trace-ID convention
@@ -301,14 +321,6 @@ _CAMPAIGN_RECORDS: list[CampaignRecord] = []
 # Heuristic implementations
 # ---------------------------------------------------------------------------
 
-def _jaccard(a: str, b: str) -> float:
-    """Token-level Jaccard similarity between two strings."""
-    sa = set(a.lower().split())
-    sb = set(b.lower().split())
-    if not sa and not sb:
-        return 1.0
-    return len(sa & sb) / len(sa | sb)
-
 
 def scan_wash_contributions() -> list[Flag]:
     """
@@ -393,7 +405,7 @@ def scan_duplicate_content() -> list[Flag]:
     for i in range(len(records)):
         for j in range(i + 1, len(records)):
             a, b = records[i], records[j]
-            sim = _jaccard(a.title, b.title)
+            sim = jaccard_similarity(a.title, b.title)
             if sim >= DUPLICATE_JACCARD_THRESHOLD:
                 flags.append(Flag(
                     id=_next_flag_id(),
@@ -594,6 +606,20 @@ app.add_middleware(TraceIDMiddleware)
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
+
+
+@app.get("/healthz")
+def healthz() -> dict:
+    return {"status": "ok", "timestamp": time.time()}
+
+
+@app.get("/readyz")
+def readyz() -> dict:
+    return {
+        "ready": True,
+        "checks": {"service": "ready", "queue": "ok"},
+        "timestamp": time.time(),
+    }
 
 
 @app.post("/contributions")

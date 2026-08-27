@@ -2,12 +2,15 @@
 
 import React, { ReactNode, Component, ErrorInfo, ComponentType } from "react";
 import { AlertCircle, RefreshCw, WifiOff, Lock } from "lucide-react";
+import { cn } from "./lib/utils";
+
+export type ErrorBoundaryLevel = "page" | "section" | "component";
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
   fallback?: (error: Error, reset: () => void) => ReactNode;
   onError?: (error: Error, errorInfo: ErrorInfo) => void;
-  level?: "page" | "section" | "component";
+  level?: ErrorBoundaryLevel;
 }
 
 interface ErrorBoundaryState {
@@ -16,7 +19,7 @@ interface ErrorBoundaryState {
 }
 
 /**
- * Error boundary component for catching React errors
+ * Shared error boundary for catching render errors in a subtree.
  * @example
  * <ErrorBoundary level="section">
  *   <SomeComponent />
@@ -36,15 +39,12 @@ export class ErrorBoundary extends Component<
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in development
     if (process.env.NODE_ENV === "development") {
       console.error("Error caught by boundary:", error, errorInfo);
     }
 
-    // Call optional error handler
     this.props.onError?.(error, errorInfo);
 
-    // Log to error tracking service (e.g., Sentry)
     if (typeof window !== "undefined" && window.__errorLogger) {
       window.__errorLogger(error, errorInfo);
     }
@@ -61,7 +61,7 @@ export class ErrorBoundary extends Component<
       }
 
       return (
-        <DefaultErrorFallback
+        <ErrorFallback
           error={this.state.error}
           reset={this.reset}
           level={this.props.level}
@@ -73,29 +73,34 @@ export class ErrorBoundary extends Component<
   }
 }
 
-interface DefaultErrorFallbackProps {
+export interface ErrorFallbackProps {
   error: Error;
   reset: () => void;
-  level?: "page" | "section" | "component";
+  level?: ErrorBoundaryLevel;
 }
 
 /**
- * Default error fallback UI
+ * Presentational fallback UI shared by `ErrorBoundary` and by route-level
+ * `error.tsx` files (Next's own error boundaries take the same
+ * `{ error, reset }` shape), so every crash surface in the app renders the
+ * same look with the same retry affordance.
  */
-function DefaultErrorFallback({
+export function ErrorFallback({
   error,
   reset,
   level = "component",
-}: DefaultErrorFallbackProps) {
+}: ErrorFallbackProps) {
   const { icon, title, description } = getErrorMeta(error);
 
-  const containerClasses = {
+  const containerClasses: Record<ErrorBoundaryLevel, string> = {
     page: "min-h-screen flex items-center justify-center p-4",
-    section: "p-6 rounded-lg border border-red-200 bg-red-50",
-    component: "p-4 rounded border border-red-200 bg-red-50",
+    section:
+      "p-6 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30",
+    component:
+      "p-4 rounded border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30",
   };
 
-  const titleClasses = {
+  const titleClasses: Record<ErrorBoundaryLevel, string> = {
     page: "text-3xl",
     section: "text-xl",
     component: "text-lg",
@@ -107,20 +112,25 @@ function DefaultErrorFallback({
         <div className="flex items-start gap-3">
           {icon}
           <div className="flex-1">
-            <h2 className={`font-semibold text-red-900 ${titleClasses[level]}`}>
+            <h2
+              className={cn(
+                "font-semibold text-red-900 dark:text-red-200",
+                titleClasses[level],
+              )}
+            >
               {title}
             </h2>
-            <p className="text-sm text-red-700 mt-2">
+            <p className="text-sm text-red-700 dark:text-red-300 mt-2">
               {process.env.NODE_ENV === "development"
                 ? error.message
                 : description}
             </p>
             {process.env.NODE_ENV === "development" && (
-              <details className="mt-3 text-xs text-red-600">
+              <details className="mt-3 text-xs text-red-600 dark:text-red-400">
                 <summary className="cursor-pointer font-mono">
                   Error details
                 </summary>
-                <pre className="mt-2 p-2 bg-red-100 rounded overflow-auto max-h-40">
+                <pre className="mt-2 p-2 bg-red-100 dark:bg-red-900/40 rounded overflow-auto max-h-40">
                   {error.stack}
                 </pre>
               </details>
@@ -206,7 +216,6 @@ function getErrorMeta(error: Error): {
   };
 }
 
-// Extend window interface for error logger
 declare global {
   interface Window {
     __errorLogger?: (error: Error, errorInfo: ErrorInfo) => void;

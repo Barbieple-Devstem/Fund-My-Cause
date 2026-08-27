@@ -196,12 +196,27 @@ describe("FormField snapshots", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Card — padding sizes, hoverable, composed sub-components
+// Card — variant API, hoverable, composed sub-components
 // ---------------------------------------------------------------------------
 
 describe("Card snapshots", () => {
-  it("renders default card", () => {
+  it("renders default card (no variant)", () => {
     const { container } = render(<Card>Simple content</Card>);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it("renders default variant explicitly", () => {
+    const { container } = render(<Card variant="default">Default</Card>);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it("renders compact variant", () => {
+    const { container } = render(<Card variant="compact">Compact</Card>);
+    expect(container.firstChild).toMatchSnapshot();
+  });
+
+  it("renders highlighted variant", () => {
+    const { container } = render(<Card variant="highlighted">Highlighted</Card>);
     expect(container.firstChild).toMatchSnapshot();
   });
 
@@ -210,13 +225,13 @@ describe("Card snapshots", () => {
     expect(container.firstChild).toMatchSnapshot();
   });
 
-  it("renders card with sm padding", () => {
-    const { container } = render(<Card padding="sm">Compact</Card>);
+  it("renders card with legacy padding='sm' (backwards compat)", () => {
+    const { container } = render(<Card padding="sm">Compact (legacy)</Card>);
     expect(container.firstChild).toMatchSnapshot();
   });
 
-  it("renders card with lg padding", () => {
-    const { container } = render(<Card padding="lg">Spacious</Card>);
+  it("renders card with legacy padding='lg' (backwards compat)", () => {
+    const { container } = render(<Card padding="lg">Spacious (legacy)</Card>);
     expect(container.firstChild).toMatchSnapshot();
   });
 
