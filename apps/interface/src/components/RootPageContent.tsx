@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ErrorBoundary } from "@fund-my-cause/components";
 import { ErrorSimulator } from "@/components/ErrorSimulator";
 
 interface RootPageContentProps {

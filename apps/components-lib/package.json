@@ -57,6 +57,10 @@
     "./examples": {
       "import": "./src/examples/index.ts",
       "types": "./src/examples/index.ts"
+    },
+    "./error-boundary": {
+      "import": "./src/ErrorBoundary.entry.ts",
+      "types": "./src/ErrorBoundary.entry.ts"
     }
   },
   "scripts": {
