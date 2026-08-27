@@ -12,9 +12,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import pino from "pino";
 import { EventDispatcher } from "./dispatcher.js";
-import { CampaignHandler } from "./campaign.handler.js";
-import { DonationHandler } from "./donation.handler.js";
-import { AchievementHandler } from "./achievement.handler.js";
+import { CampaignHandler } from "./crowdfund/campaign.handler.js";
+import { DonationHandler } from "./crowdfund/donation.handler.js";
+import { AchievementHandler } from "./crowdfund/achievement.handler.js";
 import type { EventHandler } from "./types.js";
 import type { EventRepository } from "../repository.js";
 import type { IndexerEvent } from "../rpc-client.js";

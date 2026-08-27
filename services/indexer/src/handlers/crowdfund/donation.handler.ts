@@ -1,7 +1,7 @@
 import type pino from "pino";
-import type { IndexerEvent } from "../rpc-client.js";
-import type { EventRepository } from "../repository.js";
-import type { EventHandler } from "./types.js";
+import type { IndexerEvent } from "../../rpc-client.js";
+import type { EventRepository } from "../../repository.js";
+import type { EventHandler } from "../types.js";
 
 /**
  * Handles donation/contribution events emitted by the crowdfund contract.
@@ -14,9 +14,13 @@ import type { EventHandler } from "./types.js";
  *
  * Each event carries the contributor address, the amount pledged in stroops,
  * and a running total_raised figure for the campaign.
+ *
+ * Part of the `crowdfund` contract-type module (#1125) — see
+ * `services/indexer/src/handlers/index.ts` for the full module layout.
  */
 export class DonationHandler implements EventHandler {
   readonly eventType = "donation";
+  readonly contractType = "crowdfund" as const;
 
   /**
    * Backward-compatibility alias: the Soroban contract originally emitted

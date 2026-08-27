@@ -92,7 +92,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import re
+import sys
 import time
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
@@ -105,6 +107,15 @@ from fastapi import FastAPI, BackgroundTasks, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+# ---------------------------------------------------------------------------
+# Shared DB pool config (#1128) — see backend/shared/db_config.py. Neither
+# service in this repo is packaged as an installable Python package, so we
+# add the sibling `backend/shared/` directory to sys.path rather than
+# duplicating the config module per service.
+# ---------------------------------------------------------------------------
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shared"))
+from db_config import load_db_pool_config  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Logging — structlog configured for JSON output in production,
@@ -130,6 +141,13 @@ structlog.configure(
 )
 
 log: structlog.BoundLogger = structlog.get_logger("fraud_detection")
+
+# Effective DB pool configuration (#1128). Not yet backing a live connection
+# pool — this service stores data in-memory (see module docstring) — but
+# resolved and logged at startup so the single shared source of truth is
+# visible in this service's logs ahead of a real persistence layer landing.
+DB_POOL_CONFIG = load_db_pool_config()
+log.info("db_pool_config_resolved", **DB_POOL_CONFIG.__dict__)
 
 # ---------------------------------------------------------------------------
 # Trace-ID convention
