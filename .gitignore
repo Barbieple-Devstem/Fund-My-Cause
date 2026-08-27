@@ -17,4 +17,4 @@ contracts/achievements/test_snapshots/
 contracts/crowdfund/test_snapshots/
 contracts/registry/test_snapshots/
 .claude/worktrees/
-**/test_snapshots/
+**/test_snapshots/coverage/

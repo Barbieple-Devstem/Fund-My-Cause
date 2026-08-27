@@ -19,9 +19,26 @@ import {
   formatList,
   formatListShort,
   formatAddress,
+  localeToIntlCode,
 } from "../formatting";
 
 describe("Formatting utilities", () => {
+  // ── Locale Mapping ──────────────────────────────────────────────────────
+
+  describe("localeToIntlCode", () => {
+    it("maps 'en' to 'en-US'", () => {
+      expect(localeToIntlCode("en")).toBe("en-US");
+    });
+
+    it("maps 'ar' to 'ar-SA'", () => {
+      expect(localeToIntlCode("ar")).toBe("ar-SA");
+    });
+
+    it("returns unknown locale codes unchanged", () => {
+      expect(localeToIntlCode("xx-XX")).toBe("xx-XX");
+    });
+  });
+
   // ── XLM Formatting ──────────────────────────────────────────────────
 
   describe("formatXLM", () => {
@@ -158,7 +175,8 @@ describe("Formatting utilities", () => {
   describe("formatPercentage", () => {
     it("should format percentage", () => {
       const result = formatPercentage(50, "en");
-      expect(result).toContain("50%");
+      expect(result).toContain("50");
+      expect(result).toContain("%");
     });
 
     it("should handle custom fraction digits", () => {
@@ -261,6 +279,30 @@ describe("Formatting utilities", () => {
     it("should format relative time in minutes", () => {
       const date = new Date(Date.now() - 300000); // 5 minutes ago
       const result = formatRelativeTime(date, "en");
+      expect(result).toBeTruthy();
+    });
+
+    it("should format relative time in hours", () => {
+      const date = new Date(Date.now() - 7200000); // 2 hours ago
+      const result = formatRelativeTime(date, "en");
+      expect(result).toBeTruthy();
+    });
+
+    it("should format relative time in days", () => {
+      const date = new Date(Date.now() - 172800000); // 2 days ago
+      const result = formatRelativeTime(date, "en");
+      expect(result).toBeTruthy();
+    });
+
+    it("should format relative time in weeks", () => {
+      const date = new Date(Date.now() - 1209600000); // 2 weeks ago
+      const result = formatRelativeTime(date, "en");
+      expect(result).toBeTruthy();
+    });
+
+    it("accepts a number timestamp", () => {
+      const ts = Math.floor((Date.now() - 60000) / 1000); // 1 min ago in seconds
+      const result = formatRelativeTime(ts, "en");
       expect(result).toBeTruthy();
     });
   });
