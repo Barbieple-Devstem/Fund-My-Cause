@@ -1,4 +1,4 @@
-.PHONY: help build-contract test-contract deploy-testnet dev-frontend test-frontend lint install-deps clean format build test docs docs-open docs-check
+.PHONY: help build-contract test-contract deploy-testnet dev-frontend test-frontend lint install-deps clean format fmt-check build test docs docs-open docs-check
 
 # Default target - show help
 help:
@@ -16,6 +16,7 @@ help:
 	@echo "  make install-deps       Install all dependencies"
 	@echo "  make clean              Clean build artifacts"
 	@echo "  make format             Format code (Rust + JavaScript)"
+	@echo "  make fmt-check          Verify Rust formatting without modifying files"
 	@echo "  make docs               Build rustdoc for all contracts"
 	@echo "  make docs-open          Build rustdoc and open in browser"
 	@echo "  make docs-check         Build rustdoc with warnings-as-errors (mirrors CI)"
@@ -105,8 +106,17 @@ clean:
 format:
 	@echo "Formatting Rust code..."
 	cargo fmt --all
+	cargo fmt --manifest-path contracts/benchmarks/Cargo.toml
 	@echo "Formatting JavaScript/TypeScript code..."
 	cd apps/interface && npm run format 2>/dev/null || npx prettier --write "src/**/*.{ts,tsx,js,jsx}" || true
+
+# Verify Rust formatting without modifying files
+fmt-check:
+	@echo "Checking Rust workspace formatting..."
+	cargo fmt --all -- --check
+	@echo "Checking benchmarks formatting..."
+	cargo fmt --manifest-path contracts/benchmarks/Cargo.toml -- --check
+	@echo "Formatting check passed."
 
 # ── Documentation ─────────────────────────────────────────────────────────────
 
