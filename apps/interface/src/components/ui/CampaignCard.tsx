@@ -9,7 +9,11 @@ import {
   CampaignHeaderActions,
   CampaignProgress,
 } from "@fund-my-cause/components";
-import { formatXlmWithUsd } from "@fund-my-cause/shared-utils";
+import {
+  formatXlmWithUsd,
+  calculateProgress,
+  isCampaignEnded,
+} from "@fund-my-cause/shared-utils";
 import { cn } from "@/lib/utils";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { CountdownTimer } from "@/components/ui/CountdownTimer";
@@ -19,10 +23,6 @@ import { useBookmarks } from "@/context/BookmarkContext";
 import { getCategoryBySlug } from "@/lib/categories";
 import { getFallbackImage, isValidImageUri } from "@/lib/imageValidation";
 import { SIZES_CARD_THUMB } from "@/lib/imageOptimization";
-import {
-  calculateCampaignProgress,
-  calculateIsEnded,
-} from "@/lib/campaignProgress";
 import { useTranslations } from "next-intl";
 import {
   Highlight,
@@ -63,13 +63,13 @@ function CampaignCardComponent({
 }: CampaignCardProps) {
   const t = useTranslations("campaignCard");
   const progress = React.useMemo(
-    () => calculateCampaignProgress(campaign.raised, campaign.goal),
+    () => calculateProgress(campaign.raised, campaign.goal),
     [campaign.raised, campaign.goal],
   );
   const isFunded = progress >= 100;
   const isEnded = React.useMemo(
-    () => calculateIsEnded(campaign.deadline, isFunded),
-    [campaign.deadline, isFunded],
+    () => isCampaignEnded(campaign.deadline, campaign.raised, campaign.goal),
+    [campaign.deadline, campaign.raised, campaign.goal],
   );
   const isDisabled = isFunded || isEnded;
 
