@@ -39,6 +39,9 @@
     ],
     "*.rs": [
       "bash -c 'cargo fmt --all -- --check'"
+    ],
+    "*.{ts,tsx}": [
+      "bash scripts/lint-staged-check.sh"
     ]
   }
 }
