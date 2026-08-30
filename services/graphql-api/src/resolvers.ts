@@ -3,7 +3,6 @@ import type { IResolvers } from "@graphql-tools/utils";
 import {
   CAMPAIGN_STATUS_VALUES,
   type CampaignStatus,
-  validateCampaignInput,
   validateDonationAmount,
   XLM_TO_STROOPS,
 } from "@fund-my-cause/types";
@@ -18,6 +17,12 @@ import {
   decodeCursor,
   CursorError,
 } from "./services/cursor-pagination.js";
+import {
+  validateCreateCampaignInput,
+  validateRecordContributionInput,
+  validateUpdateCampaignInput,
+  validateAuthenticateInput,
+} from "./middleware/validation.js";
 
 /**
  * Maps the public GraphQL schema's SCREAMING_CASE enum names (schema.ts)
@@ -281,7 +286,11 @@ export const resolvers: IResolvers<any, Context> = {
       return context.dataLoader.contributions.load(id);
     },
 
-    async contributions(_, { campaignId, contributor, first, after }, context: Context) {
+    async contributions(
+      _,
+      { campaignId, contributor, first, after },
+      context: Context,
+    ) {
       const pageSize = first ?? 20;
       const clampedSize = Math.max(1, Math.min(pageSize, 100));
 
@@ -307,10 +316,12 @@ export const resolvers: IResolvers<any, Context> = {
 
       let items: any[] = [];
       if (campaignId) {
-        const allContributions = await context.dataLoader.campaignContributions.load(campaignId);
+        const allContributions =
+          await context.dataLoader.campaignContributions.load(campaignId);
         items = allContributions || [];
       } else if (contributor) {
-        const allContributions = await context.dataLoader.userContributions.load(contributor);
+        const allContributions =
+          await context.dataLoader.userContributions.load(contributor);
         items = allContributions || [];
       } else {
         throw new GraphQLError(
@@ -434,7 +445,9 @@ export const resolvers: IResolvers<any, Context> = {
         }
       }
 
-      const allCampaigns = await context.dataLoader.userCampaigns.load(user.address);
+      const allCampaigns = await context.dataLoader.userCampaigns.load(
+        user.address,
+      );
       let items = allCampaigns || [];
 
       if (afterSortKey && afterId) {
@@ -481,7 +494,9 @@ export const resolvers: IResolvers<any, Context> = {
         }
       }
 
-      const allContributions = await context.dataLoader.userContributions.load(user.address);
+      const allContributions = await context.dataLoader.userContributions.load(
+        user.address,
+      );
       let items = allContributions || [];
 
       if (afterSortKey && afterId) {
@@ -561,6 +576,9 @@ export const resolvers: IResolvers<any, Context> = {
   // Mutation resolvers
   Mutation: {
     async authenticate(_, { signature, message, address }, context: Context) {
+      // Validate input
+      validateAuthenticateInput({ signature, message, address });
+
       const verified = await context.contractService.verifySignature(
         address,
         message,
@@ -585,21 +603,11 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      // Validate input using middleware
+      validateCreateCampaignInput(input);
+
       // Rate-limit: 5 campaign creations per wallet per hour (#899)
       await enforceMutationRateLimit("createCampaign", context);
-
-      const validationErrors = validateCampaignInput({
-        title: input.title,
-        description: input.description,
-        goal: input.goal?.toString() ?? "",
-        deadline: input.deadline,
-        minContribution: input.minContribution?.toString() ?? "",
-      });
-      if (Object.keys(validationErrors).length > 0) {
-        throw new GraphQLError("Invalid campaign input", {
-          extensions: { code: "BAD_USER_INPUT", validationErrors },
-        });
-      }
 
       const campaign = await context.contractService.createCampaign(
         context.user,
@@ -617,6 +625,9 @@ export const resolvers: IResolvers<any, Context> = {
       if (!context.user) {
         throw new GraphQLError("Authentication required");
       }
+
+      // Validate input using middleware
+      validateUpdateCampaignInput(input);
 
       const campaign = await context.contractService.updateCampaign(
         id,
@@ -640,18 +651,11 @@ export const resolvers: IResolvers<any, Context> = {
         throw new GraphQLError("Authentication required");
       }
 
+      // Validate input using middleware
+      validateRecordContributionInput(input);
+
       // Rate-limit: 20 contributions per wallet per 10 minutes (#899)
       await enforceMutationRateLimit("recordContribution", context);
-
-      const amountXlm = input.amount
-        ? (Number(input.amount) / Number(XLM_TO_STROOPS)).toString()
-        : "0";
-      const amountError = validateDonationAmount(amountXlm);
-      if (amountError) {
-        throw new GraphQLError(amountError, {
-          extensions: { code: "BAD_USER_INPUT" },
-        });
-      }
 
       const { traceId, log } = context;
 
