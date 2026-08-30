@@ -21,3 +21,7 @@ impl AccessControl {
         role_address.require_auth();
     }
 }
+
+#[cfg(any(test, feature = "testutils"))]
+#[path = "access_control_tests.rs"]
+mod access_control_tests;
